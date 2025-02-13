@@ -542,7 +542,7 @@ export class MediaOverlayModule implements ReaderModule {
           this.mediaOverlaysNext(this.audioElement.currentTime);
         } else if (
           this.currentAudioEnd &&
-          this.audioElement.currentTime >= this.currentAudioEnd - 0.05
+          this.audioElement.currentTime >= this.currentAudioEnd
         ) {
           log.log("ontimeupdate - mediaOverlaysNext()");
           this.mediaOverlaysNext(this.audioElement.currentTime);
