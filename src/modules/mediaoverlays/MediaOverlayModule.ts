@@ -333,7 +333,7 @@ export class MediaOverlayModule implements ReaderModule {
     await this.startBufferedReadAloud();
   }
 
-  async startReadAloud() {
+  async startReadAloud(startTime?: number) {
     this.bufferedMode = false;
     if (this.navigator.rights.enableMediaOverlays) {
       this.settings.playing = true;
@@ -342,6 +342,9 @@ export class MediaOverlayModule implements ReaderModule {
         this.currentLinks[this.currentLinkIndex]?.Properties?.MediaOverlay
       ) {
         log.log("startReadAloud(): audioElement finnes");
+        if (startTime) {
+          this.currentAudioBegin = startTime;
+        }
         const timeToSeekTo = this.currentAudioBegin
           ? this.currentAudioBegin
           : 0;

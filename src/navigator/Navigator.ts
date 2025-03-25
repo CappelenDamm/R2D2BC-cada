@@ -35,7 +35,7 @@ interface Navigator {
 
   resumeReadAloud?(): void;
 
-  startReadAlong?(): void;
+  startReadAlong?(position?: number): void;
 
   stopReadAlong?(): void;
 

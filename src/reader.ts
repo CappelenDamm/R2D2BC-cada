@@ -468,9 +468,13 @@ export default class D2Reader {
    */
 
   /** Start Media Overlay Read Along */
-  startReadAlong = () => {
+  startReadAlong = (starTime?: number) => {
     if (this.navigator instanceof IFrameNavigator) {
-      this.navigator.startReadAlong();
+      if (starTime) {
+        this.navigator.startReadAlong(starTime);
+      } else {
+        this.navigator.startReadAlong();
+      }
     }
   };
   /** Stop Media Overlay Read Along */

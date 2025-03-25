@@ -221,6 +221,9 @@ export interface ReaderConfig {
   services?: PublicationServices;
   sample?: SampleRead;
   requestConfig?: RequestConfig;
+  audioPosition?: {
+    saveAudioPosition: (position: number) => Promise<void>;
+  };
 }
 
 /** Class that shows webpub resources in an iframe, with navigation controls outside the iframe. */
@@ -2242,13 +2245,17 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     }
   }
 
-  startReadAlong() {
+  startReadAlong(startTime?: number) {
     if (
       this.rights.enableMediaOverlays &&
       this.mediaOverlayModule !== undefined &&
       this.hasMediaOverlays
     ) {
-      this.mediaOverlayModule?.startReadAloud();
+      if (startTime) {
+        this.mediaOverlayModule?.startReadAloud(startTime);
+      } else {
+        this.mediaOverlayModule?.startReadAloud();
+      }
     }
   }
 
