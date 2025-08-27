@@ -2289,13 +2289,13 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     }
   }
 
-  startBufferedReadAlong() {
+  startBufferedReadAlong(startTime?: number) {
     if (
       this.rights.enableMediaOverlays &&
       this.mediaOverlayModule !== undefined &&
       this.hasMediaOverlays
     ) {
-      this.mediaOverlayModule?.startBufferedReadAloud();
+      this.mediaOverlayModule?.startBufferedReadAloud(startTime);
     }
   }
 
@@ -2327,6 +2327,27 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     ) {
       this.mediaOverlayModule?.skipToPreviousBufferedReadAloud();
     }
+  }
+
+  // Buffered read-along helpers
+  seekBufferedBy(deltaSeconds: number) {
+    if (
+      this.rights.enableMediaOverlays &&
+      this.mediaOverlayModule !== undefined &&
+      this.hasMediaOverlays
+    ) {
+      this.mediaOverlayModule?.seekBufferedBy(deltaSeconds);
+    }
+  }
+  getBufferedState(): { position: number; src: string } | undefined {
+    if (
+      this.rights.enableMediaOverlays &&
+      this.mediaOverlayModule !== undefined &&
+      this.hasMediaOverlays
+    ) {
+      return this.mediaOverlayModule?.getBufferedState();
+    }
+    return undefined;
   }
   totalResources(): number {
     return this.publication.readingOrder.length;
@@ -2706,17 +2727,17 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
           (parseInt(getComputedStyle(iframeParent).width) - 100) /
           (this.iframes.length === 2
             ? parseInt(
-              width.toString().endsWith("px")
-                ? width?.replace("px", "")
-                : width
-            ) *
-            2 +
-            200
+                width.toString().endsWith("px")
+                  ? width?.replace("px", "")
+                  : width
+              ) *
+                2 +
+              200
             : parseInt(
-              width.toString().endsWith("px")
-                ? width?.replace("px", "")
-                : width
-            ));
+                width.toString().endsWith("px")
+                  ? width?.replace("px", "")
+                  : width
+              ));
         var heightRatio =
           (parseInt(getComputedStyle(iframeParent).height) - 100) /
           parseInt(height.toString().replace("px", ""));
@@ -2730,15 +2751,15 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
         if (newPx_ratio !== this.px_ratio) {
           this.px_ratio = newPx_ratio;
         } else {
-          var widthRatio =
+          widthRatio =
             (parseInt(getComputedStyle(iframeParent).width) - 100) /
             (this.iframes.length === 2
               ? parseInt(width?.replace("px", "")) * 2 + 200
               : parseInt(width?.replace("px", "")));
-          var heightRatio =
+          heightRatio =
             (parseInt(getComputedStyle(iframeParent).height) - 100) /
             parseInt(height?.replace("px", ""));
-          var scale = Math.min(widthRatio, heightRatio);
+          scale = Math.min(widthRatio, heightRatio);
           iframeParent.style.transform = "scale(" + scale + ")";
 
           for (const iframe of this.iframes) {

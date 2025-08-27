@@ -90,7 +90,7 @@ export default class D2Reader {
     private readonly historyModule?: HistoryModule,
     private readonly citationModule?: CitationModule,
     private readonly consumptionModule?: ConsumptionModule
-  ) { }
+  ) {}
 
   addEventListener() {
     if (this.navigator instanceof IFrameNavigator) {
@@ -238,36 +238,36 @@ export default class D2Reader {
       // Bookmark Module
       const bookmarkModule = rights.enableBookmarks
         ? await BookmarkModule.create({
-          annotator: annotator,
-          headerMenu: headerMenu,
-          rights: rights,
-          publication: publication,
-          initialAnnotations: initialConfig.initialAnnotations,
-          ...initialConfig.bookmarks,
-        })
+            annotator: annotator,
+            headerMenu: headerMenu,
+            rights: rights,
+            publication: publication,
+            initialAnnotations: initialConfig.initialAnnotations,
+            ...initialConfig.bookmarks,
+          })
         : undefined;
 
       // Annotation Module
       const annotationModule = rights.enableAnnotations
         ? await AnnotationModule.create({
-          annotator: annotator,
-          rights: rights,
-          publication: publication,
-          initialAnnotations: initialConfig.initialAnnotations,
-          highlighter: highlighter,
-          headerMenu: headerMenu,
-          ...initialConfig.annotations,
-        })
+            annotator: annotator,
+            rights: rights,
+            publication: publication,
+            initialAnnotations: initialConfig.initialAnnotations,
+            highlighter: highlighter,
+            headerMenu: headerMenu,
+            ...initialConfig.annotations,
+          })
         : undefined;
 
       // TTS Module
       const ttsEnabled = rights.enableTTS;
       const ttsSettings = ttsEnabled
         ? await TTSSettings.create({
-          store: settingsStore,
-          initialTTSSettings: initialConfig.tts,
-          headerMenu: headerMenu,
-        })
+            store: settingsStore,
+            initialTTSSettings: initialConfig.tts,
+            headerMenu: headerMenu,
+          })
         : undefined;
 
       let ttsModule: ReaderModule | undefined = undefined;
@@ -285,92 +285,92 @@ export default class D2Reader {
       // Search Module
       const searchModule = rights.enableSearch
         ? await SearchModule.create({
-          headerMenu: headerMenu,
-          publication: publication,
-          highlighter: highlighter,
-          ...initialConfig.search,
-        })
+            headerMenu: headerMenu,
+            publication: publication,
+            highlighter: highlighter,
+            ...initialConfig.search,
+          })
         : undefined;
 
       const definitionsModule = rights.enableDefinitions
         ? await DefinitionsModule.create({
-          publication: publication,
-          highlighter: highlighter,
-          ...initialConfig.define,
-        })
+            publication: publication,
+            highlighter: highlighter,
+            ...initialConfig.define,
+          })
         : undefined;
 
       // Timeline Module
       const timelineModule = rights.enableTimeline
         ? await TimelineModule.create({
-          publication: publication,
-        })
+            publication: publication,
+          })
         : undefined;
 
       // Content Protection Module
       const contentProtectionModule = rights.enableContentProtection
         ? await ContentProtectionModule.create({
-          ...initialConfig.protection,
-        })
+            ...initialConfig.protection,
+          })
         : undefined;
 
       const citationModule = rights.enableCitations
         ? await CitationModule.create({
-          publication: publication,
-          highlighter: highlighter,
-          ...initialConfig.citations,
-        })
+            publication: publication,
+            highlighter: highlighter,
+            ...initialConfig.citations,
+          })
         : undefined;
 
       const enableMediaOverlays = rights.enableMediaOverlays;
       const mediaOverlaySettings = enableMediaOverlays
         ? await MediaOverlaySettings.create({
-          store: settingsStore,
-          initialMediaOverlaySettings: initialConfig.mediaOverlays,
-          headerMenu: headerMenu,
-          ...initialConfig.mediaOverlays,
-        })
+            store: settingsStore,
+            initialMediaOverlaySettings: initialConfig.mediaOverlays,
+            headerMenu: headerMenu,
+            ...initialConfig.mediaOverlays,
+          })
         : undefined;
 
       const mediaOverlayModule = enableMediaOverlays
         ? await MediaOverlayModule.create({
-          publication: publication,
-          settings: mediaOverlaySettings,
-          ...initialConfig.mediaOverlays,
-        })
+            publication: publication,
+            settings: mediaOverlaySettings,
+            ...initialConfig.mediaOverlays,
+          })
         : undefined;
 
       const enablePageBreaks = rights.enablePageBreaks;
       const pageBreakModule =
         enablePageBreaks && publication.isReflowable
           ? await PageBreakModule.create({
-            publication: publication,
-            headerMenu: headerMenu,
-            ...initialConfig.pagebreak,
-          })
+              publication: publication,
+              headerMenu: headerMenu,
+              ...initialConfig.pagebreak,
+            })
           : undefined;
 
       const lineFocusModule = rights.enableLineFocus
         ? await LineFocusModule.create({
-          publication: publication,
-          highlighter: highlighter,
-          ...initialConfig.lineFocus,
-        })
+            publication: publication,
+            highlighter: highlighter,
+            ...initialConfig.lineFocus,
+          })
         : undefined;
 
       const historyModule = rights.enableHistory
         ? await HistoryModule.create({
-          annotator: annotator,
-          publication: publication,
-          headerMenu: headerMenu,
-        })
+            annotator: annotator,
+            publication: publication,
+            headerMenu: headerMenu,
+          })
         : undefined;
 
       const consumptionModule = rights.enableConsumption
         ? await ConsumptionModule.create({
-          publication: publication,
-          ...initialConfig.consumption,
-        })
+            publication: publication,
+            ...initialConfig.consumption,
+          })
         : undefined;
 
       // Navigator
@@ -496,9 +496,9 @@ export default class D2Reader {
     }
   };
 
-  startBufferedReadAlong = () => {
+  startBufferedReadAlong = (startTime?: number) => {
     if (this.navigator instanceof IFrameNavigator) {
-      this.navigator.startBufferedReadAlong();
+      this.navigator.startBufferedReadAlong(startTime);
     }
   };
 
@@ -518,6 +518,19 @@ export default class D2Reader {
     if (this.navigator instanceof IFrameNavigator) {
       this.navigator.previousBufferedReadAlong();
     }
+  };
+
+  // Buffered helpers
+  seekBufferedBy = (deltaSeconds: number) => {
+    if (this.navigator instanceof IFrameNavigator) {
+      this.navigator.seekBufferedBy(deltaSeconds);
+    }
+  };
+  getBufferedState = () => {
+    if (this.navigator instanceof IFrameNavigator) {
+      return this.navigator.getBufferedState();
+    }
+    return undefined;
   };
 
   get hasMediaOverlays() {
@@ -1022,7 +1035,7 @@ export default class D2Reader {
    * it tried to create a new reader, which interfered with the first one.
    */
   stop = () => {
-    document.body.onscroll = () => { };
+    document.body.onscroll = () => {};
     this.navigator.stop();
     this.settings.stop();
     this.ttsSettings?.stop();

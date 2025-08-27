@@ -99,9 +99,13 @@ export class MediaOverlayModule implements ReaderModule {
   private __ontimeupdate = false;
   private audioContext: AudioContext = new ((window as any).AudioContext ||
     (window as any).webkitAudioContext)();
-  private soundBuffers: Array<AudioBuffer> = [];
+  private soundBuffers: Array<{ buffer: AudioBuffer; src: string }> = [];
   private source = this.audioContext.createBufferSource();
   private bufferedMode = false;
+  private currentBufferedStartCtxTime?: number;
+  private currentBufferedOffset: number = 0;
+  private currentBufferedDuration: number = 0;
+  private currentBufferedSrc?: string;
 
   public static create(config: MediaOverlayModuleConfig) {
     const mediaOverlay = new this(
@@ -231,7 +235,11 @@ export class MediaOverlayModule implements ReaderModule {
             this.navigator.requestConfig
           );
           if (!response.ok) {
-            log.warn("Failed to fetch MO JSON:", manifestUrlFull, response.status);
+            log.warn(
+              "Failed to fetch MO JSON:",
+              manifestUrlFull,
+              response.status
+            );
             return;
           }
           const moJson = await response.json();
@@ -250,16 +258,24 @@ export class MediaOverlayModule implements ReaderModule {
             this.navigator.requestConfig
           );
           if (!audioResponse.ok) {
-            log.warn("Failed to fetch audio:", audioPathFull, audioResponse.status);
+            log.warn(
+              "Failed to fetch audio:",
+              audioPathFull,
+              audioResponse.status
+            );
             return;
           }
           const arrayBuffer = await audioResponse.arrayBuffer();
           // Ensure context is running before decode/play on iOS
           if (this.audioContext.state !== "running") {
-            try { await this.audioContext.resume(); } catch { /* ignore */ }
+            try {
+              await this.audioContext.resume();
+            } catch {
+              /* ignore */
+            }
           }
           const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
-          this.soundBuffers.push(audioBuffer);
+          this.soundBuffers.push({ buffer: audioBuffer, src: audioPathFull });
         } catch (e) {
           log.warn("Error loading buffered audio:", e);
         }
@@ -276,7 +292,11 @@ export class MediaOverlayModule implements ReaderModule {
         this.currentLinkIndex++;
         await this.loadAudioContext(this.currentLinks[this.currentLinkIndex]);
         if (this.soundBuffers.length > 0) {
-          const nextBuffer = this.soundBuffers.shift() as AudioBuffer;
+          const nextBuffer = this.soundBuffers.shift() as {
+            buffer: AudioBuffer;
+            src: string;
+          };
+          this.currentBufferedOffset = 0;
           await this.playBufferedReadAloud(nextBuffer);
         }
         resolve();
@@ -295,17 +315,41 @@ export class MediaOverlayModule implements ReaderModule {
     });
   }
 
-  async playBufferedReadAloud(buffer: AudioBuffer) {
+  async playBufferedReadAloud(
+    entry: { buffer: AudioBuffer; src: string },
+    startOffset?: number
+  ) {
     return new Promise<void>(async (resolve) => {
       this.settings.playing = true;
       // On iOS Safari, resume the context on user gesture initiated path
       if (this.audioContext.state !== "running") {
-        try { await this.audioContext.resume(); } catch { /* ignore */ }
+        try {
+          await this.audioContext.resume();
+        } catch {
+          /* ignore */
+        }
       }
       this.source = this.audioContext.createBufferSource();
-      this.source.buffer = buffer;
+      this.source.buffer = entry.buffer;
       this.source.connect(this.audioContext.destination);
-      this.source.start();
+      this.currentBufferedSrc = entry.src;
+      this.currentBufferedDuration = entry.buffer.duration;
+      if (typeof startOffset === "number") {
+        this.currentBufferedOffset = Math.max(
+          0,
+          Math.min(startOffset, this.currentBufferedDuration)
+        );
+      }
+      this.currentBufferedStartCtxTime = this.audioContext.currentTime;
+      try {
+        this.source.start(0, this.currentBufferedOffset);
+      } catch {
+        try {
+          this.source.start();
+        } catch {
+          /* ignore */
+        }
+      }
 
       this.source.onended = async () => {
         await this.onEndedAction();
@@ -314,7 +358,7 @@ export class MediaOverlayModule implements ReaderModule {
     });
   }
 
-  async startBufferedReadAloud() {
+  async startBufferedReadAloud(startTime?: number) {
     this.bufferedMode = true;
     if (this.navigator.rights.enableMediaOverlays) {
       this.settings.playing = true;
@@ -323,15 +367,18 @@ export class MediaOverlayModule implements ReaderModule {
       this.currentLinks = this.navigator.currentLink();
       await this.loadAudioContext(this.currentLinks[this.currentLinkIndex]);
       if (this.soundBuffers.length > 0) {
-        const next = this.soundBuffers.shift() as AudioBuffer;
-        await this.playBufferedReadAloud(next);
+        const next = this.soundBuffers.shift() as {
+          buffer: AudioBuffer;
+          src: string;
+        };
+        await this.playBufferedReadAloud(next, startTime);
       } else {
         if (this.settings.autoTurn && this.settings.playing) {
           this.soundBuffers = [];
           await this.navigator.nextResourceAsync();
           this.currentLinkIndex = 0;
           this.currentLinks = this.navigator.currentLink();
-          await this.startBufferedReadAloud();
+          await this.startBufferedReadAloud(startTime);
         }
       }
     }
@@ -341,8 +388,16 @@ export class MediaOverlayModule implements ReaderModule {
     this.settings.playing = false;
     this.soundBuffers = [];
     if (this.source) {
-      try { this.source.stop(); } catch { /* ignore */ }
-      try { this.source.disconnect(); } catch { /* ignore */ }
+      try {
+        this.source.stop();
+      } catch {
+        /* ignore */
+      }
+      try {
+        this.source.disconnect();
+      } catch {
+        /* ignore */
+      }
     }
   }
 
@@ -364,6 +419,51 @@ export class MediaOverlayModule implements ReaderModule {
     this.currentLinkIndex = 0;
     this.currentLinks = this.navigator.currentLink();
     await this.startBufferedReadAloud();
+  }
+
+  // Seek within current buffered audio (seconds). Negative for backward.
+  async seekBufferedBy(deltaSeconds: number) {
+    const now = this.audioContext.currentTime;
+    const elapsed =
+      this.currentBufferedStartCtxTime !== undefined
+        ? now - this.currentBufferedStartCtxTime
+        : 0;
+    const currentPos = Math.min(
+      this.currentBufferedDuration,
+      this.currentBufferedOffset + Math.max(0, elapsed)
+    );
+    let newOffset = currentPos + deltaSeconds;
+    newOffset = Math.max(0, Math.min(this.currentBufferedDuration, newOffset));
+    try {
+      this.source.stop();
+    } catch {
+      /* ignore */
+    }
+    try {
+      this.source.disconnect();
+    } catch {
+      /* ignore */
+    }
+    const buffer = this.source.buffer as AudioBuffer;
+    const src = this.currentBufferedSrc || "";
+    if (!buffer) return;
+    this.currentBufferedOffset = newOffset;
+    await this.playBufferedReadAloud({ buffer, src }, newOffset);
+  }
+
+  // Expose current buffered playback state for persistence
+  getBufferedState(): { position: number; src: string } | undefined {
+    if (!this.currentBufferedSrc) return undefined;
+    const now = this.audioContext.currentTime;
+    const elapsed =
+      this.currentBufferedStartCtxTime !== undefined
+        ? now - this.currentBufferedStartCtxTime
+        : 0;
+    const position = Math.min(
+      this.currentBufferedDuration,
+      this.currentBufferedOffset + Math.max(0, elapsed)
+    );
+    return { position, src: this.currentBufferedSrc };
   }
 
   async startReadAloud(startTime?: number) {
