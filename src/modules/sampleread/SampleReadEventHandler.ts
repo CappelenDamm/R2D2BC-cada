@@ -144,8 +144,7 @@ export default class SampleReadEventHandler {
         this.navigator.errorMessage.style.display = "block";
         this.navigator.errorMessage.style.backgroundColor =
           "rgb(255, 255, 255)";
-        this.navigator.errorMessage.innerHTML =
-          `<span>${this.navigator.sample?.popup}</span>` ?? "";
+        this.navigator.errorMessage.innerHTML = `<span>${this.navigator.sample?.popup}</span>`;
       }
     } else {
       this.navigator.iframes[0].focus();
