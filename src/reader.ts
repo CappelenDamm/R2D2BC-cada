@@ -389,7 +389,7 @@ export default class D2Reader {
         requestConfig: initialConfig.requestConfig,
         injectables:
           (publication.Metadata.Rendition?.Layout ?? "unknown") === "fixed"
-            ? initialConfig.injectablesFixed ?? []
+            ? (initialConfig.injectablesFixed ?? [])
             : initialConfig.injectables,
         attributes: initialConfig.attributes,
         services: initialConfig.services,

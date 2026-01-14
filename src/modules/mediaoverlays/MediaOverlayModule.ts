@@ -66,7 +66,6 @@ interface MediaOverlayBeginEnd {
   end?: number;
 }
 
-
 export class MediaOverlayModule implements ReaderModule {
   private publication: Publication;
   navigator: IFrameNavigator;
@@ -97,8 +96,9 @@ export class MediaOverlayModule implements ReaderModule {
   private mediaOverlayTextAudioPair: MediaOverlayNode | undefined;
   private pid: string | undefined = undefined;
   private __ontimeupdate = false;
-  private audioContext: AudioContext = new ((window as any).AudioContext ||
-    (window as any).webkitAudioContext)();
+  private audioContext: AudioContext = new (
+    (window as any).AudioContext || (window as any).webkitAudioContext
+  )();
   private soundBuffers: Array<{ buffer: AudioBuffer; src: string }> = [];
   private source = this.audioContext.createBufferSource();
   private bufferedMode = false;
@@ -274,7 +274,8 @@ export class MediaOverlayModule implements ReaderModule {
               /* ignore */
             }
           }
-          const audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
+          const audioBuffer =
+            await this.audioContext.decodeAudioData(arrayBuffer);
           this.soundBuffers.push({ buffer: audioBuffer, src: audioPathFull });
         } catch (e) {
           log.warn("Error loading buffered audio:", e);
@@ -691,7 +692,7 @@ export class MediaOverlayModule implements ReaderModule {
         this.mediaOverlayHighlight(match_id);
 
         this.myReq = requestAnimationFrame(this.trackCurrentTime.bind(this));
-      } catch (e) { }
+      } catch (e) {}
     }
   }
 
@@ -740,9 +741,9 @@ export class MediaOverlayModule implements ReaderModule {
           if (hrefUrlObj1.pathname !== hrefUrlObj2.pathname) {
             log.log(
               "mediaOverlaysNext() SWITCH! " +
-              hrefUrlObj1.pathname +
-              " != " +
-              hrefUrlObj2.pathname
+                hrefUrlObj1.pathname +
+                " != " +
+                hrefUrlObj2.pathname
             );
             switchDoc = true;
           }
@@ -930,9 +931,9 @@ export class MediaOverlayModule implements ReaderModule {
       this.currentAudioUrl = urlNoQuery;
       log.log(
         "playMediaOverlaysAudio() - RESET: " +
-        this.previousAudioUrl +
-        " => " +
-        this.currentAudioUrl
+          this.previousAudioUrl +
+          " => " +
+          this.currentAudioUrl
       );
 
       this.audioElement = document.getElementById(
@@ -958,12 +959,12 @@ export class MediaOverlayModule implements ReaderModule {
       this.audioElement.addEventListener("error", (ev) => {
         log.log(
           "-1) error: " +
-          (this.currentAudioUrl !== (ev.currentTarget as HTMLAudioElement).src
-            ? this.currentAudioUrl + " -- "
-            : "") +
-          (ev.currentTarget as HTMLAudioElement).src.substring(
-            (ev.currentTarget as HTMLAudioElement).src.lastIndexOf("/")
-          )
+            (this.currentAudioUrl !== (ev.currentTarget as HTMLAudioElement).src
+              ? this.currentAudioUrl + " -- "
+              : "") +
+            (ev.currentTarget as HTMLAudioElement).src.substring(
+              (ev.currentTarget as HTMLAudioElement).src.lastIndexOf("/")
+            )
         );
 
         if (this.audioElement && this.audioElement.error) {
