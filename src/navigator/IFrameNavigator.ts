@@ -1032,7 +1032,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
           this.view.height =
             BrowserUtilities.getHeight() - 40 - (this.attributes?.margin ?? 0);
           if (this.infoBottom) this.infoBottom.style.removeProperty("display");
-          document.body.onscroll = () => { };
+          document.body.onscroll = () => {};
           if (this.nextChapterBottomAnchorElement)
             this.nextChapterBottomAnchorElement.style.display = "none";
           if (this.previousChapterTopAnchorElement)
@@ -1342,8 +1342,8 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
       if (this.annotator) {
         lastReadingPosition =
           (await this.annotator.getLastReadingPosition()) as
-          | ReadingPosition
-          | undefined;
+            | ReadingPosition
+            | undefined;
       }
 
       const startLink = this.publication.getStartLink();
@@ -1376,7 +1376,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     } catch (err: unknown) {
       log.error(err);
       this.abortOnError(err);
-      return new Promise<void>((_, reject) => reject(err)).catch(() => { });
+      return Promise.reject(err).catch(() => {});
     }
   }
 
@@ -1625,17 +1625,12 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     const addLoadingInjectable = (
       injectable: HTMLLinkElement | HTMLScriptElement
     ) => {
-      const loadPromise = new Promise<boolean>((resolve, reject) => {
+      const loadPromise = new Promise<boolean>((resolve) => {
         injectable.onload = () => {
           resolve(true);
         };
-        injectable.onerror = (e) => {
-          const message =
-            typeof e === "string"
-              ? e
-              : `Injectable failed to load at: ${"href" in injectable ? injectable.href : injectable.src
-              }`;
-          reject(new Error(message));
+        injectable.onerror = () => {
+          resolve(false);
         };
       });
       injectablesToLoad.push(loadPromise);
@@ -2407,7 +2402,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     this.handlePreviousChapterClick(undefined);
   }
   async previousResourceAsync(): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<void>((resolve) => {
       this.handlePreviousChapterClick(undefined);
       resolve();
     });
@@ -2416,7 +2411,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     this.handleNextChapterClick(undefined);
   }
   nextResourceAsync(): Promise<void> {
-    return new Promise<void>((resolve, reject) => {
+    return new Promise<void>((resolve) => {
       this.handleNextChapterClick(undefined);
       resolve();
     });

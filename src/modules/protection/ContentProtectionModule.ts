@@ -52,8 +52,7 @@ export interface ContentProtectionModuleProperties {
   excludeNodes: string[];
 }
 
-export interface ContentProtectionModuleConfig
-  extends Partial<ContentProtectionModuleProperties> {
+export interface ContentProtectionModuleConfig extends Partial<ContentProtectionModuleProperties> {
   api?: ContentProtectionModuleAPI;
 }
 
