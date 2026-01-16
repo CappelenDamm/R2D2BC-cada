@@ -27,3 +27,12 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: npm run publish:r2d2bc
+
+      - name: Commit and push version bump
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "chore: bump version after publish [skip ci]" || echo "No changes to commit"
+          git push origin HEAD:master
