@@ -22,9 +22,9 @@
     "examples": "npx ts-node examples/server.ts",
     "lint": "eslint '*/**/*.{js,ts,tsx}' --fix",
     "example:react": "parcel examples/react/index.html --dist-dir parcel-dist",
-    "version": "npm version prerelease --preid=cada --no-git-tag-version",
-    "ci:publish": "npm run version && npm run build && npm publish",
-    "publish:dry": "npm run version && npm run build && npm publish --dry-run"
+    "bump:version": "npm version prerelease --preid=cada --no-git-tag-version",
+    "ci:publish": "npm run bump:version && npm run build && npm publish",
+    "publish:dry": "npm run bump:version && npm run build && npm publish --dry-run"
   },
   "dependencies": {
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
