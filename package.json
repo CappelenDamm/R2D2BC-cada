@@ -2,7 +2,10 @@
   "name": "@cappelendamm/r2d2bc",
   "version": "2.4.10-cada.0",
   "description": "A viewer application for EPUB files.",
-  "repository": "https://github.com/CappelenDamm/R2D2BC-cada",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CappelenDamm/R2D2BC-cada.git"
+  },
   "license": "Apache-2.0",
   "main": "dist/esm/index.js",
   "typings": "dist/types/index.d.ts",
