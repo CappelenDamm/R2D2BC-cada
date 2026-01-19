@@ -1,8 +1,11 @@
 {
-  "name": "@d-i-t-a/reader",
-  "version": "2.4.10",
+  "name": "@cappelendamm/r2d2bc",
+  "version": "2.4.10-cada.0",
   "description": "A viewer application for EPUB files.",
-  "repository": "https://github.com/d-i-t-a/R2D2BC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CappelenDamm/R2D2BC-cada.git"
+  },
   "license": "Apache-2.0",
   "main": "dist/esm/index.js",
   "typings": "dist/types/index.d.ts",
@@ -10,7 +13,7 @@
     "node": ">=16"
   },
   "publishConfig": {
-    "registry": "https://registry.npmjs.org/"
+    "registry": "https://npm.pkg.github.com"
   },
   "scripts": {
     "prepare": "npm run build",
@@ -21,7 +24,10 @@
     "sass:release": "sass --style=compressed src/styles/sass/:dist",
     "examples": "npx ts-node examples/server.ts",
     "lint": "eslint '*/**/*.{js,ts,tsx}' --fix",
-    "example:react": "parcel examples/react/index.html --dist-dir parcel-dist"
+    "example:react": "parcel examples/react/index.html --dist-dir parcel-dist",
+    "bump:version": "npm version prerelease --preid=cada --no-git-tag-version",
+    "ci:publish": "npm run bump:version && npm run build && npm publish --tag latest",
+    "publish:dry": "npm run bump:version && npm run build && npm publish --tag latest --dry-run"
   },
   "dependencies": {
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",

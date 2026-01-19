@@ -1,0 +1,38 @@
+name: Publish r2d2bc to GitHub Packages
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js (LTS)
+        uses: actions/setup-node@v4
+        with:
+          node-version: "lts/*"
+          registry-url: "https://npm.pkg.github.com/"
+          scope: "@cappelendamm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Bump version, build, and publish package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: npm run ci:publish
+
+      - name: Commit and push version bump
+        if: success()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "chore: bump version after publish [skip ci]" || echo "No changes to commit"
+          git push origin HEAD:master
