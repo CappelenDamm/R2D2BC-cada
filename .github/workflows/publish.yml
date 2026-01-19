@@ -26,7 +26,7 @@ jobs:
       - name: Bump version, build, and publish package
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: npm run publish:r2d2bc
+        run: npm run ci:publish
 
       - name: Commit and push version bump
         if: success()
