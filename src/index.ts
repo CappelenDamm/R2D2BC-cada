@@ -25,4 +25,14 @@ export default D2Reader;
 export const load = D2Reader.load;
 
 export { Link } from "./model/Link";
-export { Locator, ReadingPosition } from "./model/Locator";
+export {
+  Locator,
+  ReadingPosition,
+  Annotation,
+  AnnotationMarker,
+  Bookmark,
+} from "./model/Locator";
+
+export { ISearchResult as SearchResult } from "./modules/search/searchWithDomSeek";
+export { IColor as Color } from "./modules/highlight/common/highlight";
+export { IUserSettings as UserSettings } from "./model/user-settings/UserSettings";
