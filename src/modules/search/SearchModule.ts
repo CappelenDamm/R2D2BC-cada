@@ -413,8 +413,8 @@ export class SearchModule implements ReaderModule {
       return await this.searchBook(term);
     }
   }
-  async goToSearchID(href: string, index: number, current: boolean) {
-    var filteredIndex = index;
+  async goToSearchID(href: string, searchId: string, current: boolean) {
+    var filteredIndex: number;
     var item;
     let currentLocation = this.navigator.currentChapterLink.href;
     var absolutehref = this.publication.getAbsoluteHref(href);
@@ -423,14 +423,16 @@ export class SearchModule implements ReaderModule {
     );
     if (current) {
       item = this.currentChapterSearchResult.filter(
-        (el: any) => el.uuid === index
+        (el: any) => el.uuid === searchId
       )[0];
       filteredIndex = this.currentChapterSearchResult.findIndex(
-        (el: any) => el.uuid === index
+        (el: any) => el.uuid === searchId
       );
     } else {
-      item = filteredIndexes.filter((el: any) => el.uuid === index)[0];
-      filteredIndex = filteredIndexes.findIndex((el: any) => el.uuid === index);
+      item = filteredIndexes.filter((el: any) => el.uuid === searchId)[0];
+      filteredIndex = filteredIndexes.findIndex(
+        (el: any) => el.uuid === searchId
+      );
     }
     if (item !== undefined) {
       if (currentLocation === absolutehref) {
