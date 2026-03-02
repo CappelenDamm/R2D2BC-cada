@@ -687,12 +687,12 @@ export default class D2Reader {
       await this.searchModule?.goToSearchIndex(href, index, current);
     }
   };
-  goToSearchID = async (href: string, index: number, current: boolean) => {
+  goToSearchID = async (href: string, searchId: string, current: boolean) => {
     if (
       this.navigator instanceof IFrameNavigator &&
       this.navigator.rights.enableSearch
     ) {
-      await this.searchModule?.goToSearchID(href, index, current);
+      await this.searchModule?.goToSearchID(href, searchId, current);
     }
   };
   clearSearch = async () => {
