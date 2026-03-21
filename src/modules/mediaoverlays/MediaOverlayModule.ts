@@ -497,7 +497,8 @@ export class MediaOverlayModule implements ReaderModule {
     this.mediaOverlayTextAudioPair = moTextAudioPair;
 
     if (!moTextAudioPair.Audio) {
-      return; // TODO TTS
+      // No audio clip for this text node — skip silently.
+      return;
     }
 
     const urlObjFull = new URL(
