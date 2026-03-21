@@ -11,6 +11,17 @@ const injectables = [
   { type: "style", url: readiumAfter, r2after: true },
 ];
 
+// ── Themes ───────────────────────────────────────────────────────────
+
+const themes: Record<string, { bg: string; fg: string; border: string }> = {
+  day: { bg: "#FFFFFF", fg: "#121212", border: "#e0e0e0" },
+  sepia: { bg: "#faf4e8", fg: "#121212", border: "#e0d0b0" },
+  night: { bg: "#000000", fg: "#FEFEFE", border: "#333333" },
+  "readium-default-on": { bg: "#FFFFFF", fg: "#121212", border: "#e0e0e0" },
+  "readium-sepia-on": { bg: "#faf4e8", fg: "#121212", border: "#e0d0b0" },
+  "readium-night-on": { bg: "#000000", fg: "#FEFEFE", border: "#333333" },
+};
+
 // ── Styles ───────────────────────────────────────────────────────────
 
 const FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
@@ -22,25 +33,30 @@ const css = {
     position: "fixed", top: 0, left: 0, right: 0, zIndex: 10,
     display: "flex", alignItems: "center", gap: 6,
     padding: "0 10px", height: TOOLBAR_H,
-    background: "rgba(255,255,255,0.97)", backdropFilter: "blur(8px)",
-    borderBottom: "1px solid #e0e0e0", fontFamily: FONT, fontSize: 12,
+    backdropFilter: "blur(8px)",
+    borderBottom: "1px solid", fontFamily: FONT, fontSize: 12,
+    transition: "background .2s, color .2s",
+  } as React.CSSProperties,
+  badge: {
+    fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1,
+    padding: "2px 8px", borderRadius: 10, color: "#fff", background: "#61dafb", flexShrink: 0,
   } as React.CSSProperties,
   btn: {
-    padding: "4px 10px", fontSize: 11, border: "1px solid #d0d0d0",
-    borderRadius: 14, background: "#fff", cursor: "pointer",
-    color: "#555", textTransform: "uppercase", letterSpacing: 0.4,
+    padding: "4px 10px", fontSize: 11, border: "1px solid transparent",
+    borderRadius: 14, background: "none", cursor: "pointer",
+    color: "inherit", textTransform: "uppercase", letterSpacing: 0.4,
     whiteSpace: "nowrap",
   } as React.CSSProperties,
-  btnActive: { background: "#e0e0e0", fontWeight: 600 } as React.CSSProperties,
-  sep: { width: 1, height: 18, background: "#e0e0e0", flexShrink: 0 } as React.CSSProperties,
+  btnActive: { background: "rgba(128,128,128,0.2)", fontWeight: 600 } as React.CSSProperties,
+  sep: { width: 1, height: 18, background: "currentColor", opacity: 0.2, flexShrink: 0 } as React.CSSProperties,
   select: {
     padding: "4px 6px", fontSize: 11, border: "1px solid #d0d0d0",
-    borderRadius: 6, background: "#fff", color: "#555",
+    borderRadius: 6, background: "inherit", color: "inherit",
   } as React.CSSProperties,
   slider: { width: 70, accentColor: "#4a90d9" } as React.CSSProperties,
   sidebar: {
     position: "fixed", top: TOOLBAR_H, bottom: 0, width: SIDEBAR_W,
-    background: "#fafafa", borderRight: "1px solid #e0e0e0",
+    borderRight: "1px solid",
     overflowY: "auto", padding: "10px 0", fontFamily: FONT, fontSize: 12,
     zIndex: 9, transition: "transform .2s ease",
   } as React.CSSProperties,
@@ -49,7 +65,7 @@ const css = {
     position: "fixed", inset: 0, background: "rgba(0,0,0,0.15)", zIndex: 8,
   } as React.CSSProperties,
   tocItem: {
-    padding: "6px 14px", cursor: "pointer", color: "#333",
+    padding: "6px 14px", cursor: "pointer", color: "inherit",
     borderBottom: "1px solid #f0f0f0", lineHeight: 1.4,
   } as React.CSSProperties,
   tocItemHover: { background: "#e8e8e8" } as React.CSSProperties,
@@ -59,10 +75,10 @@ const css = {
   settingRow: {
     display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6,
   } as React.CSSProperties,
-  label: { fontSize: 11, color: "#666", flexShrink: 0 } as React.CSSProperties,
-  value: { fontSize: 10, color: "#999", minWidth: 28, textAlign: "right" } as React.CSSProperties,
+  label: { fontSize: 11, color: "inherit", opacity: 0.7, flexShrink: 0 } as React.CSSProperties,
+  value: { fontSize: 10, opacity: 0.5, minWidth: 28, textAlign: "right" } as React.CSSProperties,
   bookmarkItem: {
-    padding: "8px 14px", cursor: "pointer", color: "#333",
+    padding: "8px 14px", cursor: "pointer", color: "inherit",
     borderBottom: "1px solid #f0f0f0", fontSize: 11, lineHeight: 1.4,
     display: "flex", justifyContent: "space-between", alignItems: "center",
   } as React.CSSProperties,
@@ -92,7 +108,7 @@ function TabBar({ active, onChange }: { active: SidebarTab; onChange: (t: Sideba
             flex: 1, padding: "8px 0", fontSize: 10, textTransform: "uppercase",
             letterSpacing: 0.5, border: "none", cursor: "pointer",
             background: active === t.key ? "#e8e8e8" : "transparent",
-            fontWeight: active === t.key ? 600 : 400, color: "#555",
+            fontWeight: active === t.key ? 600 : 400, color: "inherit",
           }}
           onClick={() => onChange(t.key)}
         >
@@ -109,7 +125,7 @@ function TOCPanel({ reader, onNavigate }: { reader: D2Reader; onNavigate: () => 
 
   return (
     <div>
-      {toc.length === 0 && <div style={{ padding: 14, color: "#999" }}>No table of contents</div>}
+      {toc.length === 0 && <div style={{ padding: 14, opacity: 0.5 }}>No table of contents</div>}
       {toc.map((item: any, i: number) => (
         <div
           key={i}
@@ -290,7 +306,7 @@ function SearchPanel({ reader, onNavigate }: { reader: D2Reader; onNavigate: () 
         {searched && <button style={css.btn} onClick={clear}>✕</button>}
       </div>
       {searched && results.length === 0 && (
-        <div style={{ padding: 14, color: "#999" }}>No results found</div>
+        <div style={{ padding: 14, opacity: 0.5 }}>No results found</div>
       )}
       {results.map((r: any, i: number) => (
         <div
@@ -301,9 +317,9 @@ function SearchPanel({ reader, onNavigate }: { reader: D2Reader; onNavigate: () 
             onNavigate();
           }}
         >
-          <span style={{ color: "#999" }}>…{r.textBefore}</span>
+          <span style={{ opacity: 0.5 }}>…{r.textBefore}</span>
           <mark>{r.textMatch}</mark>
-          <span style={{ color: "#999" }}>{r.textAfter}…</span>
+          <span style={{ opacity: 0.5 }}>{r.textAfter}…</span>
         </div>
       ))}
     </div>
@@ -321,7 +337,7 @@ function BookmarksPanel({ reader, refresh }: { reader: D2Reader; refresh: () => 
           + Add Bookmark
         </button>
       </div>
-      {bookmarks.length === 0 && <div style={{ padding: 14, color: "#999" }}>No bookmarks yet</div>}
+      {bookmarks.length === 0 && <div style={{ padding: 14, opacity: 0.5 }}>No bookmarks yet</div>}
       {bookmarks.map((bm: any, i: number) => (
         <div key={bm.id || i} style={css.bookmarkItem}>
           <span
@@ -330,7 +346,7 @@ function BookmarksPanel({ reader, refresh }: { reader: D2Reader; refresh: () => 
           >
             {bm.href?.split("/").pop() || bm.href}
             {bm.locations?.progression != null && (
-              <span style={{ color: "#999", marginLeft: 6 }}>
+              <span style={{ opacity: 0.5, marginLeft: 6 }}>
                 ({Math.round(bm.locations.progression * 100)}%)
               </span>
             )}
@@ -358,20 +374,22 @@ interface PageInfo {
   totalRemainingPositions?: number;
 }
 
-function Toolbar({ reader, refresh, sidebarOpen, onToggleSidebar, pageInfo, onPageTurn }: {
+function Toolbar({ reader, refresh, sidebarOpen, onToggleSidebar, pageInfo, onPageTurn, theme }: {
   reader: D2Reader; refresh: () => void;
   sidebarOpen: boolean; onToggleSidebar: () => void;
   pageInfo: PageInfo; onPageTurn: () => void;
+  theme: { bg: string; fg: string; border: string };
 }) {
   const settings = reader.currentSettings;
   const isScrolling = settings.verticalScroll ?? false;
 
   return (
-    <div style={css.toolbar}>
+    <div style={{ ...css.toolbar, background: theme.bg, color: theme.fg, borderColor: theme.border }}>
       {/* Menu toggle */}
       <button style={css.btn} onClick={onToggleSidebar}>
         {sidebarOpen ? "✕" : "☰"}
       </button>
+      <span style={css.badge}>React</span>
 
       <div style={css.sep} />
 
@@ -394,15 +412,15 @@ function Toolbar({ reader, refresh, sidebarOpen, onToggleSidebar, pageInfo, onPa
       <div style={css.sep} />
 
       {/* Page info */}
-      <span style={{ fontSize: 11, color: "#666", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+      <span style={{ fontSize: 11, color: "inherit", opacity: 0.7, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
         {pageInfo.chapterTitle && (
-          <span style={{ color: "#999", marginRight: 6 }}>{pageInfo.chapterTitle}</span>
+          <span style={{ opacity: 0.5, marginRight: 6 }}>{pageInfo.chapterTitle}</span>
         )}
         {pageInfo.pageIndex != null && pageInfo.pageCount != null && !isScrolling && (
           <span>Page {pageInfo.pageIndex} of {pageInfo.pageCount}</span>
         )}
         {pageInfo.totalProgression != null && (
-          <span style={{ color: "#999", marginLeft: 6 }}>
+          <span style={{ opacity: 0.5, marginLeft: 6 }}>
             {Math.round(pageInfo.totalProgression * 100)}%
           </span>
         )}
@@ -424,7 +442,7 @@ function LoadingScreen() {
   return (
     <div style={{
       display: "flex", alignItems: "center", justifyContent: "center",
-      height: "100vh", fontFamily: FONT, color: "#888", fontSize: 16,
+      height: "100vh", fontFamily: FONT, opacity: 0.5, fontSize: 16,
     }}>
       Loading reader…
     </div>
@@ -439,7 +457,11 @@ function App() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<SidebarTab>("toc");
   const [pageInfo, setPageInfo] = useState<PageInfo>({});
-  const refresh = useCallback(() => setTick((n) => n + 1), []);
+  const [appearance, setAppearance] = useState("day");
+  const refresh = useCallback(() => {
+    setTick((n) => n + 1);
+  }, []);
+  const theme = themes[appearance] || themes.day;
 
   const updatePageInfo = useCallback((r: D2Reader) => {
     try {
@@ -456,6 +478,8 @@ function App() {
           totalRemainingPositions: locator.locations?.totalRemainingPositions,
         });
       }
+      const a = r.currentSettings?.appearance;
+      if (a) setAppearance(a);
     } catch (_) { /* locator may not be ready yet */ }
   }, []);
 
@@ -477,12 +501,21 @@ function App() {
         enableLineFocus: false,
         autoGeneratePositions: true,
       },
+      api: {
+        updateCurrentLocation: async () => {},
+        updateSettings: async (settings: any) => {
+          if (settings?.appearance) setAppearance(settings.appearance);
+        },
+      },
     }).then((r) => {
       setReader(r);
       // Listen for navigation events to update page info
       r.addEventListener("resource.ready", () => updatePageInfo(r));
       // Also update on click (handles page turns within same resource)
       r.addEventListener("click", () => setTimeout(() => updatePageInfo(r), 100));
+      // Sync persisted appearance
+      const a = r.currentSettings?.appearance;
+      if (a) setAppearance(a);
       // Initial update
       setTimeout(() => updatePageInfo(r), 500);
     });
@@ -502,7 +535,7 @@ function App() {
   const closeSidebar = () => setSidebarOpen(false);
 
   return (
-    <>
+    <div style={{ background: theme.bg, color: theme.fg, minHeight: "100vh" }}>
       {reader && (
         <>
           <Toolbar
@@ -512,11 +545,13 @@ function App() {
             onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
             pageInfo={pageInfo}
             onPageTurn={() => updatePageInfo(reader)}
+            theme={theme}
           />
 
           {/* Sidebar */}
           <div style={{
             ...css.sidebar,
+            background: theme.bg, color: theme.fg, borderColor: theme.border,
             ...(sidebarOpen ? {} : css.sidebarHidden),
           }}>
             <TabBar active={activeTab} onChange={setActiveTab} />
@@ -545,7 +580,7 @@ function App() {
           <div id="reader-error" className="error" />
         </main>
       </div>
-    </>
+    </div>
   );
 }
 

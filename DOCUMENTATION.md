@@ -170,6 +170,21 @@ You must provide Readium CSS files and pass them as injectables. Download them f
 - `ReadiumCSS-default.css` (base styles)
 - `ReadiumCSS-after.css` (injected after content styles)
 
+### Running the examples
+
+The project includes 7 runnable examples. See [`examples/README.md`](examples/README.md) for details.
+
+```bash
+npm run dev              # DITA viewer — build + watch + serve (port 4444)
+npm run examples         # DITA viewer — streamer for local EPUBs
+npm run example:react    # React 18 (Parcel, port 1234)
+npm run example:vue      # Vue 3 (Parcel, port 1234)
+npm run example:angular  # Angular (Parcel, port 1234)
+npm run example:nextjs   # Next.js pattern (Parcel, port 1234)
+npm run example:remix    # Remix pattern (Parcel, port 1234)
+npm run example:vanilla  # Vanilla JS (builds first, port 3000)
+```
+
 ---
 
 ## Core Concepts

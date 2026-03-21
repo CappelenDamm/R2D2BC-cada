@@ -24,7 +24,13 @@
     "sass:release": "sass --style=compressed src/styles/sass/:dist",
     "examples": "npx ts-node examples/server.ts",
     "lint": "eslint '*/**/*.{js,ts,tsx}' --fix",
-    "example:react": "parcel examples/react/index.html --dist-dir parcel-dist",
+    "example:clean": "rm -rf parcel-dist .parcel-cache",
+    "example:react": "npm run example:clean && parcel examples/react/index.html --dist-dir parcel-dist",
+    "example:vue": "npm run example:clean && parcel examples/vue/index.html --dist-dir parcel-dist --no-hmr",
+    "example:angular": "npm run example:clean && parcel examples/angular/index.html --dist-dir parcel-dist",
+    "example:nextjs": "npm run example:clean && parcel examples/nextjs/index.html --dist-dir parcel-dist",
+    "example:remix": "npm run example:clean && parcel examples/remix/index.html --dist-dir parcel-dist",
+    "example:vanilla": "npm run example:clean && npm run build && npx serve . -l 3000 --no-clipboard",
     "format": "prettier --write src/",
     "format:check": "prettier --check src/",
     "test": "vitest run",
@@ -63,6 +69,7 @@
     "@babel/plugin-proposal-private-property-in-object": "^7.21.11",
     "@parcel/transformer-sass": "^2.7.0",
     "@parcel/transformer-typescript-tsc": "^2.7.0",
+    "@parcel/transformer-vue": "^2.16.4",
     "@types/copy": "^0.3.1",
     "@types/cssesc": "^3.0.0",
     "@types/debounce": "^3.0.0",
@@ -111,7 +118,8 @@
     "typedoc": "^0.28.15",
     "typedoc-plugin-rename-defaults": "^0.7.3",
     "typescript": "5.9.3",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "vue": "^3.5.30"
   },
   "files": [
     "dist"

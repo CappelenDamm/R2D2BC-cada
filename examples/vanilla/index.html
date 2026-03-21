@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>R2D2BC Vanilla Example</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #f5f5f5;
+      color: #1a1a1a;
+      overflow: hidden;
+      height: 100vh;
+    }
+
+    /* ── Toolbar ── */
+    #toolbar {
+      position: fixed; top: 0; left: 0; right: 0;
+      height: 42px; z-index: 100;
+      display: flex; align-items: center; gap: 6px;
+      padding: 0 8px;
+      background: #fff;
+      border-bottom: 1px solid #e0e0e0;
+      font-size: 12px;
+    }
+    #toolbar button, #toolbar .seg-btn {
+      height: 28px;
+      padding: 0 10px;
+      border: 1px solid rgba(128,128,128,0.3);
+      background: transparent;
+      color: inherit;
+      font-size: 11px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.15s, color 0.15s;
+      white-space: nowrap;
+    }
+    #toolbar button:hover { background: rgba(128,128,128,0.15); }
+    #toolbar button:active { background: rgba(128,128,128,0.25); }
+    #toolbar button.active { background: rgba(128,128,128,0.3); font-weight: 700; }
+
+    /* pill buttons */
+    #toolbar button.pill { border-radius: 14px; }
+
+    /* segmented group */
+    .seg-group { display: flex; }
+    .seg-group button { border-radius: 0; margin-left: -1px; }
+    .seg-group button:first-child { border-radius: 14px 0 0 14px; margin-left: 0; }
+    .seg-group button:last-child { border-radius: 0 14px 14px 0; }
+
+    .toolbar-spacer { flex: 1; }
+
+    #page-info {
+      font-size: 11px; color: inherit; opacity: 0.7;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+      max-width: 280px;
+    }
+
+    /* hamburger */
+    #btn-toc {
+      display: flex; align-items: center; justify-content: center;
+      width: 28px; padding: 0; font-size: 16px; border-radius: 6px;
+    }
+
+    /* settings gear */
+    #btn-settings {
+      display: flex; align-items: center; justify-content: center;
+      width: 28px; padding: 0; font-size: 15px; border-radius: 6px;
+    }
+
+    /* bookmark */
+    #btn-bookmark {
+      display: flex; align-items: center; justify-content: center;
+      width: 28px; padding: 0; font-size: 15px; border-radius: 6px;
+    }
+    #btn-bookmark.bookmarked { color: #e04040; }
+
+    /* ── TOC Sidebar ── */
+    #toc-panel {
+      position: fixed; top: 42px; left: 0; bottom: 0;
+      width: 280px; z-index: 90;
+      border-right: 1px solid rgba(128,128,128,0.2);
+      transform: translateX(-100%);
+      transition: transform 0.2s ease;
+      overflow-y: auto;
+      padding: 12px 0;
+    }
+    #toc-panel.open { transform: translateX(0); }
+    #toc-panel h3 {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.5px; color: inherit; opacity: 0.5; padding: 8px 16px 4px;
+    }
+    #toc-list { list-style: none; }
+    #toc-list li a {
+      display: block; padding: 6px 16px;
+      font-size: 13px; color: inherit; text-decoration: none;
+      border-left: 3px solid transparent;
+      transition: background 0.1s;
+    }
+    #toc-list li a:hover { background: rgba(128,128,128,0.1); }
+    #toc-list li a.active { border-left-color: currentColor; font-weight: 600; }
+    #toc-list li ul { list-style: none; padding-left: 12px; }
+    #toc-list li ul a { font-size: 12px; color: inherit; opacity: 0.7; }
+
+    /* ── Settings Panel ── */
+    #settings-panel {
+      position: fixed; top: 42px; right: 0; bottom: 0;
+      width: 280px; z-index: 90;
+      border-left: 1px solid rgba(128,128,128,0.2);
+      transform: translateX(100%);
+      transition: transform 0.2s ease;
+      overflow-y: auto;
+      padding: 16px;
+    }
+    #settings-panel.open { transform: translateX(0); }
+    #settings-panel h3 {
+      font-size: 11px; font-weight: 600; text-transform: uppercase;
+      letter-spacing: 0.5px; color: inherit; opacity: 0.5; margin-bottom: 12px;
+    }
+    .setting-row {
+      margin-bottom: 14px;
+    }
+    .setting-row label {
+      display: block; font-size: 11px; font-weight: 600;
+      color: inherit; opacity: 0.7; margin-bottom: 4px; text-transform: uppercase;
+      letter-spacing: 0.3px;
+    }
+    .setting-row input[type="range"] {
+      width: 100%; accent-color: #4a90d9;
+      -webkit-appearance: none; appearance: none;
+      height: 4px; border-radius: 2px;
+      background: rgba(128,128,128,0.3); outline: none;
+    }
+    .setting-row input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 16px; height: 16px;
+      border-radius: 50%; background: #4a90d9; cursor: pointer;
+      border: 2px solid currentColor; box-shadow: 0 1px 3px rgba(0,0,0,0.3);
+    }
+    .setting-row select {
+      width: 100%; height: 30px;
+      border: 1px solid rgba(128,128,128,0.3); border-radius: 6px;
+      padding: 0 8px; font-size: 12px;
+      background: inherit; color: inherit;
+      -webkit-appearance: none; appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='gray' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+      background-repeat: no-repeat; background-position: right 8px center;
+    }
+    .appearance-group {
+      display: flex; gap: 6px;
+    }
+    .appearance-group button {
+      flex: 1; height: 32px; border-radius: 8px;
+      border: 2px solid rgba(128,128,128,0.3); font-size: 11px; font-weight: 600;
+      cursor: pointer; transition: border-color 0.15s;
+    }
+    .appearance-group button.active { border-color: currentColor; }
+    .appearance-group .app-day { background: #fff; color: #333; }
+    .appearance-group .app-sepia { background: #f5e6c8; color: #5b4636; }
+    .appearance-group .app-night { background: #1a1a1a; color: #e0e0e0; }
+    #btn-reset-settings {
+      width: 100%; height: 30px; margin-top: 8px;
+      border: 1px solid rgba(128,128,128,0.3); border-radius: 6px;
+      background: inherit; color: inherit; font-size: 12px; font-weight: 500;
+      cursor: pointer; transition: background 0.15s;
+    }
+    #btn-reset-settings:hover { background: rgba(128,128,128,0.15); }
+
+    .font-size-display {
+      font-size: 11px; color: inherit; opacity: 0.5; text-align: right; margin-top: 2px;
+    }
+
+    /* ── Overlay for closing panels ── */
+    #panel-overlay {
+      display: none;
+      position: fixed; top: 42px; left: 0; right: 0; bottom: 0;
+      z-index: 80; background: rgba(0,0,0,0.15);
+    }
+    #panel-overlay.visible { display: block; }
+
+    /* ── Reader Container ── */
+    #D2Reader-Container {
+      position: fixed;
+      top: 42px; left: 0; right: 0; bottom: 0;
+    }
+    #iframe-wrapper {
+      width: 100%; height: 100%;
+      outline: none;
+    }
+    #reader-loading {
+      display: flex; align-items: center; justify-content: center;
+      height: 100%;
+      font-size: 13px; color: inherit; opacity: 0.5;
+    }
+    #reader-error {
+      display: none;
+      align-items: center; justify-content: center;
+      height: 100%;
+      color: #c00; font-size: 13px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Toolbar -->
+<div id="toolbar">
+  <button id="btn-toc" title="Table of Contents">&#9776;</button>
+  <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;padding:2px 8px;border-radius:10px;color:#000;background:#f7df1e;flex-shrink:0">Vanilla</span>
+
+  <div class="seg-group">
+    <button id="btn-prev" class="pill" title="Previous page">&larr; Prev</button>
+    <button id="btn-next" class="pill" title="Next page">Next &rarr;</button>
+  </div>
+
+  <div class="seg-group">
+    <button id="btn-paginate" class="active" title="Paginated view">Pages</button>
+    <button id="btn-scroll" title="Scroll view">Scroll</button>
+  </div>
+
+  <button id="btn-bookmark" class="pill" title="Toggle bookmark">&#9734;</button>
+
+  <span id="page-info"></span>
+
+  <span class="toolbar-spacer"></span>
+
+  <button id="btn-settings" title="Settings">&#9881;</button>
+</div>
+
+<!-- TOC Sidebar -->
+<div id="toc-panel">
+  <h3>Table of Contents</h3>
+  <ul id="toc-list"></ul>
+</div>
+
+<!-- Settings Panel -->
+<div id="settings-panel">
+  <h3>Settings</h3>
+
+  <div class="setting-row">
+    <label>Font Size</label>
+    <input type="range" id="slider-fontsize" min="50" max="200" step="12.5" value="100" />
+    <div class="font-size-display" id="fontsize-display">100%</div>
+  </div>
+
+  <div class="setting-row">
+    <label>Font Family</label>
+    <select id="select-fontfamily">
+      <option value="Original">Original</option>
+      <option value="serif">Serif</option>
+      <option value="sans-serif">Sans-Serif</option>
+    </select>
+  </div>
+
+  <div class="setting-row">
+    <label>Appearance</label>
+    <div class="appearance-group">
+      <button class="app-day active" data-appearance="day">Day</button>
+      <button class="app-sepia" data-appearance="sepia">Sepia</button>
+      <button class="app-night" data-appearance="night">Night</button>
+    </div>
+  </div>
+
+  <button id="btn-reset-settings">Reset to Defaults</button>
+</div>
+
+<!-- Panel overlay (click to close) -->
+<div id="panel-overlay"></div>
+
+<!-- Reader DOM structure (required) -->
+<div id="D2Reader-Container">
+  <main tabindex="-1" id="iframe-wrapper">
+    <div id="reader-loading">Loading&hellip;</div>
+    <div id="reader-error"></div>
+  </main>
+</div>
+
+<script type="module">
+  import D2Reader from '../../dist/esm/index.js';
+
+  // ── ReadiumCSS injectables (reuse react example files) ──
+  const cssBase = new URL('../react/readium-css/', window.location.href).href;
+  const injectables = [
+    { type: 'style', url: cssBase + 'ReadiumCSS-before.css', r2before: true },
+    { type: 'style', url: cssBase + 'ReadiumCSS-default.css', r2default: true },
+    { type: 'style', url: cssBase + 'ReadiumCSS-after.css', r2after: true },
+  ];
+
+  // ── Theme sync ──
+  const themeMap = {
+    day:   { bg: '#FFFFFF', fg: '#121212', border: '#e0e0e0' },
+    sepia: { bg: '#faf4e8', fg: '#121212', border: '#e0d0b0' },
+    night: { bg: '#000000', fg: '#FEFEFE', border: '#333333' },
+  };
+  function applyTheme(mode) {
+    const t = themeMap[mode] || themeMap.day;
+    document.body.style.background = t.bg;
+    document.body.style.color = t.fg;
+    const toolbar = document.getElementById('toolbar');
+    if (toolbar) { toolbar.style.background = t.bg; toolbar.style.color = t.fg; toolbar.style.borderColor = t.border; }
+    const container = document.getElementById('D2Reader-Container');
+    if (container) container.style.background = t.bg;
+    const tocPanelEl = document.getElementById('toc-panel');
+    if (tocPanelEl) { tocPanelEl.style.background = t.bg; tocPanelEl.style.color = t.fg; tocPanelEl.style.borderColor = t.border; }
+    const settingsPanelEl = document.getElementById('settings-panel');
+    if (settingsPanelEl) { settingsPanelEl.style.background = t.bg; settingsPanelEl.style.color = t.fg; settingsPanelEl.style.borderColor = t.border; }
+  }
+
+  // ── DOM references ──
+  const $ = (sel) => document.querySelector(sel);
+  const btnToc = $('#btn-toc');
+  const btnPrev = $('#btn-prev');
+  const btnNext = $('#btn-next');
+  const btnPaginate = $('#btn-paginate');
+  const btnScroll = $('#btn-scroll');
+  const btnBookmark = $('#btn-bookmark');
+  const btnSettings = $('#btn-settings');
+  const pageInfo = $('#page-info');
+  const tocPanel = $('#toc-panel');
+  const tocList = $('#toc-list');
+  const settingsPanel = $('#settings-panel');
+  const overlay = $('#panel-overlay');
+  const sliderFontsize = $('#slider-fontsize');
+  const fontsizeDisplay = $('#fontsize-display');
+  const selectFontfamily = $('#select-fontfamily');
+  const appearanceBtns = document.querySelectorAll('.appearance-group button');
+  const btnReset = $('#btn-reset-settings');
+
+  let reader = null;
+
+  // ── Close all panels ──
+  function closePanels() {
+    tocPanel.classList.remove('open');
+    settingsPanel.classList.remove('open');
+    overlay.classList.remove('visible');
+  }
+
+  function openPanel(panel) {
+    closePanels();
+    panel.classList.add('open');
+    overlay.classList.add('visible');
+  }
+
+  // ── Update page info from locator ──
+  function updatePageInfo() {
+    if (!reader) return;
+    try {
+      const locator = reader.currentLocator;
+      if (!locator) return;
+
+      const parts = [];
+      const tocItem = reader.mostRecentNavigatedTocItem;
+      if (tocItem && tocItem.Title) {
+        parts.push(tocItem.Title);
+      }
+      if (locator.displayInfo) {
+        const di = locator.displayInfo;
+        if (di.resourceScreenIndex != null && di.resourceScreenCount != null) {
+          parts.push('Page ' + di.resourceScreenIndex + ' of ' + di.resourceScreenCount);
+        }
+      }
+      if (locator.locations && locator.locations.totalProgression != null) {
+        parts.push(Math.round(locator.locations.totalProgression * 100) + '%');
+      }
+      pageInfo.textContent = parts.join('  \u00b7  ');
+    } catch (_) { /* reader not ready yet */ }
+  }
+
+  // ── Update scroll/paginate button state ──
+  function updateScrollButtons() {
+    if (!reader) return;
+    const scrolling = reader.currentSettings.verticalScroll;
+    btnScroll.classList.toggle('active', scrolling);
+    btnPaginate.classList.toggle('active', !scrolling);
+  }
+
+  // ── Update bookmark button state ──
+  function updateBookmarkState() {
+    if (!reader) return;
+    const locator = reader.currentLocator;
+    if (!locator) return;
+    const bookmarks = reader.bookmarks;
+    const currentProg = locator.locations?.progression;
+    const currentHref = locator.href;
+    const isBookmarked = bookmarks.some(
+      (b) => b.href === currentHref && Math.abs((b.locations?.progression ?? -1) - (currentProg ?? -2)) < 0.001
+    );
+    btnBookmark.classList.toggle('bookmarked', isBookmarked);
+    btnBookmark.innerHTML = isBookmarked ? '&#9733;' : '&#9734;';
+  }
+
+  // ── Build TOC ──
+  function buildToc(items, parentUl) {
+    for (const item of items) {
+      const li = document.createElement('li');
+      const a = document.createElement('a');
+      a.href = '#';
+      a.textContent = item.Title || item.title || 'Untitled';
+      a.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (item.Href || item.href) {
+          reader.goTo({ href: item.Href || item.href, locations: {} });
+        }
+        closePanels();
+      });
+      li.appendChild(a);
+
+      const children = item.Children || item.children;
+      if (children && children.length > 0) {
+        const subUl = document.createElement('ul');
+        buildToc(children, subUl);
+        li.appendChild(subUl);
+      }
+      parentUl.appendChild(li);
+    }
+  }
+
+  // ── Sync settings UI to reader state ──
+  function syncSettingsUI() {
+    if (!reader) return;
+    const s = reader.currentSettings;
+
+    // font size
+    sliderFontsize.value = s.fontSize || 100;
+    fontsizeDisplay.textContent = (s.fontSize || 100) + '%';
+
+    // font family
+    const ff = s.fontFamily || 'Original';
+    selectFontfamily.value = ff;
+
+    // appearance
+    const appMap = {
+      'readium-default-on': 'day',
+      'readium-sepia-on': 'sepia',
+      'readium-night-on': 'night',
+    };
+    const currentApp = appMap[s.appearance] || s.appearance || 'day';
+    appearanceBtns.forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.appearance === currentApp);
+    });
+    applyTheme(currentApp);
+
+    updateScrollButtons();
+  }
+
+  // ── Initialize reader ──
+  async function init() {
+    try {
+      reader = await D2Reader.load({
+        url: new URL('https://alice.dita.digital/manifest.json'),
+        injectables: injectables,
+        injectablesFixed: [],
+        useLocalStorage: true,
+        rights: {
+          enableBookmarks: true,
+          enableSearch: true,
+          enableAnnotations: true,
+          autoGeneratePositions: true,
+        },
+        api: {
+          updateCurrentLocation: async () => {
+            updatePageInfo();
+            updateBookmarkState();
+          },
+        },
+      });
+
+      // Build TOC
+      const toc = reader.tableOfContents;
+      if (toc && toc.length > 0) {
+        buildToc(toc, tocList);
+      }
+
+      // Listen to events
+      reader.addEventListener('resource.ready', () => {
+        updatePageInfo();
+        updateBookmarkState();
+        syncSettingsUI();
+      });
+
+      reader.addEventListener('click', () => {
+        updatePageInfo();
+      });
+
+      syncSettingsUI();
+      updatePageInfo();
+    } catch (err) {
+      const errorEl = $('#reader-error');
+      errorEl.style.display = 'flex';
+      errorEl.textContent = 'Failed to load: ' + err.message;
+      console.error(err);
+    }
+  }
+
+  // ── Toolbar event handlers ──
+
+  // TOC toggle
+  btnToc.addEventListener('click', () => {
+    if (tocPanel.classList.contains('open')) {
+      closePanels();
+    } else {
+      openPanel(tocPanel);
+    }
+  });
+
+  // Settings toggle
+  btnSettings.addEventListener('click', () => {
+    if (settingsPanel.classList.contains('open')) {
+      closePanels();
+    } else {
+      openPanel(settingsPanel);
+    }
+  });
+
+  // Overlay click closes panels
+  overlay.addEventListener('click', closePanels);
+
+  // Navigation
+  btnPrev.addEventListener('click', () => reader?.previousPage());
+  btnNext.addEventListener('click', () => reader?.nextPage());
+
+  // Scroll / Paginate
+  btnPaginate.addEventListener('click', async () => {
+    if (!reader) return;
+    await reader.scroll(false);
+    updateScrollButtons();
+    updatePageInfo();
+  });
+  btnScroll.addEventListener('click', async () => {
+    if (!reader) return;
+    await reader.scroll(true);
+    updateScrollButtons();
+    updatePageInfo();
+  });
+
+  // Bookmark
+  btnBookmark.addEventListener('click', async () => {
+    if (!reader) return;
+    const locator = reader.currentLocator;
+    const bookmarks = reader.bookmarks;
+    const currentProg = locator?.locations?.progression;
+    const currentHref = locator?.href;
+    const existing = bookmarks.find(
+      (b) => b.href === currentHref && Math.abs((b.locations?.progression ?? -1) - (currentProg ?? -2)) < 0.001
+    );
+    if (existing) {
+      await reader.deleteBookmark(existing);
+    } else {
+      await reader.saveBookmark();
+    }
+    updateBookmarkState();
+  });
+
+  // ── Settings handlers ──
+
+  // Font size slider
+  sliderFontsize.addEventListener('input', async () => {
+    const val = parseFloat(sliderFontsize.value);
+    fontsizeDisplay.textContent = val + '%';
+    if (reader) {
+      await reader.applyUserSettings({ fontSize: val });
+    }
+  });
+
+  // Font family
+  selectFontfamily.addEventListener('change', async () => {
+    if (reader) {
+      await reader.applyUserSettings({ fontFamily: selectFontfamily.value });
+    }
+  });
+
+  // Appearance buttons
+  appearanceBtns.forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (!reader) return;
+      await reader.applyUserSettings({ appearance: btn.dataset.appearance });
+      appearanceBtns.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      applyTheme(btn.dataset.appearance);
+    });
+  });
+
+  // Reset
+  btnReset.addEventListener('click', async () => {
+    if (!reader) return;
+    await reader.resetUserSettings();
+    syncSettingsUI();
+  });
+
+  // ── Keyboard navigation ──
+  document.addEventListener('keydown', (e) => {
+    if (!reader) return;
+    if (e.key === 'ArrowLeft') {
+      e.preventDefault();
+      reader.previousPage();
+    } else if (e.key === 'ArrowRight') {
+      e.preventDefault();
+      reader.nextPage();
+    }
+  });
+
+  // ── Start ──
+  init();
+</script>
+
+</body>
+</html>

@@ -1,6 +1,16 @@
 # R2D2BC Examples
 
-Two example implementations are included to demonstrate how to integrate `@d-i-t-a/reader`.
+Seven example implementations are included to demonstrate how to integrate `@d-i-t-a/reader` across different frameworks and environments.
+
+| Example | Framework | Description |
+|---------|-----------|-------------|
+| [`viewer/index_dita.html`](../viewer/index_dita.html) | Vanilla (full) | Full-featured dev viewer with all modules |
+| [`vanilla/`](vanilla/) | Vanilla JS | Minimal single-file, no build tools |
+| [`react/`](react/) | React 18 | Complete reader app with sidebar |
+| [`angular/`](angular/) | Angular 16+ | Standalone component (drop-in) |
+| [`vue/`](vue/) | Vue 3 | Composition API SFC (drop-in) |
+| [`nextjs/`](nextjs/) | Next.js | SSR-safe with dynamic import |
+| [`remix/`](remix/) | Remix / React Router v7 | Client-only with loader pattern |
 
 ---
 
@@ -12,18 +22,61 @@ From the project root:
 # Install dependencies
 npm install
 
-# Run the DITA viewer (vanilla JS)
+# DITA Viewer — full-featured dev viewer (builds + watches + serves on port 4444)
 npm run dev
 
-# Run the React example
+# React example (Parcel, port 1234)
 npm run example:react
+
+# Vue example (Parcel, port 1234)
+npm run example:vue
+
+# Angular example (Parcel, port 1234)
+npm run example:angular
+
+# Next.js example (Parcel, port 1234)
+npm run example:nextjs
+
+# Remix example (Parcel, port 1234)
+npm run example:remix
+
+# Vanilla JS example (builds first, then serves on port 3000)
+# Navigate to http://localhost:3000/examples/vanilla/
+npm run example:vanilla
 ```
+
+> **Note:** The Parcel-based examples share port 1234 — run one at a time.
+> Each `example:*` script auto-clears the Parcel cache before starting.
+> The DITA viewer (`npm run dev`) and vanilla example require a build step;
+> the other examples import directly from source via Parcel.
 
 ---
 
 ## DITA Viewer (`viewer/index_dita.html`)
 
 A full-featured vanilla JS/HTML viewer that exercises every reader capability. This is the primary test harness for development.
+
+```bash
+# Build + watch + serve on http://localhost:4444
+npm run dev
+
+# Streamer server for local EPUBs (serves files from examples/epubs/)
+npm run examples
+```
+
+`npm run dev` builds the library (`dist/`), compiles SASS, and starts the esbuild watcher. The viewer loads the built library from `dist/` and uses its own ReadiumCSS from `viewer/readium-css/`.
+
+`npm run examples` starts a streamer server (`dita-streamer-js`) that serves local EPUB files from `examples/epubs/` through multiple viewer variants:
+
+| Viewer | Path | Description |
+|--------|------|-------------|
+| DITA Example | `viewer/index_dita.html` | Full-featured viewer with all modules |
+| Sample Read | `viewer/index_sampleread.html` | Preview/sample mode with read limits |
+| Minimal | `viewer/index_minimal.html` | Minimal EPUB viewer |
+| API Example | `viewer/index_api.html` | API callback demonstration |
+| PDF | `viewer/index_pdf.html` | PDF document viewer (via pdf.js) |
+
+The PDF viewer is a separate viewer for PDF publications, not an EPUB viewer variant. It uses `PDFNavigator` instead of `IFrameNavigator` and supports annotations, zoom, fit-to-page/width, and grab-to-pan.
 
 ### What it demonstrates
 
@@ -211,17 +264,63 @@ examples/react/
 
 ---
 
-## Differences between the examples
+## Vanilla JS Example (`examples/vanilla/`)
 
-| Feature | DITA Viewer | React Example |
-|---------|------------|---------------|
-| Framework | Vanilla JS/HTML | React 18 |
-| Settings UI | Built-in (navigator manages DOM) | External (reads `currentSettings`) |
-| Page info | Navigator writes to `.chapter-title` etc. | Reads from `currentLocator` |
-| Search | Built-in headerMenu UI | Programmatic via `search()` API |
-| TTS | Yes (with settings sliders) | Not included |
-| Media overlays | Yes | Not included |
-| Definitions | Yes | Not included |
-| Content protection | Configurable | Not included |
+A single `index.html` file — no build tools, no framework, no bundler. Shows the simplest possible integration using ESM `<script type="module">` imports.
 
-The DITA viewer shows the full feature set. The React example shows the minimal integration pattern for building your own UI on top of the reader API.
+Features: toolbar, TOC sidebar, settings, bookmarks, page info, keyboard navigation.
+
+```bash
+# Serve from project root (needs the dist/ build)
+npx serve .
+# Open http://localhost:3000/examples/vanilla/
+```
+
+---
+
+## Angular Example (`examples/angular/`)
+
+A standalone Angular 16+ component (`reader.component.ts`) designed to be dropped into an existing Angular project. Uses `OnPush` change detection with manual `detectChanges()` for reader events.
+
+See [`examples/angular/README.md`](angular/README.md) for integration instructions.
+
+---
+
+## Vue Example (`examples/vue/`)
+
+A Vue 3 Single File Component (`ReaderComponent.vue`) using Composition API (`<script setup>`). Uses reactive refs for reader state and scoped styles.
+
+See [`examples/vue/README.md`](vue/README.md) for integration instructions.
+
+---
+
+## Next.js Example (`examples/nextjs/`)
+
+Shows the critical SSR gotcha: the reader requires `window`/`document` so it must be dynamically imported with `ssr: false`. Includes `EpubReader.tsx` (client component) and `page.tsx` (using `next/dynamic`).
+
+See [`examples/nextjs/README.md`](nextjs/README.md) for integration instructions.
+
+---
+
+## Remix Example (`examples/remix/`)
+
+Shows the Remix/React Router v7 integration pattern using `React.lazy()` + `<Suspense>` for client-only loading, and typed loaders to pass the manifest URL from the server.
+
+See [`examples/remix/README.md`](remix/README.md) for integration instructions.
+
+---
+
+## Comparison
+
+| Feature | DITA Viewer | Vanilla | React | Angular | Vue | Next.js | Remix |
+|---------|------------|---------|-------|---------|-----|---------|-------|
+| Build tools needed | No | No | Parcel | Angular CLI | Vite | Next.js | Remix |
+| Settings UI | Full | Basic | Full | Basic | Full | Basic | Basic |
+| TOC | Built-in | Yes | Yes | Yes | Yes | Yes | Yes |
+| Bookmarks | Built-in | Yes | Yes | Yes | Yes | Yes | Yes |
+| Search | Built-in | No | Yes | No | Yes | No | No |
+| Page info | Navigator DOM | Yes | Yes | Yes | Yes | Yes | Yes |
+| TTS | Yes | No | No | No | No | No | No |
+| SSR safe | N/A | N/A | N/A | N/A | N/A | Yes | Yes |
+
+The DITA viewer exercises all features. The framework examples show the integration pattern for each ecosystem.
