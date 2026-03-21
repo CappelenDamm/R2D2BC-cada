@@ -14,7 +14,8 @@ import { ReadiumCSS } from "../../src/model/user-settings/ReadiumCSS";
 describe("ReadiumCSS constants", () => {
   it("every KEY follows the --USER__<ref> pattern", () => {
     const keyEntries = Object.entries(ReadiumCSS).filter(
-      ([name]) => name.endsWith("_KEY") && typeof (ReadiumCSS as any)[name] === "string"
+      ([name]) =>
+        name.endsWith("_KEY") && typeof (ReadiumCSS as any)[name] === "string"
     );
 
     expect(keyEntries.length).toBeGreaterThan(0);

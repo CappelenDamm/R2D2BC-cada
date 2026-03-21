@@ -194,7 +194,7 @@ export class PDFNavigator extends EventEmitter implements Navigator {
     // pdf_viewer.css targets .pdfViewer on the inner element.
     this.pdfContainer.classList.add("pdfViewer");
 
-    this.handTool = new GrabToPan({ element: this.pdfContainer });
+    this.handTool = new GrabToPan({ element: this.wrapper });
 
     // ── Build pdfjs viewer stack ─────────────────────────────────────────────
     this.eventBus = new EventBus();
@@ -928,7 +928,9 @@ export class PDFNavigator extends EventEmitter implements Navigator {
     const mode = scroll
       ? direction === "horizontal"
         ? ScrollMode.HORIZONTAL
-        : ScrollMode.VERTICAL
+        : direction === "wrapped"
+          ? ScrollMode.WRAPPED
+          : ScrollMode.VERTICAL
       : ScrollMode.PAGE;
     this.pdfViewer.scrollMode = mode;
     this.saveViewSetting(PDFNavigator.KEY_SCROLL, mode);

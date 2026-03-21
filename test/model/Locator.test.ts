@@ -9,7 +9,12 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { Locator, Bookmark, Annotation, Locations } from "../../src/model/Locator";
+import {
+  Locator,
+  Bookmark,
+  Annotation,
+  Locations,
+} from "../../src/model/Locator";
 
 describe("Locator model", () => {
   it("creates a minimal Locator", () => {

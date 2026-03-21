@@ -8,7 +8,7 @@
  * http://www.apache.org/licenses/LICENSE-2.0
  */
 
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import LocalAnnotator from "../../src/store/LocalAnnotator";
 import MemoryStore from "../../src/store/MemoryStore";
 import { AnnotationType } from "../../src/store/Annotator";
@@ -81,8 +81,14 @@ describe("LocalAnnotator – reading position", () => {
 
   it("saveLastReadingPosition overwrites previous", () => {
     const a = makeAnnotator();
-    const pos1 = { ...makeBookmark("ch1.xhtml", 0.1), created: new Date() } as any;
-    const pos2 = { ...makeBookmark("ch2.xhtml", 0.9), created: new Date() } as any;
+    const pos1 = {
+      ...makeBookmark("ch1.xhtml", 0.1),
+      created: new Date(),
+    } as any;
+    const pos2 = {
+      ...makeBookmark("ch2.xhtml", 0.9),
+      created: new Date(),
+    } as any;
     a.saveLastReadingPosition(pos1);
     a.saveLastReadingPosition(pos2);
     const result = a.getLastReadingPosition() as any;
@@ -148,7 +154,10 @@ describe("LocalAnnotator – bookmarks", () => {
 
   it("initBookmarks seeds from an array", () => {
     const a = makeAnnotator();
-    const list = [makeBookmark("ch1.xhtml", 0.2), makeBookmark("ch2.xhtml", 0.6)];
+    const list = [
+      makeBookmark("ch1.xhtml", 0.2),
+      makeBookmark("ch2.xhtml", 0.6),
+    ];
     a.initBookmarks(list);
     expect(a.getBookmarks()).toHaveLength(2);
   });
@@ -194,7 +203,9 @@ describe("LocalAnnotator – annotations", () => {
     a.saveAnnotation(makeAnnotation("ch1.xhtml", 0.5));
 
     const sorted = a.getAnnotations();
-    const progressions = sorted.map((n: Annotation) => n.locations.progression!);
+    const progressions = sorted.map(
+      (n: Annotation) => n.locations.progression!
+    );
     expect(progressions).toEqual([0.2, 0.5, 0.8]);
   });
 

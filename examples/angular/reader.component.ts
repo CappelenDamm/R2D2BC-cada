@@ -24,17 +24,50 @@ interface TocItem {
     <div class="toolbar" *ngIf="reader">
       <div class="toolbar-group">
         <button class="btn" (click)="toggleToc()" title="Table of Contents">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
           </svg>
         </button>
-        <button class="btn" (click)="previousPage()" [disabled]="isAtStart" title="Previous Page">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <button
+          class="btn"
+          (click)="previousPage()"
+          [disabled]="isAtStart"
+          title="Previous Page"
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <polyline points="15 18 9 12 15 6" />
           </svg>
         </button>
-        <button class="btn" (click)="nextPage()" [disabled]="isAtEnd" title="Next Page">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <button
+          class="btn"
+          (click)="nextPage()"
+          [disabled]="isAtEnd"
+          title="Next Page"
+        >
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <polyline points="9 18 15 12 9 6" />
           </svg>
         </button>
@@ -54,22 +87,52 @@ interface TocItem {
           (click)="toggleScrollMode()"
           [title]="isScrolling ? 'Switch to paginated' : 'Switch to scroll'"
         >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <rect *ngIf="!isScrolling" x="3" y="3" width="18" height="18" rx="2" />
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <rect
+              *ngIf="!isScrolling"
+              x="3"
+              y="3"
+              width="18"
+              height="18"
+              rx="2"
+            />
             <line *ngIf="isScrolling" x1="12" y1="3" x2="12" y2="21" />
             <polyline *ngIf="isScrolling" points="8 7 12 3 16 7" />
             <polyline *ngIf="isScrolling" points="8 17 12 21 16 17" />
           </svg>
         </button>
         <button class="btn" (click)="saveBookmark()" title="Bookmark this page">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
           </svg>
         </button>
         <button class="btn" (click)="toggleSettings()" title="Settings">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
             <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+            <path
+              d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"
+            />
           </svg>
         </button>
       </div>
@@ -86,14 +149,27 @@ interface TocItem {
       <div class="toc-header">
         <h3>Table of Contents</h3>
         <button class="btn btn-close" (click)="toggleToc()">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
         </button>
       </div>
       <ul class="toc-list">
         <ng-container *ngFor="let item of toc">
-          <ng-container *ngTemplateOutlet="tocItemTpl; context: { $implicit: item, depth: 0 }"></ng-container>
+          <ng-container
+            *ngTemplateOutlet="
+              tocItemTpl;
+              context: { $implicit: item, depth: 0 }
+            "
+          ></ng-container>
         </ng-container>
       </ul>
 
@@ -103,20 +179,37 @@ interface TocItem {
         </li>
         <ng-container *ngIf="item.children?.length">
           <ng-container *ngFor="let child of item.children">
-            <ng-container *ngTemplateOutlet="tocItemTpl; context: { $implicit: child, depth: depth + 1 }"></ng-container>
+            <ng-container
+              *ngTemplateOutlet="
+                tocItemTpl;
+                context: { $implicit: child, depth: depth + 1 }
+              "
+            ></ng-container>
           </ng-container>
         </ng-container>
       </ng-template>
     </div>
 
     <!-- Settings Panel -->
-    <div class="settings-overlay" *ngIf="settingsOpen" (click)="toggleSettings()"></div>
+    <div
+      class="settings-overlay"
+      *ngIf="settingsOpen"
+      (click)="toggleSettings()"
+    ></div>
     <div class="settings-panel" [class.open]="settingsOpen">
       <div class="settings-header">
         <h3>Settings</h3>
         <button class="btn btn-close" (click)="toggleSettings()">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+          <svg
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+          >
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
           </svg>
         </button>
       </div>
@@ -124,9 +217,13 @@ interface TocItem {
       <div class="settings-section">
         <label class="settings-label">Font Size</label>
         <div class="settings-row">
-          <button class="btn btn-setting" (click)="decreaseFontSize()">A-</button>
+          <button class="btn btn-setting" (click)="decreaseFontSize()">
+            A-
+          </button>
           <span class="setting-value">{{ fontSizeLabel }}</span>
-          <button class="btn btn-setting" (click)="increaseFontSize()">A+</button>
+          <button class="btn btn-setting" (click)="increaseFontSize()">
+            A+
+          </button>
         </div>
       </div>
 
@@ -161,7 +258,9 @@ interface TocItem {
       </div>
 
       <div class="settings-section">
-        <button class="btn btn-reset" (click)="resetSettings()">Reset to Defaults</button>
+        <button class="btn btn-reset" (click)="resetSettings()">
+          Reset to Defaults
+        </button>
       </div>
     </div>
 
@@ -180,8 +279,9 @@ interface TocItem {
     `
       :host {
         display: block;
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
-          Helvetica, Arial, sans-serif;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
+          Arial, sans-serif;
         height: 100vh;
         overflow: hidden;
         position: relative;
@@ -247,7 +347,9 @@ interface TocItem {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        transition: background 0.15s, color 0.15s;
+        transition:
+          background 0.15s,
+          color 0.15s;
       }
 
       .btn:hover {

@@ -98,13 +98,18 @@
 
     // Make manifest URLs absolute (viewers use new URL() which requires absolute)
     function fixViewerUrls(pubs) {
-      const origin = window.location.origin;
       return pubs.map(pub => ({
         ...pub,
-        viewers: (pub.viewers || []).map(v => ({
-          ...v,
-          url: v.url.replace(/\?url=\//, '?url=' + origin + '/'),
-        })),
+        viewers: (pub.viewers || []).map(v => {
+          // Extract the origin from the viewer URL to fix relative manifest paths
+          try {
+            const viewerUrl = new URL(v.url, window.location.origin);
+            const viewerOrigin = viewerUrl.origin;
+            return { ...v, url: v.url.replace(/\?url=\//, '?url=' + viewerOrigin + '/') };
+          } catch(_) {
+            return v;
+          }
+        }),
       }));
     }
 
@@ -190,6 +195,7 @@
             <div class="card-cover" style="${coverStyle}">
               ${pub.coverUrl ? '' : icon}
               <span class="type-badge ${badgeClass}">${pub.type}</span>
+              ${pub.hosted ? '<span class="type-badge" style="background:#888;top:8px;right:auto;left:8px;">hosted</span>' : ''}
             </div>
             <div class="card-body">
               <div class="card-title">${pub.title || pub.filename}</div>

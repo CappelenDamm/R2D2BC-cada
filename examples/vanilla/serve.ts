@@ -8,7 +8,10 @@ const PORT = 3000;
 app.use("/dist", express.static(path.join(__dirname, "../../dist")));
 
 // Serve ReadiumCSS from the react example
-app.use("/readium-css", express.static(path.join(__dirname, "../react/readium-css")));
+app.use(
+  "/readium-css",
+  express.static(path.join(__dirname, "../react/readium-css"))
+);
 
 // Serve the vanilla example
 app.use("/", express.static(__dirname));

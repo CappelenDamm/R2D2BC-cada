@@ -1,13 +1,14 @@
 import { Server } from "r2-streamer-js";
 import * as express from "express";
 import * as path from "path";
-import * as fs from "fs";
+
 import recursive from "recursive-readdir";
 
 interface PublicationEntry {
   title: string;
   filename: string;
   type: "epub" | "pdf";
+  hosted?: boolean;
   viewers: { title: string; url: string }[];
 }
 
@@ -16,18 +17,26 @@ async function start() {
     // Built-in demo publications (hosted remotely)
     {
       title: "Alice's Adventures in Wonderland",
-      filename: "alice (hosted PDF)",
+      filename: "alice (hosted)",
       type: "pdf",
+      hosted: true,
       viewers: [
-        { title: "PDF Viewer", url: `/viewer/index_pdf.html?url=${encodeURIComponent("https://alicepdf.dita.digital/alice.json")}` },
+        {
+          title: "PDF Viewer",
+          url: `/viewer/index_pdf.html?url=https://alicepdf.dita.digital/alice.json`,
+        },
       ],
     },
     {
       title: "Alice's Adventures in Wonderland",
-      filename: "alice (hosted EPUB)",
+      filename: "alice (hosted)",
       type: "epub",
+      hosted: true,
       viewers: [
-        { title: "DITA Reader", url: `/viewer/index_dita.html?url=${encodeURIComponent("https://alice.dita.digital/manifest.json")}` },
+        {
+          title: "DITA Reader",
+          url: `/viewer/index_dita.html?url=https://alice.dita.digital/manifest.json`,
+        },
       ],
     },
   ];
@@ -51,7 +60,6 @@ async function start() {
   server.expressUse("/viewer", express.static(path.join(__dirname, "../dist")));
 
   // ── Landing page ────────────────────────────────────────────────────
-
 
   // ── PDF serving ─────────────────────────────────────────────────────
 
@@ -95,9 +103,7 @@ async function start() {
           title: title,
         },
       ],
-      resources: [
-        { href: pdfHref, type: "application/pdf" },
-      ],
+      resources: [{ href: pdfHref, type: "application/pdf" }],
     };
 
     res.json(manifest);
@@ -135,10 +141,22 @@ async function start() {
         filename,
         type: "epub",
         viewers: [
-          { title: "DITA Reader", url: `/viewer/index_dita.html?url=${manifestUrl}` },
-          { title: "Minimal", url: `/viewer/index_minimal.html?url=${manifestUrl}` },
-          { title: "API Test", url: `/viewer/index_api.html?url=${manifestUrl}` },
-          { title: "Sample Read", url: `/viewer/index_sampleread.html?url=${manifestUrl}` },
+          {
+            title: "DITA Reader",
+            url: `/viewer/index_dita.html?url=${manifestUrl}`,
+          },
+          {
+            title: "Minimal",
+            url: `/viewer/index_minimal.html?url=${manifestUrl}`,
+          },
+          {
+            title: "API Test",
+            url: `/viewer/index_api.html?url=${manifestUrl}`,
+          },
+          {
+            title: "Sample Read",
+            url: `/viewer/index_sampleread.html?url=${manifestUrl}`,
+          },
         ],
       });
     });
@@ -154,17 +172,20 @@ async function start() {
     console.log(`📄 Found ${files.length} PDF(s)`);
 
     files.forEach((filePath) => {
-      const relativePath = path.relative(epubsPath, filePath).replace(/\\/g, "/");
+      const relativePath = path
+        .relative(epubsPath, filePath)
+        .replace(/\\/g, "/");
       const filename = path.basename(filePath);
       const title = filename.replace(/\.pdf$/i, "").replace(/[_-]/g, " ");
-      const manifestUrl = `/pdf-manifest?file=${encodeURIComponent(relativePath)}`;
-
       publications.push({
         title,
         filename,
         type: "pdf",
         viewers: [
-          { title: "PDF Viewer", url: `/viewer/index_pdf.html?url=/pdf-manifest/${encodeURIComponent(relativePath)}` },
+          {
+            title: "PDF Viewer",
+            url: `/viewer/index_pdf.html?url=/pdf-manifest/${encodeURIComponent(relativePath)}`,
+          },
         ],
       });
     });
@@ -174,7 +195,9 @@ async function start() {
 
   const data = await server.start(4444, false);
 
-  console.log(`\n🚀 R2D2BC Library: http://localhost:${data.urlPort}/viewer/index.html\n`);
+  console.log(
+    `\n🚀 R2D2BC Library: http://localhost:${data.urlPort}/viewer/index.html\n`
+  );
 }
 
 (async () => {

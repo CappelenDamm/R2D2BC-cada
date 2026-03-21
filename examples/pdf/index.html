@@ -8,7 +8,7 @@
   <link rel="stylesheet" href="/dist/pdf_viewer.css" />
   <script src="/dist/reader.js"></script>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    /* Do NOT use * { box-sizing: border-box } — it breaks pdf.js text layer alignment */
     body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; height: 100vh; overflow: hidden; }
 
     /* Toolbar */

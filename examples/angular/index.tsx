@@ -192,7 +192,8 @@ const styles = {
     fontWeight: 600,
     textTransform: "uppercase" as const,
     letterSpacing: 0.5,
-    opacity: 0.5, color: "inherit",
+    opacity: 0.5,
+    color: "inherit",
     marginBottom: 12,
   } as React.CSSProperties,
   settingsRow: {
@@ -218,7 +219,8 @@ const styles = {
     border: "2px solid rgba(128,128,128,0.2)",
     borderRadius: 8,
     fontSize: 12,
-    opacity: 0.7, color: "inherit",
+    opacity: 0.7,
+    color: "inherit",
     background: "none",
     cursor: "pointer",
     fontFamily: FONT,
@@ -241,7 +243,8 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     height: "100%",
-    opacity: 0.5, color: "inherit",
+    opacity: 0.5,
+    color: "inherit",
     fontFamily: FONT,
   } as React.CSSProperties,
 };
@@ -398,7 +401,7 @@ function App() {
 
       updateFontSizeLabel(r);
     },
-    [updateFontSizeLabel],
+    [updateFontSizeLabel]
   );
 
   // ── Initialise D2Reader (mirrors ngOnInit) ───────────────────────
@@ -515,12 +518,12 @@ function App() {
 
   // ── Theme colors ─────────────────────────────────────────────────
   const themes = {
-    day:   { bg: "#FFFFFF", fg: "#121212", border: "#e0e0e0" },
+    day: { bg: "#FFFFFF", fg: "#121212", border: "#e0e0e0" },
     sepia: { bg: "#faf4e8", fg: "#121212", border: "#e0d0b0" },
     night: { bg: "#000000", fg: "#FEFEFE", border: "#333333" },
     "readium-default-on": { bg: "#FFFFFF", fg: "#121212", border: "#e0e0e0" },
-    "readium-sepia-on":   { bg: "#faf4e8", fg: "#121212", border: "#e0d0b0" },
-    "readium-night-on":   { bg: "#000000", fg: "#FEFEFE", border: "#333333" },
+    "readium-sepia-on": { bg: "#faf4e8", fg: "#121212", border: "#e0d0b0" },
+    "readium-night-on": { bg: "#000000", fg: "#FEFEFE", border: "#333333" },
   };
   const theme = themes[appearance] || themes.day;
 
@@ -530,12 +533,37 @@ function App() {
     <div style={{ background: theme.bg, color: theme.fg, minHeight: "100vh" }}>
       {/* Toolbar */}
       {reader && (
-        <div style={{ ...styles.toolbar, background: theme.bg, color: theme.fg, borderBottomColor: theme.border }}>
+        <div
+          style={{
+            ...styles.toolbar,
+            background: theme.bg,
+            color: theme.fg,
+            borderBottomColor: theme.border,
+          }}
+        >
           <div style={styles.toolbarGroup}>
-            <button style={styles.btn} onClick={toggleToc} title="Table of Contents">
+            <button
+              style={styles.btn}
+              onClick={toggleToc}
+              title="Table of Contents"
+            >
               <MenuIcon />
             </button>
-            <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1, padding: "2px 8px", borderRadius: 10, color: "#fff", background: "#dd0031", flexShrink: 0 }}>Angular</span>
+            <span
+              style={{
+                fontSize: 9,
+                fontWeight: 700,
+                textTransform: "uppercase",
+                letterSpacing: 1,
+                padding: "2px 8px",
+                borderRadius: 10,
+                color: "#fff",
+                background: "#dd0031",
+                flexShrink: 0,
+              }}
+            >
+              Angular
+            </span>
             <button
               style={{ ...styles.btn, opacity: isAtStart ? 0.35 : 1 }}
               onClick={previousPage}
@@ -558,8 +586,7 @@ function App() {
             <span style={styles.chapterTitle}>{chapterTitle}</span>
             {totalPages > 0 && (
               <span style={styles.pageInfo}>
-                Page {currentPage} of {totalPages}{" "}
-({progressPercent}%)
+                Page {currentPage} of {totalPages} ({progressPercent}%)
               </span>
             )}
           </div>
@@ -572,10 +599,18 @@ function App() {
             >
               {isScrolling ? <ScrollIcon /> : <PaginateIcon />}
             </button>
-            <button style={styles.btn} onClick={saveBookmark} title="Bookmark this page">
+            <button
+              style={styles.btn}
+              onClick={saveBookmark}
+              title="Bookmark this page"
+            >
               <BookmarkIcon />
             </button>
-            <button style={styles.btn} onClick={toggleSettings} title="Settings">
+            <button
+              style={styles.btn}
+              onClick={toggleSettings}
+              title="Settings"
+            >
               <SettingsIcon />
             </button>
           </div>
@@ -603,12 +638,20 @@ function App() {
       <div
         style={{
           ...styles.tocSidebar,
-          background: theme.bg, color: theme.fg,
+          background: theme.bg,
+          color: theme.fg,
           left: tocOpen ? 0 : -SIDEBAR_W,
         }}
       >
         <div style={styles.tocHeader}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: "inherit" }}>
+          <h3
+            style={{
+              margin: 0,
+              fontSize: 16,
+              fontWeight: 600,
+              color: "inherit",
+            }}
+          >
             Table of Contents
           </h3>
           <button style={{ ...styles.btn, padding: 4 }} onClick={toggleToc}>
@@ -629,15 +672,26 @@ function App() {
       <div
         style={{
           ...styles.settingsPanel,
-          background: theme.bg, color: theme.fg,
+          background: theme.bg,
+          color: theme.fg,
           right: settingsOpen ? 0 : -SETTINGS_W,
         }}
       >
         <div style={styles.tocHeader}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: "inherit" }}>
+          <h3
+            style={{
+              margin: 0,
+              fontSize: 16,
+              fontWeight: 600,
+              color: "inherit",
+            }}
+          >
             Settings
           </h3>
-          <button style={{ ...styles.btn, padding: 4 }} onClick={toggleSettings}>
+          <button
+            style={{ ...styles.btn, padding: 4 }}
+            onClick={toggleSettings}
+          >
             <CloseIcon />
           </button>
         </div>
@@ -661,15 +715,34 @@ function App() {
           <label style={styles.settingsLabel}>Appearance</label>
           <div style={{ ...styles.settingsRow, gap: 12 }}>
             {[
-              { value: "day", label: "Light", bg: "#fff", fg: "#333", border: "1px solid rgba(128,128,128,0.3)" },
-              { value: "sepia", label: "Sepia", bg: "#f5e6c8", fg: "#5b4636", border: "none" },
-              { value: "night", label: "Dark", bg: "#1e1e1e", fg: "#e0e0e0", border: "none" },
+              {
+                value: "day",
+                label: "Light",
+                bg: "#fff",
+                fg: "#333",
+                border: "1px solid rgba(128,128,128,0.3)",
+              },
+              {
+                value: "sepia",
+                label: "Sepia",
+                bg: "#f5e6c8",
+                fg: "#5b4636",
+                border: "none",
+              },
+              {
+                value: "night",
+                label: "Dark",
+                bg: "#1e1e1e",
+                fg: "#e0e0e0",
+                border: "none",
+              },
             ].map((a) => (
               <button
                 key={a.value}
                 style={{
                   ...styles.btnAppearance,
-                  borderColor: appearance === a.value ? ACCENT : "rgba(128,128,128,0.2)",
+                  borderColor:
+                    appearance === a.value ? ACCENT : "rgba(128,128,128,0.2)",
                   color: appearance === a.value ? ACCENT : "inherit",
                 }}
                 onClick={() => setAppearance(a.value)}

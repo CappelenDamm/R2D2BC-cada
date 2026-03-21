@@ -35,9 +35,11 @@ describe("contributorName", () => {
   });
 
   it("returns first value from IStringMap Name", () => {
-    expect(contributorName({ Name: { en: "Herman Melville", de: "Herman Melville" } })).toBe(
-      "Herman Melville"
-    );
+    expect(
+      contributorName({
+        Name: { en: "Herman Melville", de: "Herman Melville" },
+      })
+    ).toBe("Herman Melville");
   });
 
   it("returns empty string for empty object Name", () => {
@@ -49,9 +51,11 @@ describe("contributorName", () => {
 // We replicate the author-formatting algorithm to verify style-guide
 // compliance without needing a full module instantiation.
 
-function formatAuthors(
-  names: string[]
-): { chicago: string; mla: string; apa: string } {
+function formatAuthors(names: string[]): {
+  chicago: string;
+  mla: string;
+  apa: string;
+} {
   if (names.length === 0) return { chicago: "", mla: "", apa: "" };
   if (names.length === 1) {
     return { chicago: names[0], mla: names[0], apa: names[0] };
@@ -66,7 +70,8 @@ function formatAuthors(
   // 3+
   let chicago: string;
   if (names.length <= 6) {
-    chicago = names.slice(0, -1).join(", ") + ", and " + names[names.length - 1];
+    chicago =
+      names.slice(0, -1).join(", ") + ", and " + names[names.length - 1];
   } else {
     chicago = names.slice(0, 3).join(", ") + ", et al.";
   }
@@ -142,9 +147,7 @@ describe("selectedText truncation", () => {
 
 // ── eBookVersion formatting ──────────────────────────────────────────
 
-function eBookVersionFormatted(
-  modified: Date
-): [string, string, string] {
+function eBookVersionFormatted(modified: Date): [string, string, string] {
   const version =
     modified.getFullYear() +
     "-" +

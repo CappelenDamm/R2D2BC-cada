@@ -24,67 +24,144 @@ const themes: Record<string, { bg: string; fg: string; border: string }> = {
 
 // ── Styles ───────────────────────────────────────────────────────────
 
-const FONT = "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+const FONT =
+  "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
 const TOOLBAR_H = 42;
 const SIDEBAR_W = 280;
 
 const css = {
   toolbar: {
-    position: "fixed", top: 0, left: 0, right: 0, zIndex: 10,
-    display: "flex", alignItems: "center", gap: 6,
-    padding: "0 10px", height: TOOLBAR_H,
+    position: "fixed",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "0 10px",
+    height: TOOLBAR_H,
     backdropFilter: "blur(8px)",
-    borderBottom: "1px solid", fontFamily: FONT, fontSize: 12,
+    borderBottom: "1px solid",
+    fontFamily: FONT,
+    fontSize: 12,
     transition: "background .2s, color .2s",
   } as React.CSSProperties,
   badge: {
-    fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: 1,
-    padding: "2px 8px", borderRadius: 10, color: "#fff", background: "#61dafb", flexShrink: 0,
+    fontSize: 9,
+    fontWeight: 700,
+    textTransform: "uppercase",
+    letterSpacing: 1,
+    padding: "2px 8px",
+    borderRadius: 10,
+    color: "#fff",
+    background: "#61dafb",
+    flexShrink: 0,
   } as React.CSSProperties,
   btn: {
-    padding: "4px 10px", fontSize: 11, border: "1px solid transparent",
-    borderRadius: 14, background: "none", cursor: "pointer",
-    color: "inherit", textTransform: "uppercase", letterSpacing: 0.4,
+    padding: "4px 10px",
+    fontSize: 11,
+    border: "1px solid transparent",
+    borderRadius: 14,
+    background: "none",
+    cursor: "pointer",
+    color: "inherit",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
     whiteSpace: "nowrap",
   } as React.CSSProperties,
-  btnActive: { background: "rgba(128,128,128,0.2)", fontWeight: 600 } as React.CSSProperties,
-  sep: { width: 1, height: 18, background: "currentColor", opacity: 0.2, flexShrink: 0 } as React.CSSProperties,
+  btnActive: {
+    background: "rgba(128,128,128,0.2)",
+    fontWeight: 600,
+  } as React.CSSProperties,
+  sep: {
+    width: 1,
+    height: 18,
+    background: "currentColor",
+    opacity: 0.2,
+    flexShrink: 0,
+  } as React.CSSProperties,
   select: {
-    padding: "4px 6px", fontSize: 11, border: "1px solid #d0d0d0",
-    borderRadius: 6, background: "inherit", color: "inherit",
+    padding: "4px 6px",
+    fontSize: 11,
+    border: "1px solid #d0d0d0",
+    borderRadius: 6,
+    background: "inherit",
+    color: "inherit",
   } as React.CSSProperties,
   slider: { width: 70, accentColor: "#4a90d9" } as React.CSSProperties,
   sidebar: {
-    position: "fixed", top: TOOLBAR_H, bottom: 0, width: SIDEBAR_W,
+    position: "fixed",
+    top: TOOLBAR_H,
+    bottom: 0,
+    width: SIDEBAR_W,
     borderRight: "1px solid",
-    overflowY: "auto", padding: "10px 0", fontFamily: FONT, fontSize: 12,
-    zIndex: 9, transition: "transform .2s ease",
+    overflowY: "auto",
+    padding: "10px 0",
+    fontFamily: FONT,
+    fontSize: 12,
+    zIndex: 9,
+    transition: "transform .2s ease",
   } as React.CSSProperties,
-  sidebarHidden: { transform: `translateX(-${SIDEBAR_W}px)` } as React.CSSProperties,
+  sidebarHidden: {
+    transform: `translateX(-${SIDEBAR_W}px)`,
+  } as React.CSSProperties,
   overlay: {
-    position: "fixed", inset: 0, background: "rgba(0,0,0,0.15)", zIndex: 8,
+    position: "fixed",
+    inset: 0,
+    background: "rgba(0,0,0,0.15)",
+    zIndex: 8,
   } as React.CSSProperties,
   tocItem: {
-    padding: "6px 14px", cursor: "pointer", color: "inherit",
-    borderBottom: "1px solid #f0f0f0", lineHeight: 1.4,
+    padding: "6px 14px",
+    cursor: "pointer",
+    color: "inherit",
+    borderBottom: "1px solid #f0f0f0",
+    lineHeight: 1.4,
   } as React.CSSProperties,
   tocItemHover: { background: "#e8e8e8" } as React.CSSProperties,
   settingsPanel: {
-    padding: "8px 12px", display: "flex", flexDirection: "column", gap: 8,
+    padding: "8px 12px",
+    display: "flex",
+    flexDirection: "column",
+    gap: 8,
   } as React.CSSProperties,
   settingRow: {
-    display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 6,
   } as React.CSSProperties,
-  label: { fontSize: 11, color: "inherit", opacity: 0.7, flexShrink: 0 } as React.CSSProperties,
-  value: { fontSize: 10, opacity: 0.5, minWidth: 28, textAlign: "right" } as React.CSSProperties,
+  label: {
+    fontSize: 11,
+    color: "inherit",
+    opacity: 0.7,
+    flexShrink: 0,
+  } as React.CSSProperties,
+  value: {
+    fontSize: 10,
+    opacity: 0.5,
+    minWidth: 28,
+    textAlign: "right",
+  } as React.CSSProperties,
   bookmarkItem: {
-    padding: "8px 14px", cursor: "pointer", color: "inherit",
-    borderBottom: "1px solid #f0f0f0", fontSize: 11, lineHeight: 1.4,
-    display: "flex", justifyContent: "space-between", alignItems: "center",
+    padding: "8px 14px",
+    cursor: "pointer",
+    color: "inherit",
+    borderBottom: "1px solid #f0f0f0",
+    fontSize: 11,
+    lineHeight: 1.4,
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
   } as React.CSSProperties,
   deleteBtn: {
-    fontSize: 10, color: "#c00", cursor: "pointer", border: "none",
-    background: "none", padding: "2px 6px",
+    fontSize: 10,
+    color: "#c00",
+    cursor: "pointer",
+    border: "none",
+    background: "none",
+    padding: "2px 6px",
   } as React.CSSProperties,
 };
 
@@ -92,7 +169,13 @@ const css = {
 
 type SidebarTab = "toc" | "settings" | "bookmarks" | "search";
 
-function TabBar({ active, onChange }: { active: SidebarTab; onChange: (t: SidebarTab) => void }) {
+function TabBar({
+  active,
+  onChange,
+}: {
+  active: SidebarTab;
+  onChange: (t: SidebarTab) => void;
+}) {
   const tabs: { key: SidebarTab; label: string }[] = [
     { key: "toc", label: "TOC" },
     { key: "settings", label: "Settings" },
@@ -105,10 +188,16 @@ function TabBar({ active, onChange }: { active: SidebarTab; onChange: (t: Sideba
         <button
           key={t.key}
           style={{
-            flex: 1, padding: "8px 0", fontSize: 10, textTransform: "uppercase",
-            letterSpacing: 0.5, border: "none", cursor: "pointer",
+            flex: 1,
+            padding: "8px 0",
+            fontSize: 10,
+            textTransform: "uppercase",
+            letterSpacing: 0.5,
+            border: "none",
+            cursor: "pointer",
             background: active === t.key ? "#e8e8e8" : "transparent",
-            fontWeight: active === t.key ? 600 : 400, color: "inherit",
+            fontWeight: active === t.key ? 600 : 400,
+            color: "inherit",
           }}
           onClick={() => onChange(t.key)}
         >
@@ -119,13 +208,21 @@ function TabBar({ active, onChange }: { active: SidebarTab; onChange: (t: Sideba
   );
 }
 
-function TOCPanel({ reader, onNavigate }: { reader: D2Reader; onNavigate: () => void }) {
+function TOCPanel({
+  reader,
+  onNavigate,
+}: {
+  reader: D2Reader;
+  onNavigate: () => void;
+}) {
   const toc = reader.tableOfContents || [];
   const [hover, setHover] = useState<number | null>(null);
 
   return (
     <div>
-      {toc.length === 0 && <div style={{ padding: 14, opacity: 0.5 }}>No table of contents</div>}
+      {toc.length === 0 && (
+        <div style={{ padding: 14, opacity: 0.5 }}>No table of contents</div>
+      )}
       {toc.map((item: any, i: number) => (
         <div
           key={i}
@@ -144,25 +241,44 @@ function TOCPanel({ reader, onNavigate }: { reader: D2Reader; onNavigate: () => 
   );
 }
 
-function SettingsPanel({ reader, refresh }: { reader: D2Reader; refresh: () => void }) {
+function SettingsPanel({
+  reader,
+  refresh,
+}: {
+  reader: D2Reader;
+  refresh: () => void;
+}) {
   const s = reader.currentSettings;
-  const apply = (settings: any) => { reader.applyUserSettings(settings); refresh(); };
+  const apply = (settings: any) => {
+    reader.applyUserSettings(settings);
+    refresh();
+  };
 
   return (
     <div style={css.settingsPanel as React.CSSProperties}>
       {/* Font size */}
       <div style={css.settingRow}>
         <span style={css.label}>Font Size</span>
-        <input type="range" min={100} max={300} step={25} defaultValue={s.fontSize}
-          style={css.slider} onChange={(e) => apply({ fontSize: Number(e.target.value) })} />
+        <input
+          type="range"
+          min={100}
+          max={300}
+          step={25}
+          defaultValue={s.fontSize}
+          style={css.slider}
+          onChange={(e) => apply({ fontSize: Number(e.target.value) })}
+        />
         <span style={css.value as React.CSSProperties}>{s.fontSize}%</span>
       </div>
 
       {/* Font family */}
       <div style={css.settingRow}>
         <span style={css.label}>Font</span>
-        <select style={css.select} defaultValue={s.fontFamily}
-          onChange={(e) => apply({ fontFamily: e.target.value })}>
+        <select
+          style={css.select}
+          defaultValue={s.fontFamily}
+          onChange={(e) => apply({ fontFamily: e.target.value })}
+        >
           <option value="Original">Publisher</option>
           <option value="serif">Serif</option>
           <option value="sans-serif">Sans-serif</option>
@@ -175,11 +291,23 @@ function SettingsPanel({ reader, refresh }: { reader: D2Reader; refresh: () => v
         <span style={css.label}>Theme</span>
         <div style={{ display: "flex", gap: 0 }}>
           {(["day", "sepia", "night"] as const).map((mode, i) => (
-            <button key={mode} style={{
-              ...css.btn, borderRadius: i === 0 ? "14px 0 0 14px" : i === 2 ? "0 14px 14px 0" : 0,
-              background: mode === "night" ? "#121212" : mode === "sepia" ? "#f5e6c8" : "#fff",
-              color: mode === "night" ? "#fff" : "#555", minWidth: 50,
-            }} onClick={() => apply({ appearance: mode })}>
+            <button
+              key={mode}
+              style={{
+                ...css.btn,
+                borderRadius:
+                  i === 0 ? "14px 0 0 14px" : i === 2 ? "0 14px 14px 0" : 0,
+                background:
+                  mode === "night"
+                    ? "#121212"
+                    : mode === "sepia"
+                      ? "#f5e6c8"
+                      : "#fff",
+                color: mode === "night" ? "#fff" : "#555",
+                minWidth: 50,
+              }}
+              onClick={() => apply({ appearance: mode })}
+            >
               {mode}
             </button>
           ))}
@@ -190,64 +318,129 @@ function SettingsPanel({ reader, refresh }: { reader: D2Reader; refresh: () => v
       <div style={css.settingRow}>
         <span style={css.label}>Layout</span>
         <div style={{ display: "flex", gap: 0 }}>
-          <button style={{
-            ...css.btn, borderRadius: "14px 0 0 14px", minWidth: 60,
-            ...(s.verticalScroll ? css.btnActive : {}),
-          }} onClick={() => { reader.scroll(true); refresh(); }}>Scroll</button>
-          <button style={{
-            ...css.btn, borderRadius: "0 14px 14px 0", minWidth: 60,
-            ...(!s.verticalScroll ? css.btnActive : {}),
-          }} onClick={() => { reader.scroll(false); refresh(); }}>Pages</button>
+          <button
+            style={{
+              ...css.btn,
+              borderRadius: "14px 0 0 14px",
+              minWidth: 60,
+              ...(s.verticalScroll ? css.btnActive : {}),
+            }}
+            onClick={() => {
+              reader.scroll(true);
+              refresh();
+            }}
+          >
+            Scroll
+          </button>
+          <button
+            style={{
+              ...css.btn,
+              borderRadius: "0 14px 14px 0",
+              minWidth: 60,
+              ...(!s.verticalScroll ? css.btnActive : {}),
+            }}
+            onClick={() => {
+              reader.scroll(false);
+              refresh();
+            }}
+          >
+            Pages
+          </button>
         </div>
       </div>
 
       {/* Line height */}
       <div style={css.settingRow}>
         <span style={css.label}>Line Height</span>
-        <input type="range" min={1} max={2} step={0.25} defaultValue={s.lineHeight}
-          style={css.slider} onChange={(e) => apply({ lineHeight: Number(e.target.value) })} />
+        <input
+          type="range"
+          min={1}
+          max={2}
+          step={0.25}
+          defaultValue={s.lineHeight}
+          style={css.slider}
+          onChange={(e) => apply({ lineHeight: Number(e.target.value) })}
+        />
       </div>
 
       {/* Page margins */}
       <div style={css.settingRow}>
         <span style={css.label}>Margins</span>
-        <input type="range" min={0.5} max={4} step={0.25} defaultValue={s.pageMargins}
-          style={css.slider} onChange={(e) => apply({ pageMargins: Number(e.target.value) })} />
+        <input
+          type="range"
+          min={0.5}
+          max={4}
+          step={0.25}
+          defaultValue={s.pageMargins}
+          style={css.slider}
+          onChange={(e) => apply({ pageMargins: Number(e.target.value) })}
+        />
       </div>
 
       {/* Word spacing */}
       <div style={css.settingRow}>
         <span style={css.label}>Word Spacing</span>
-        <input type="range" min={0} max={1} step={0.25} defaultValue={s.wordSpacing}
-          style={css.slider} onChange={(e) => apply({ wordSpacing: Number(e.target.value) })} />
+        <input
+          type="range"
+          min={0}
+          max={1}
+          step={0.25}
+          defaultValue={s.wordSpacing}
+          style={css.slider}
+          onChange={(e) => apply({ wordSpacing: Number(e.target.value) })}
+        />
       </div>
 
       {/* Letter spacing */}
       <div style={css.settingRow}>
         <span style={css.label}>Letter Spacing</span>
-        <input type="range" min={0} max={0.5} step={0.0625} defaultValue={s.letterSpacing}
-          style={css.slider} onChange={(e) => apply({ letterSpacing: Number(e.target.value) })} />
+        <input
+          type="range"
+          min={0}
+          max={0.5}
+          step={0.0625}
+          defaultValue={s.letterSpacing}
+          style={css.slider}
+          onChange={(e) => apply({ letterSpacing: Number(e.target.value) })}
+        />
       </div>
 
       {/* Paragraph spacing */}
       <div style={css.settingRow}>
         <span style={css.label}>Paragraph Spacing</span>
-        <input type="range" min={0} max={3} step={0.5} defaultValue={s.paraSpacing ?? 0}
-          style={css.slider} onChange={(e) => apply({ paraSpacing: Number(e.target.value) })} />
+        <input
+          type="range"
+          min={0}
+          max={3}
+          step={0.5}
+          defaultValue={s.paraSpacing ?? 0}
+          style={css.slider}
+          onChange={(e) => apply({ paraSpacing: Number(e.target.value) })}
+        />
       </div>
 
       {/* Paragraph indent */}
       <div style={css.settingRow}>
         <span style={css.label}>Paragraph Indent</span>
-        <input type="range" min={0} max={3} step={0.5} defaultValue={s.paraIndent ?? 1}
-          style={css.slider} onChange={(e) => apply({ paraIndent: Number(e.target.value) })} />
+        <input
+          type="range"
+          min={0}
+          max={3}
+          step={0.5}
+          defaultValue={s.paraIndent ?? 1}
+          style={css.slider}
+          onChange={(e) => apply({ paraIndent: Number(e.target.value) })}
+        />
       </div>
 
       {/* Alignment */}
       <div style={css.settingRow}>
         <span style={css.label}>Align</span>
-        <select style={css.select} defaultValue={s.textAlignment}
-          onChange={(e) => apply({ textAlignment: e.target.value })}>
+        <select
+          style={css.select}
+          defaultValue={s.textAlignment}
+          onChange={(e) => apply({ textAlignment: e.target.value })}
+        >
           <option value="auto">Auto</option>
           <option value="justify">Justify</option>
           <option value="start">Start</option>
@@ -257,8 +450,11 @@ function SettingsPanel({ reader, refresh }: { reader: D2Reader; refresh: () => v
       {/* Columns */}
       <div style={css.settingRow}>
         <span style={css.label}>Columns</span>
-        <select style={css.select} defaultValue={s.columnCount}
-          onChange={(e) => apply({ columnCount: e.target.value })}>
+        <select
+          style={css.select}
+          defaultValue={s.columnCount}
+          onChange={(e) => apply({ columnCount: e.target.value })}
+        >
           <option value="auto">Auto</option>
           <option value="1">Single</option>
           <option value="2">Double</option>
@@ -266,15 +462,26 @@ function SettingsPanel({ reader, refresh }: { reader: D2Reader; refresh: () => v
       </div>
 
       {/* Reset */}
-      <button style={{ ...css.btn, marginTop: 8, alignSelf: "center" }}
-        onClick={() => { reader.resetUserSettings(); refresh(); }}>
+      <button
+        style={{ ...css.btn, marginTop: 8, alignSelf: "center" }}
+        onClick={() => {
+          reader.resetUserSettings();
+          refresh();
+        }}
+      >
         Reset
       </button>
     </div>
   );
 }
 
-function SearchPanel({ reader, onNavigate }: { reader: D2Reader; onNavigate: () => void }) {
+function SearchPanel({
+  reader,
+  onNavigate,
+}: {
+  reader: D2Reader;
+  onNavigate: () => void;
+}) {
   const [term, setTerm] = useState("");
   const [results, setResults] = useState<any[]>([]);
   const [searched, setSearched] = useState(false);
@@ -297,13 +504,28 @@ function SearchPanel({ reader, onNavigate }: { reader: D2Reader; onNavigate: () 
     <div>
       <div style={{ padding: "8px 12px", display: "flex", gap: 6 }}>
         <input
-          type="text" value={term} placeholder="Search…"
-          style={{ flex: 1, padding: "6px 8px", fontSize: 11, border: "1px solid #d0d0d0", borderRadius: 6, outline: "none" }}
+          type="text"
+          value={term}
+          placeholder="Search…"
+          style={{
+            flex: 1,
+            padding: "6px 8px",
+            fontSize: 11,
+            border: "1px solid #d0d0d0",
+            borderRadius: 6,
+            outline: "none",
+          }}
           onChange={(e) => setTerm(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && doSearch()}
         />
-        <button style={css.btn} onClick={doSearch}>Go</button>
-        {searched && <button style={css.btn} onClick={clear}>✕</button>}
+        <button style={css.btn} onClick={doSearch}>
+          Go
+        </button>
+        {searched && (
+          <button style={css.btn} onClick={clear}>
+            ✕
+          </button>
+        )}
       </div>
       {searched && results.length === 0 && (
         <div style={{ padding: 14, opacity: 0.5 }}>No results found</div>
@@ -326,18 +548,31 @@ function SearchPanel({ reader, onNavigate }: { reader: D2Reader; onNavigate: () 
   );
 }
 
-function BookmarksPanel({ reader, refresh }: { reader: D2Reader; refresh: () => void }) {
+function BookmarksPanel({
+  reader,
+  refresh,
+}: {
+  reader: D2Reader;
+  refresh: () => void;
+}) {
   const bookmarks = reader.bookmarks || [];
 
   return (
     <div>
       <div style={{ padding: "8px 14px", borderBottom: "1px solid #e0e0e0" }}>
-        <button style={{ ...css.btn, width: "100%" }}
-          onClick={() => { reader.saveBookmark(); refresh(); }}>
+        <button
+          style={{ ...css.btn, width: "100%" }}
+          onClick={() => {
+            reader.saveBookmark();
+            refresh();
+          }}
+        >
           + Add Bookmark
         </button>
       </div>
-      {bookmarks.length === 0 && <div style={{ padding: 14, opacity: 0.5 }}>No bookmarks yet</div>}
+      {bookmarks.length === 0 && (
+        <div style={{ padding: 14, opacity: 0.5 }}>No bookmarks yet</div>
+      )}
       {bookmarks.map((bm: any, i: number) => (
         <div key={bm.id || i} style={css.bookmarkItem}>
           <span
@@ -351,8 +586,13 @@ function BookmarksPanel({ reader, refresh }: { reader: D2Reader; refresh: () => 
               </span>
             )}
           </span>
-          <button style={css.deleteBtn}
-            onClick={() => { reader.deleteBookmark(bm); refresh(); }}>
+          <button
+            style={css.deleteBtn}
+            onClick={() => {
+              reader.deleteBookmark(bm);
+              refresh();
+            }}
+          >
             ✕
           </button>
         </div>
@@ -374,17 +614,35 @@ interface PageInfo {
   totalRemainingPositions?: number;
 }
 
-function Toolbar({ reader, refresh, sidebarOpen, onToggleSidebar, pageInfo, onPageTurn, theme }: {
-  reader: D2Reader; refresh: () => void;
-  sidebarOpen: boolean; onToggleSidebar: () => void;
-  pageInfo: PageInfo; onPageTurn: () => void;
+function Toolbar({
+  reader,
+  refresh,
+  sidebarOpen,
+  onToggleSidebar,
+  pageInfo,
+  onPageTurn,
+  theme,
+}: {
+  reader: D2Reader;
+  refresh: () => void;
+  sidebarOpen: boolean;
+  onToggleSidebar: () => void;
+  pageInfo: PageInfo;
+  onPageTurn: () => void;
   theme: { bg: string; fg: string; border: string };
 }) {
   const settings = reader.currentSettings;
   const isScrolling = settings.verticalScroll ?? false;
 
   return (
-    <div style={{ ...css.toolbar, background: theme.bg, color: theme.fg, borderColor: theme.border }}>
+    <div
+      style={{
+        ...css.toolbar,
+        background: theme.bg,
+        color: theme.fg,
+        borderColor: theme.border,
+      }}
+    >
       {/* Menu toggle */}
       <button style={css.btn} onClick={onToggleSidebar}>
         {sidebarOpen ? "✕" : "☰"}
@@ -394,31 +652,72 @@ function Toolbar({ reader, refresh, sidebarOpen, onToggleSidebar, pageInfo, onPa
       <div style={css.sep} />
 
       {/* Navigation */}
-      <button style={css.btn} onClick={() => { reader.previousPage(); setTimeout(onPageTurn, 150); }}>←</button>
-      <button style={css.btn} onClick={() => { reader.nextPage(); setTimeout(onPageTurn, 150); }}>→</button>
+      <button
+        style={css.btn}
+        onClick={() => {
+          reader.previousPage();
+          setTimeout(onPageTurn, 150);
+        }}
+      >
+        ←
+      </button>
+      <button
+        style={css.btn}
+        onClick={() => {
+          reader.nextPage();
+          setTimeout(onPageTurn, 150);
+        }}
+      >
+        →
+      </button>
 
       <div style={css.sep} />
 
       {/* Layout toggle */}
       <button
         style={{ ...css.btn, ...(isScrolling ? css.btnActive : {}) }}
-        onClick={() => { reader.scroll(true); refresh(); }}
-      >Scroll</button>
+        onClick={() => {
+          reader.scroll(true);
+          refresh();
+        }}
+      >
+        Scroll
+      </button>
       <button
         style={{ ...css.btn, ...(!isScrolling ? css.btnActive : {}) }}
-        onClick={() => { reader.scroll(false); refresh(); }}
-      >Pages</button>
+        onClick={() => {
+          reader.scroll(false);
+          refresh();
+        }}
+      >
+        Pages
+      </button>
 
       <div style={css.sep} />
 
       {/* Page info */}
-      <span style={{ fontSize: 11, color: "inherit", opacity: 0.7, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+      <span
+        style={{
+          fontSize: 11,
+          color: "inherit",
+          opacity: 0.7,
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          textOverflow: "ellipsis",
+        }}
+      >
         {pageInfo.chapterTitle && (
-          <span style={{ opacity: 0.5, marginRight: 6 }}>{pageInfo.chapterTitle}</span>
+          <span style={{ opacity: 0.5, marginRight: 6 }}>
+            {pageInfo.chapterTitle}
+          </span>
         )}
-        {pageInfo.pageIndex != null && pageInfo.pageCount != null && !isScrolling && (
-          <span>Page {pageInfo.pageIndex} of {pageInfo.pageCount}</span>
-        )}
+        {pageInfo.pageIndex != null &&
+          pageInfo.pageCount != null &&
+          !isScrolling && (
+            <span>
+              Page {pageInfo.pageIndex} of {pageInfo.pageCount}
+            </span>
+          )}
         {pageInfo.totalProgression != null && (
           <span style={{ opacity: 0.5, marginLeft: 6 }}>
             {Math.round(pageInfo.totalProgression * 100)}%
@@ -429,7 +728,13 @@ function Toolbar({ reader, refresh, sidebarOpen, onToggleSidebar, pageInfo, onPa
       <div style={{ flex: 1 }} />
 
       {/* Bookmark shortcut */}
-      <button style={css.btn} onClick={() => { reader.saveBookmark(); refresh(); }}>
+      <button
+        style={css.btn}
+        onClick={() => {
+          reader.saveBookmark();
+          refresh();
+        }}
+      >
         Bookmark
       </button>
     </div>
@@ -440,10 +745,17 @@ function Toolbar({ reader, refresh, sidebarOpen, onToggleSidebar, pageInfo, onPa
 
 function LoadingScreen() {
   return (
-    <div style={{
-      display: "flex", alignItems: "center", justifyContent: "center",
-      height: "100vh", fontFamily: FONT, opacity: 0.5, fontSize: 16,
-    }}>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        height: "100vh",
+        fontFamily: FONT,
+        opacity: 0.5,
+        fontSize: 16,
+      }}
+    >
       Loading reader…
     </div>
   );
@@ -480,7 +792,9 @@ function App() {
       }
       const a = r.currentSettings?.appearance;
       if (a) setAppearance(a);
-    } catch (_) { /* locator may not be ready yet */ }
+    } catch (_) {
+      /* locator may not be ready yet */
+    }
   }, []);
 
   useEffect(() => {
@@ -512,7 +826,9 @@ function App() {
       // Listen for navigation events to update page info
       r.addEventListener("resource.ready", () => updatePageInfo(r));
       // Also update on click (handles page turns within same resource)
-      r.addEventListener("click", () => setTimeout(() => updatePageInfo(r), 100));
+      r.addEventListener("click", () =>
+        setTimeout(() => updatePageInfo(r), 100)
+      );
       // Sync persisted appearance
       const a = r.currentSettings?.appearance;
       if (a) setAppearance(a);
@@ -525,8 +841,14 @@ function App() {
   useEffect(() => {
     if (!reader) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "ArrowRight") { reader.nextPage(); setTimeout(() => updatePageInfo(reader), 100); }
-      if (e.key === "ArrowLeft") { reader.previousPage(); setTimeout(() => updatePageInfo(reader), 100); }
+      if (e.key === "ArrowRight") {
+        reader.nextPage();
+        setTimeout(() => updatePageInfo(reader), 100);
+      }
+      if (e.key === "ArrowLeft") {
+        reader.previousPage();
+        setTimeout(() => updatePageInfo(reader), 100);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -549,20 +871,37 @@ function App() {
           />
 
           {/* Sidebar */}
-          <div style={{
-            ...css.sidebar,
-            background: theme.bg, color: theme.fg, borderColor: theme.border,
-            ...(sidebarOpen ? {} : css.sidebarHidden),
-          }}>
+          <div
+            style={{
+              ...css.sidebar,
+              background: theme.bg,
+              color: theme.fg,
+              borderColor: theme.border,
+              ...(sidebarOpen ? {} : css.sidebarHidden),
+            }}
+          >
             <TabBar active={activeTab} onChange={setActiveTab} />
-            {activeTab === "toc" && <TOCPanel reader={reader} onNavigate={closeSidebar} />}
-            {activeTab === "settings" && <SettingsPanel reader={reader} refresh={refresh} />}
-            {activeTab === "bookmarks" && <BookmarksPanel reader={reader} refresh={refresh} />}
-            {activeTab === "search" && <SearchPanel reader={reader} onNavigate={closeSidebar} />}
+            {activeTab === "toc" && (
+              <TOCPanel reader={reader} onNavigate={closeSidebar} />
+            )}
+            {activeTab === "settings" && (
+              <SettingsPanel reader={reader} refresh={refresh} />
+            )}
+            {activeTab === "bookmarks" && (
+              <BookmarksPanel reader={reader} refresh={refresh} />
+            )}
+            {activeTab === "search" && (
+              <SearchPanel reader={reader} onNavigate={closeSidebar} />
+            )}
           </div>
 
           {/* Overlay to close sidebar */}
-          {sidebarOpen && <div style={css.overlay as React.CSSProperties} onClick={closeSidebar} />}
+          {sidebarOpen && (
+            <div
+              style={css.overlay as React.CSSProperties}
+              onClick={closeSidebar}
+            />
+          )}
         </>
       )}
 

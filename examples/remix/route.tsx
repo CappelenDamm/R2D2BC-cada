@@ -15,7 +15,7 @@ import type { Route } from "./+types/route";
 
 // --- Server loader: passes the manifest URL to the client ---
 
-export function loader({ request }: Route.LoaderArgs) {
+export function loader({ _request }: Route.LoaderArgs) {
   // In a real app, the manifest URL would come from a database,
   // CMS, or route parameter (e.g. /reader/:bookId).
   return {
@@ -51,9 +51,7 @@ const EpubReader = lazy(() => import("./EpubReader"));
 
 // --- Route component ---
 
-export default function ReaderRoute({
-  loaderData,
-}: Route.ComponentProps) {
+export default function ReaderRoute({ loaderData }: Route.ComponentProps) {
   const { manifestUrl } = loaderData;
 
   return (
