@@ -41,7 +41,8 @@ async function buildTs(
   const config: BuildOptions = {
     bundle: true,
     // what browsers we want to support, this is basically all >1% usage
-    target: ["chrome89", "firefox88", "safari14", "edge90"],
+    // updated for 2025: Chrome 109+ (2023), Firefox 115+ (2023 ESR), Safari 16+ (2022), Edge 109+ (2023)
+    target: ["chrome109", "firefox115", "safari16", "edge109"],
     sourcemap: true,
     // we include some node.js polyfills
     inject: ["./polyfills.js"],
@@ -101,6 +102,41 @@ async function copyJsInjectables() {
     logBundled("Copied JS injectables", "dist/injectables/**/*.js");
   } catch (e) {
     err("CSS Copy Error: ", e);
+  }
+}
+
+/**
+ * Copies pdfjs-dist assets to dist/ so consumers can self-host the worker
+ * instead of relying on the CDN fallback.
+ *
+ * Consumers using the ESM build can configure the worker path via:
+ *   PDFNavigator.create({ ..., workerSrc: "/path/to/pdf.worker.min.mjs" })
+ */
+async function copyPdfjsAssets() {
+  try {
+    await fs.copyFile(
+      "node_modules/pdfjs-dist/build/pdf.worker.min.mjs",
+      "dist/pdf.worker.min.mjs"
+    );
+    logBundled("Copied PDF.js worker", "dist/pdf.worker.min.mjs");
+    await fs.copyFile(
+      "node_modules/pdfjs-dist/web/pdf_viewer.css",
+      "dist/pdf_viewer.css"
+    );
+    logBundled("Copied PDF.js viewer CSS", "dist/pdf_viewer.css");
+    // pdf_viewer.css references SVG icons as relative paths (images/*.svg).
+    // Copy the entire images/ directory so annotation editor icons (delete,
+    // highlight, cursors, etc.) resolve correctly when the CSS is served.
+    await fs.mkdir("dist/images", { recursive: true });
+    const imgSrc = "node_modules/pdfjs-dist/web/images";
+    const imgDst = "dist/images";
+    const svgs = await fs.readdir(imgSrc);
+    await Promise.all(
+      svgs.map((f) => fs.copyFile(`${imgSrc}/${f}`, `${imgDst}/${f}`))
+    );
+    logBundled("Copied PDF.js viewer images", "dist/images/");
+  } catch (e) {
+    err("PDF.js assets copy error", e as string);
   }
 }
 
@@ -176,8 +212,11 @@ async function buildAll() {
   // compile sass files into reader.css and material.css
   const p7 = compileCss("src/styles/sass/reader.scss", "reader");
 
+  // copy pdfjs-dist worker + viewer CSS for self-hosting
+  const p8 = copyPdfjsAssets();
+
   // wait for everything to finish running in parallel
-  await Promise.all([p1, p2, p3, p4, p5, p6, p7]);
+  await Promise.all([p1, p2, p3, p4, p5, p6, p7, p8]);
   console.log("🔥 Build finished.");
 }
 

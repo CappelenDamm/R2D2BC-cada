@@ -63,7 +63,6 @@ export interface DefinitionsModuleConfig extends DefinitionsModuleProperties {
 
 export class DefinitionsModule implements ReaderModule {
   properties: DefinitionsModuleProperties;
-  // @ts-ignore
   api?: DefinitionsModuleAPI;
   private publication: Publication;
   navigator: IFrameNavigator;

@@ -16,57 +16,59 @@
  * Developed on behalf of: Bokbasen AS (https://www.bokbasen.no)
  * Licensed to: Bokbasen AS and CAST under one or more contributor license agreements.
  */
- :root {
-    --RS__highlightColor: rgba(255, 255, 0, 0.5);
- }
- .sidenav-annotations {
-    padding-inline-start: 0px;
-    .chapter-link {
+:root {
+  --RS__highlightColor: rgba(255, 255, 0, 0.5);
+}
+.sidenav-annotations {
+  padding-inline-start: 0px;
+  .chapter-link {
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .chapter-title {
+    padding: 0 16px;
+    font-size: 14px;
+    color: lightgray;
+  }
+  ol {
+    padding-left: 24px;
+  }
+  li {
+    position: relative;
+    .delete {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translate(0, -50%);
+    }
+    .bookmark-link,
+    .highlight-link {
+      display: block;
+      position: relative;
+      padding-top: 8px !important;
+      padding-bottom: 8px !important;
+      line-height: 1.25;
+      svg,
+      i {
+        left: 4px;
+        top: 8px;
+        position: absolute;
+      }
+      .title {
         display: block;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
+      }
+      .subtitle {
+        display: block;
+        line-height: 20px;
+        font-size: 10px;
+      }
+      .timestamp {
+        display: block;
+        line-height: 20px;
+        font-size: 8px;
+      }
     }
-    .chapter-title {
-        padding: 0 16px;
-        font-size: 14px;
-        color: lightgray;
-    }
-    ol {
-      padding-left: 24px;
-    }
-    li {
-        position: relative;
-        .delete {
-            position: absolute;
-            right: 10px;
-            top: 50%;
-            transform: translate(0,-50%);
-        }
-        .bookmark-link, .highlight-link {
-            display: block;
-            position: relative;
-            padding-top: 8px !important;
-            padding-bottom: 8px !important;
-            line-height: 1.25;
-            svg, i {
-                left: 4px;
-                top: 8px;
-                position: absolute;
-            }
-            .title {
-                display: block;
-            }
-            .subtitle {
-                display: block;
-                line-height: 20px;
-                font-size: 10px;
-            }
-            .timestamp {
-                display: block;
-                line-height: 20px;
-                font-size: 8px;
-            }
-        }
-    }
+  }
 }

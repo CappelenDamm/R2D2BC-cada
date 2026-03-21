@@ -21,7 +21,8 @@
 // Bookmarks Styles         //
 //////////////////////////////
 
-.bookmarks-view, .highlights-view{
+.bookmarks-view,
+.highlights-view {
   background-color: $ui-white;
   overflow: scroll;
   top: 3.5rem;
@@ -60,17 +61,17 @@
         color: $ui-light-gray;
       }
     }
-
   }
 }
 
 [data-viewer-theme="sepia"] {
-    .bookmarks-view, .highlights-view {
-        background-color: $sepia-bg;
+  .bookmarks-view,
+  .highlights-view {
+    background-color: $sepia-bg;
 
     ol li,
     ul li {
-        a {
+      a {
         color: $ui-dark-gray;
         border-bottom: 1px solid darken($sepia-bg, 20%);
 
@@ -100,12 +101,13 @@
 }
 
 [data-viewer-theme="night"] {
-    .bookmarks-view, .highlights-view {
-        background-color: $night-bg;
+  .bookmarks-view,
+  .highlights-view {
+    background-color: $night-bg;
 
     ol li,
     ul li {
-        a {
+      a {
         color: $ui-dark-gray;
         border-bottom: 1px solid darken($ui-white, 20%);
 
