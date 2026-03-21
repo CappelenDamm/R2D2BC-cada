@@ -1093,9 +1093,11 @@ export class TextHighlighter {
                 win!,
                 getCssSelector
               );
-              self.navigator.annotationModule?.annotator?.saveTemporarySelectionInfo(
-                selectionInfo
-              );
+              if (selectionInfo) {
+                self.navigator.annotationModule?.annotator?.saveTemporarySelectionInfo(
+                  selectionInfo
+                );
+              }
             }, 5);
           }
         }, 100);
@@ -1335,7 +1337,7 @@ export class TextHighlighter {
                   selectionInfo =
                     self.navigator.annotationModule?.annotator?.getTemporarySelectionInfo(
                       doc
-                    );
+                    ) ?? undefined;
                 }
 
                 if (selectionInfo !== undefined) {
@@ -1448,7 +1450,7 @@ export class TextHighlighter {
         selectionInfo =
           this.navigator.annotationModule?.annotator?.getTemporarySelectionInfo(
             doc
-          );
+          ) ?? undefined;
       }
 
       if (selectionInfo) {
@@ -1526,7 +1528,7 @@ export class TextHighlighter {
           selectionInfo =
             self.navigator.annotationModule?.annotator?.getTemporarySelectionInfo(
               doc
-            );
+            ) ?? undefined;
         }
 
         if (selectionInfo !== undefined) {
@@ -2476,13 +2478,14 @@ export class TextHighlighter {
             }
           }
         } else {
-          if (foundElement.dataset.definition) {
+          const defElement = foundElement.parentElement ?? foundElement;
+          if (defElement.dataset.definition) {
             const popup = new Popup(this.navigator);
-            popup.showPopup(foundElement.dataset.definition, ev);
+            popup.showPopup(defElement.dataset.definition, ev);
           }
           let result =
             this.navigator.definitionsModule?.properties?.definitions?.filter(
-              (el: any) => el.order === Number(foundElement?.dataset.order)
+              (el: any) => el.order === Number(defElement?.dataset.order)
             )[0];
           log.log(result);
           if (this.navigator.definitionsModule?.api?.click) {
