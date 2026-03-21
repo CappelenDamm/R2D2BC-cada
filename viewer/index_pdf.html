@@ -358,8 +358,20 @@
 <script>
     let d2reader = undefined;
 
+    // Read manifest URL from query string (?url=...)
+    let defined_url = 'https://alicepdf.dita.digital/alice.json';
+    const query = window.location.search;
+    if (query) {
+        const params = {};
+        query.substring(1).split('&').forEach(function(kv) {
+            const pair = kv.split('=');
+            if (pair.length > 1) params[pair[0]] = decodeURIComponent(pair[1]);
+        });
+        if (params['url']) defined_url = params['url'];
+    }
+
     D2Reader.load({
-        url: new URL('https://alicepdf.dita.digital/alice.json'),
+        url: new URL(defined_url),
         injectables: [],
         injectablesFixed: [],
         workerSrc: '/viewer/pdf.worker.min.mjs',

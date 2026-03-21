@@ -1,16 +1,22 @@
 # R2D2BC Examples
 
-Seven example implementations are included to demonstrate how to integrate `@d-i-t-a/reader` across different frameworks and environments.
+Eight example implementations are included to demonstrate how to integrate `@d-i-t-a/reader` across different frameworks and environments.
 
 | Example | Framework | Description |
 |---------|-----------|-------------|
-| [`viewer/index_dita.html`](../viewer/index_dita.html) | Vanilla (full) | Full-featured dev viewer with all modules |
-| [`vanilla/`](vanilla/) | Vanilla JS | Minimal single-file, no build tools |
+| [`viewer/index_dita.html`](../viewer/index_dita.html) | Vanilla (full) | Full-featured EPUB dev viewer with all modules |
+| [`viewer/index_pdf.html`](../viewer/index_pdf.html) | Vanilla (full) | Full-featured PDF viewer with annotations, TOC, search |
+| [`vanilla/`](vanilla/) | Vanilla JS | Minimal EPUB reader, single-file, no build tools |
+| [`pdf/`](pdf/) | Vanilla JS | Minimal PDF viewer, standalone |
 | [`react/`](react/) | React 18 | Complete reader app with sidebar |
 | [`angular/`](angular/) | Angular 16+ | Standalone component (drop-in) |
 | [`vue/`](vue/) | Vue 3 | Composition API SFC (drop-in) |
 | [`nextjs/`](nextjs/) | Next.js | SSR-safe with dynamic import |
 | [`remix/`](remix/) | Remix / React Router v7 | Client-only with loader pattern |
+
+### Publication Library (Streamer)
+
+`npm run examples` starts a streamer server with a landing page at `http://localhost:4444/viewer/index.html` that lists all local EPUB and PDF files from `examples/epubs/`. Publications show cover images, titles, and viewer links. Includes built-in Alice demos (hosted EPUB + PDF).
 
 ---
 
@@ -25,27 +31,23 @@ npm install
 # DITA Viewer — full-featured dev viewer (builds + watches + serves on port 4444)
 npm run dev
 
-# React example (Parcel, port 1234)
-npm run example:react
+# Publication Library — streamer with landing page (port 4444)
+npm run examples
 
-# Vue example (Parcel, port 1234)
-npm run example:vue
+# Framework examples (each auto-clears Parcel cache before starting)
+npm run example:react    # React 18 (Parcel, port 1234)
+npm run example:vue      # Vue 3 (Parcel, port 1234)
+npm run example:angular  # Angular (Parcel, port 1234)
+npm run example:nextjs   # Next.js pattern (Parcel, port 1234)
+npm run example:remix    # Remix pattern (Parcel, port 1234)
 
-# Angular example (Parcel, port 1234)
-npm run example:angular
-
-# Next.js example (Parcel, port 1234)
-npm run example:nextjs
-
-# Remix example (Parcel, port 1234)
-npm run example:remix
-
-# Vanilla JS example (builds first, then serves on port 3000)
-# Navigate to http://localhost:3000/examples/vanilla/
-npm run example:vanilla
+# Standalone examples (build + serve)
+npm run example:vanilla  # Vanilla JS EPUB reader (port 3000)
+npm run example:pdf      # Standalone PDF viewer (port 3001)
 ```
 
-> **Note:** The Parcel-based examples share port 1234 — run one at a time.
+> **Parcel examples** share port 1234 — run one at a time.
+> **Standalone examples** each have their own port.
 > Each `example:*` script auto-clears the Parcel cache before starting.
 > The DITA viewer (`npm run dev`) and vanilla example require a build step;
 > the other examples import directly from source via Parcel.

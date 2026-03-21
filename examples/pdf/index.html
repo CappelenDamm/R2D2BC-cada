@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>R2D2BC — PDF Example</title>
+  <link rel="stylesheet" href="/dist/reader.css" />
+  <link rel="stylesheet" href="/dist/pdf_viewer.css" />
+  <script src="/dist/reader.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; height: 100vh; overflow: hidden; }
+
+    /* Toolbar */
+    #toolbar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 10;
+      height: 42px; display: flex; align-items: center; gap: 6px;
+      padding: 0 10px; background: #fff; border-bottom: 1px solid #e0e0e0;
+      font-size: 12px;
+    }
+    #toolbar button {
+      height: 28px; padding: 0 10px; border: 1px solid rgba(128,128,128,0.3);
+      background: transparent; color: inherit; font-size: 11px; cursor: pointer;
+      border-radius: 14px; white-space: nowrap;
+    }
+    #toolbar button:hover { background: rgba(128,128,128,0.1); }
+    .badge {
+      font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+      padding: 2px 8px; border-radius: 10px; color: #fff; background: #e44d26;
+    }
+    .sep { width: 1px; height: 18px; background: #e0e0e0; flex-shrink: 0; }
+    #page-info { font-size: 11px; color: #666; white-space: nowrap; }
+    .spacer { flex: 1; }
+  </style>
+</head>
+<body>
+
+<div id="toolbar">
+  <span class="badge">PDF</span>
+  <div class="sep"></div>
+  <button onclick="d2reader?.previousPage()">← Prev</button>
+  <button onclick="d2reader?.nextPage()">Next →</button>
+  <div class="sep"></div>
+  <button onclick="d2reader?.zoomOut()">−</button>
+  <button onclick="d2reader?.zoomIn()">+</button>
+  <button onclick="d2reader?.fitToPage()">Fit Page</button>
+  <button onclick="d2reader?.fitToWidth()">Fit Width</button>
+  <div class="sep"></div>
+  <button onclick="d2reader?.scroll(false)">Paginated</button>
+  <button onclick="d2reader?.scroll(true, 'vertical')">Scroll</button>
+  <div class="sep"></div>
+  <span id="page-info">Loading…</span>
+  <div class="spacer"></div>
+  <button onclick="d2reader?.activateHand()">✋ Pan</button>
+  <button onclick="d2reader?.deactivateHand()">Pan Off</button>
+</div>
+
+<div id="D2Reader-Container" style="position: relative; height: calc(100vh - 42px); margin-top: 42px;">
+  <div role="main" tabindex="-1" id="iframe-wrapper">
+    <div id="pdf-container"></div>
+  </div>
+</div>
+
+<script>
+  let d2reader = undefined;
+
+  // Read manifest URL from query string (?url=...), default to hosted Alice PDF
+  let defined_url = 'https://alicepdf.dita.digital/alice.json';
+  const query = window.location.search;
+  if (query) {
+    const params = {};
+    query.substring(1).split('&').forEach(function(kv) {
+      const pair = kv.split('=');
+      if (pair.length > 1) params[pair[0]] = decodeURIComponent(pair[1]);
+    });
+    if (params['url']) defined_url = params['url'];
+  }
+
+  D2Reader.load({
+    url: new URL(defined_url),
+    injectables: [],
+    injectablesFixed: [],
+    workerSrc: '/dist/pdf.worker.min.mjs',
+    useLocalStorage: true,
+  }).then(instance => {
+    d2reader = instance;
+    updatePageInfo();
+
+    const nav = d2reader.navigator;
+    if (nav?.eventBus) {
+      nav.eventBus.on('pagechanging', ({ pageNumber }) => updatePageInfo(pageNumber));
+    }
+  }).catch(err => {
+    document.getElementById('page-info').textContent = 'Failed to load: ' + err.message;
+  });
+
+  function updatePageInfo(page) {
+    const el = document.getElementById('page-info');
+    if (!el) return;
+    const current = page ?? d2reader?.navigator?.pageNum ?? '?';
+    const total = d2reader?.navigator?.numPages ?? '?';
+    el.textContent = 'Page ' + current + ' of ' + total;
+  }
+
+  // Keyboard navigation
+  document.addEventListener('keydown', e => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') d2reader?.nextPage();
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') d2reader?.previousPage();
+  });
+</script>
+</body>
+</html>

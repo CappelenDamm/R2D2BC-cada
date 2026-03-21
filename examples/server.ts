@@ -1,85 +1,180 @@
-// ES5 import (assuming node_modules/r2-streamer-js/):
-import { Server } from "dita-streamer-js";
+import { Server } from "r2-streamer-js";
 import * as express from "express";
 import * as path from "path";
+import * as fs from "fs";
 import recursive from "recursive-readdir";
 
+interface PublicationEntry {
+  title: string;
+  filename: string;
+  type: "epub" | "pdf";
+  viewers: { title: string; url: string }[];
+}
+
 async function start() {
-  // Constructor parameter is optional:
-  // disableDecryption: true
-  // disableOPDS
-  // disableReaders: true
-  // disableRemotePubUrl: true to deactivate
+  const publications: PublicationEntry[] = [
+    // Built-in demo publications (hosted remotely)
+    {
+      title: "Alice's Adventures in Wonderland",
+      filename: "alice (hosted PDF)",
+      type: "pdf",
+      viewers: [
+        { title: "PDF Viewer", url: `/viewer/index_pdf.html?url=${encodeURIComponent("https://alicepdf.dita.digital/alice.json")}` },
+      ],
+    },
+    {
+      title: "Alice's Adventures in Wonderland",
+      filename: "alice (hosted EPUB)",
+      type: "epub",
+      viewers: [
+        { title: "DITA Reader", url: `/viewer/index_dita.html?url=${encodeURIComponent("https://alice.dita.digital/manifest.json")}` },
+      ],
+    },
+  ];
+
   const server = new Server({
-    disableDecryption: true, // deactivates the decryption of encrypted resources (Readium LCP).
-    disableOPDS: true, // deactivates the HTTP routes for the OPDS "micro services" (browser, converter)
-    disableReaders: false, // deactivates the built-in "readers" for ReadiumWebPubManifest (HTTP static host / route).
-    disableRemotePubUrl: true, // deactivates the HTTP route for loading a remote publication.
-    maxPrefetchLinks: 5, // Link HTTP header, with rel = prefetch, see server.ts MAX_PREFETCH_LINKS (default = 10)
-    readers: [
-      {
-        title: "Dita Example",
-        getUrl: (url) => `/viewer/index_dita.html?url=${url}`,
-      },
-      {
-        title: "Dita Sample Read",
-        getUrl: (url) => `/viewer/index_sampleread.html?url=${url}`,
-      },
-      {
-        title: "Minimal Example",
-        getUrl: (url) => `/viewer/index_minimal.html?url=${url}`,
-      },
-      {
-        title: "API Example",
-        getUrl: (url) => `/viewer/index_api.html?url=${url}`,
-      },
-      {
-        title: "Static Placeholder PDF Example",
-        getUrl: (url) => `/viewer/index_pdf.html?url=${url}`,
-      },
-    ],
+    disableDecryption: true,
+    disableOPDS: true,
+    disableReaders: true,
+    disableRemotePubUrl: true,
+    maxPrefetchLinks: 5,
   });
 
-  /**
-   * Serve our viewer examples, and allow unresolved requests to fall through
-   * to the following static handler from /dist
-   */
+  // ── Serve viewer files ──────────────────────────────────────────────
+
   server.expressUse(
     "/viewer",
     //@ts-ignore
     express.static(path.join(__dirname, "../viewer"), { fallthrough: true })
   );
-
-  /**
-   * Serve our built application bundles from /dist
-   */
-  // @ts-ignore
+  //@ts-ignore
   server.expressUse("/viewer", express.static(path.join(__dirname, "../dist")));
 
-  /**
-   * Serve our sample EPUBS from /examples/epubs
-   */
+  // ── Landing page ────────────────────────────────────────────────────
+
+
+  // ── PDF serving ─────────────────────────────────────────────────────
+
+  // Serve PDFs as static files
+  const pdfsPath = path.join(__dirname, "./epubs"); // PDFs live alongside EPUBs
+  //@ts-ignore
+  server.expressUse("/pdfs", express.static(pdfsPath));
+
+  // Generate a simple RWPM manifest for a PDF file
+  // Use path-based URL (/pdf-manifest/filename.pdf) to avoid query string conflicts
+  server.expressUse("/pdf-manifest", (req: any, res: any, next: any) => {
+    // Extract filename from path: /pdf-manifest/daisy.pdf → daisy.pdf
+    const file = decodeURIComponent(req.path.replace(/^\//, ""));
+    if (!file) {
+      next();
+      return;
+    }
+
+    const filename = path.basename(file);
+    const title = filename.replace(/\.pdf$/i, "").replace(/[_-]/g, " ");
+
+    const pdfHref = `/pdfs/${file}`;
+    const manifestHref = `/pdf-manifest/${encodeURIComponent(file)}`;
+
+    const manifest = {
+      "@context": "https://readium.org/webpub-manifest/context.jsonld",
+      metadata: {
+        "@type": "https://schema.org/Book",
+        conformsTo: "https://readium.org/webpub-manifest/profiles/pdf",
+        title: title,
+        identifier: `urn:pdf:${filename}`,
+      },
+      links: [
+        { rel: "self", href: manifestHref, type: "application/webpub+json" },
+        { rel: "alternate", href: pdfHref, type: "application/pdf" },
+      ],
+      readingOrder: [
+        {
+          href: pdfHref,
+          type: "application/pdf",
+          title: title,
+        },
+      ],
+      resources: [
+        { href: pdfHref, type: "application/pdf" },
+      ],
+    };
+
+    res.json(manifest);
+  });
+
+  // ── Publications API ────────────────────────────────────────────────
+
+  server.expressUse("/api/publications", (req: any, res: any) => {
+    res.json(publications);
+  });
+
+  // ── Scan local files ────────────────────────────────────────────────
+
   const epubsPath = path.join(__dirname, "./epubs");
 
+  // Scan EPUBs
   recursive(epubsPath, ["!*.epub"], function (err, files) {
-    if (err) return console.error(err);
+    if (err) {
+      console.error("Error scanning EPUBs:", err);
+      return;
+    }
+
     const filePaths = files.map((fileName) => path.join(fileName));
     const publicationURLs = server.addPublications(filePaths);
-    console.log("Local Publications: ", publicationURLs.length);
+    console.log(`📚 Found ${publicationURLs.length} EPUB(s)`);
+
+    // Add EPUBs to our publications list
+    filePaths.forEach((filePath, i) => {
+      const filename = path.basename(filePath);
+      const title = filename.replace(/\.epub$/i, "").replace(/[_-]/g, " ");
+      const manifestUrl = publicationURLs[i];
+
+      publications.push({
+        title,
+        filename,
+        type: "epub",
+        viewers: [
+          { title: "DITA Reader", url: `/viewer/index_dita.html?url=${manifestUrl}` },
+          { title: "Minimal", url: `/viewer/index_minimal.html?url=${manifestUrl}` },
+          { title: "API Test", url: `/viewer/index_api.html?url=${manifestUrl}` },
+          { title: "Sample Read", url: `/viewer/index_sampleread.html?url=${manifestUrl}` },
+        ],
+      });
+    });
   });
+
+  // Scan PDFs
+  recursive(epubsPath, ["!*.pdf"], function (err, files) {
+    if (err) {
+      console.error("Error scanning PDFs:", err);
+      return;
+    }
+
+    console.log(`📄 Found ${files.length} PDF(s)`);
+
+    files.forEach((filePath) => {
+      const relativePath = path.relative(epubsPath, filePath).replace(/\\/g, "/");
+      const filename = path.basename(filePath);
+      const title = filename.replace(/\.pdf$/i, "").replace(/[_-]/g, " ");
+      const manifestUrl = `/pdf-manifest?file=${encodeURIComponent(relativePath)}`;
+
+      publications.push({
+        title,
+        filename,
+        type: "pdf",
+        viewers: [
+          { title: "PDF Viewer", url: `/viewer/index_pdf.html?url=/pdf-manifest/${encodeURIComponent(relativePath)}` },
+        ],
+      });
+    });
+  });
+
+  // ── Start server ────────────────────────────────────────────────────
 
   const data = await server.start(4444, false);
 
-  // http://127.0.0.1:3000
-  // Note that ports 80 and 443 (HTTPS) are always implicit (ommitted).
-  console.log(
-    `Dev server (R2 Streamer) running at url: http://localhost:${data.urlPort}}`
-  );
-
-  // // Calls `uncachePublications()` (see below)
-  // server.stop();
-
-  // console.log(server.isStarted()); // false
+  console.log(`\n🚀 R2D2BC Library: http://localhost:${data.urlPort}/viewer/index.html\n`);
 }
 
 (async () => {

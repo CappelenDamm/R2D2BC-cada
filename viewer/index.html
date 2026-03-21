@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>R2D2BC Library</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f8f8f8; color: #222; min-height: 100vh;
+    }
+    header {
+      background: #fff; border-bottom: 1px solid #e0e0e0;
+      padding: 16px 24px; display: flex; align-items: center; gap: 16px;
+    }
+    header h1 { font-size: 18px; font-weight: 700; }
+    header .subtitle { font-size: 12px; color: #888; }
+    .toolbar {
+      padding: 12px 24px; display: flex; gap: 8px; flex-wrap: wrap;
+      border-bottom: 1px solid #eee; background: #fff;
+    }
+    .filter-btn {
+      padding: 6px 14px; font-size: 11px; border: 1px solid #d0d0d0;
+      border-radius: 14px; background: #fff; color: #555; cursor: pointer;
+      text-transform: uppercase; letter-spacing: 0.5px; transition: all .15s;
+    }
+    .filter-btn:hover { background: #f0f0f0; }
+    .filter-btn.active { background: #222; color: #fff; border-color: #222; }
+    .grid {
+      display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: 16px; padding: 24px; max-width: 1200px; margin: 0 auto;
+    }
+    .card {
+      background: #fff; border-radius: 8px; overflow: hidden;
+      border: 1px solid #e8e8e8; transition: box-shadow .2s, transform .1s;
+      cursor: pointer; text-decoration: none; color: inherit;
+    }
+    .card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.1); transform: translateY(-2px); }
+    .card-cover {
+      height: 140px; background: #eee; display: flex;
+      align-items: center; justify-content: center; font-size: 36px;
+      color: #ccc; position: relative;
+    }
+    .card-cover .type-badge {
+      position: absolute; top: 8px; right: 8px;
+      font-size: 9px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 1px; padding: 2px 8px; border-radius: 10px;
+      color: #fff;
+    }
+    .badge-epub { background: #4a90d9; }
+    .badge-pdf { background: #e44d26; }
+    .badge-audiobook { background: #1db954; }
+    .card-body { padding: 12px; }
+    .card-title {
+      font-size: 13px; font-weight: 600; line-height: 1.3;
+      margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    }
+    .card-meta { font-size: 11px; color: #999; }
+    .card-viewers {
+      padding: 8px 12px; border-top: 1px solid #f0f0f0;
+      display: flex; gap: 4px; flex-wrap: wrap;
+    }
+    .viewer-link {
+      font-size: 10px; padding: 2px 8px; border-radius: 10px;
+      background: #f5f5f5; color: #555; text-decoration: none;
+      border: 1px solid #e8e8e8; transition: background .15s;
+    }
+    .viewer-link:hover { background: #e0e0e0; }
+    .empty {
+      grid-column: 1 / -1; text-align: center; padding: 60px 20px;
+      color: #999; font-size: 14px;
+    }
+    .loading { text-align: center; padding: 60px; color: #999; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>R2D2BC</h1>
+    <span class="subtitle">Local Publication Library</span>
+  </header>
+
+  <div class="toolbar">
+    <button class="filter-btn active" data-filter="all">All</button>
+    <button class="filter-btn" data-filter="epub">EPUB</button>
+    <button class="filter-btn" data-filter="pdf">PDF</button>
+  </div>
+
+  <div class="grid" id="publications-grid">
+    <div class="loading">Loading publications...</div>
+  </div>
+
+  <script>
+    const grid = document.getElementById('publications-grid');
+    let allPublications = [];
+    let activeFilter = 'all';
+
+    // Make manifest URLs absolute (viewers use new URL() which requires absolute)
+    function fixViewerUrls(pubs) {
+      const origin = window.location.origin;
+      return pubs.map(pub => ({
+        ...pub,
+        viewers: (pub.viewers || []).map(v => ({
+          ...v,
+          url: v.url.replace(/\?url=\//, '?url=' + origin + '/'),
+        })),
+      }));
+    }
+
+    // Extract manifest URL from a viewer link (the ?url= parameter)
+    function getManifestUrl(pub) {
+      const viewer = (pub.viewers || [])[0];
+      if (!viewer) return null;
+      const match = viewer.url.match(/[?&]url=([^&]+)/);
+      return match ? decodeURIComponent(match[1]) : null;
+    }
+
+    // Fetch metadata from manifest and enrich publication
+    async function enrichWithMetadata(pub) {
+      try {
+        const manifestUrl = getManifestUrl(pub);
+        if (!manifestUrl) return;
+        const resp = await fetch(manifestUrl);
+        if (!resp.ok) return;
+        const manifest = await resp.json();
+
+        // Title
+        if (manifest.metadata?.title) {
+          pub.title = typeof manifest.metadata.title === 'string'
+            ? manifest.metadata.title
+            : manifest.metadata.title?.en || Object.values(manifest.metadata.title)[0] || pub.title;
+        }
+
+        // Author
+        if (manifest.metadata?.author) {
+          const authors = Array.isArray(manifest.metadata.author)
+            ? manifest.metadata.author : [manifest.metadata.author];
+          pub.author = authors.map(a => typeof a === 'string' ? a : a.name || '').filter(Boolean).join(', ');
+        }
+
+        // Cover image
+        const allLinks = [...(manifest.resources || []), ...(manifest.links || [])];
+        const cover = allLinks.find(l =>
+          (l.rel === 'cover' || (Array.isArray(l.rel) && l.rel.includes('cover'))) &&
+          l.type?.startsWith('image/')
+        );
+        if (cover?.href) {
+          // Resolve cover href relative to manifest URL
+          pub.coverUrl = new URL(cover.href, manifestUrl).href;
+        }
+      } catch (_) { /* metadata fetch failed, keep defaults */ }
+    }
+
+    // Fetch publications from our API
+    async function loadPublications() {
+      try {
+        const resp = await fetch('/api/publications');
+        allPublications = fixViewerUrls(await resp.json());
+        renderGrid();
+
+        // Enrich with metadata in background
+        await Promise.allSettled(allPublications.map(pub => enrichWithMetadata(pub)));
+        renderGrid();
+      } catch (e) {
+        grid.innerHTML = '<div class="empty">Failed to load publications. Make sure the server is running.</div>';
+      }
+    }
+
+    function renderGrid() {
+      const filtered = activeFilter === 'all'
+        ? allPublications
+        : allPublications.filter(p => p.type === activeFilter);
+
+      if (filtered.length === 0) {
+        grid.innerHTML = '<div class="empty">No publications found.</div>';
+        return;
+      }
+
+      grid.innerHTML = filtered.map(pub => {
+        const icon = pub.type === 'pdf' ? '📄' : '📖';
+        const badgeClass = pub.type === 'pdf' ? 'badge-pdf' : 'badge-epub';
+        const viewers = pub.viewers || [];
+        const coverStyle = pub.coverUrl
+          ? `background-image:url('${pub.coverUrl}');background-size:cover;background-position:center;`
+          : '';
+
+        return `
+          <div class="card" onclick="openPublication('${viewers[0]?.url || '#'}')">
+            <div class="card-cover" style="${coverStyle}">
+              ${pub.coverUrl ? '' : icon}
+              <span class="type-badge ${badgeClass}">${pub.type}</span>
+            </div>
+            <div class="card-body">
+              <div class="card-title">${pub.title || pub.filename}</div>
+              <div class="card-meta">${pub.author || pub.filename}</div>
+            </div>
+            <div class="card-viewers">
+              ${viewers.map(v => `<a class="viewer-link" href="${v.url}" onclick="event.stopPropagation()">${v.title}</a>`).join('')}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function openPublication(url) {
+      if (url && url !== '#') window.location.href = url;
+    }
+
+    // Filter buttons
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelector('.filter-btn.active').classList.remove('active');
+        btn.classList.add('active');
+        activeFilter = btn.dataset.filter;
+        renderGrid();
+      });
+    });
+
+    loadPublications();
+  </script>
+</body>
+</html>

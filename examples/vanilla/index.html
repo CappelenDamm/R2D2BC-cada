@@ -276,10 +276,10 @@
 </div>
 
 <script type="module">
-  import D2Reader from '../../dist/esm/index.js';
+  import D2Reader from '/dist/esm/index.js';
 
   // ── ReadiumCSS injectables (reuse react example files) ──
-  const cssBase = new URL('../react/readium-css/', window.location.href).href;
+  const cssBase = new URL('/readium-css/', window.location.href).href;
   const injectables = [
     { type: 'style', url: cssBase + 'ReadiumCSS-before.css', r2before: true },
     { type: 'style', url: cssBase + 'ReadiumCSS-default.css', r2default: true },

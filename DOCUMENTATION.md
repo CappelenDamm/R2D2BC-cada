@@ -182,7 +182,8 @@ npm run example:vue      # Vue 3 (Parcel, port 1234)
 npm run example:angular  # Angular (Parcel, port 1234)
 npm run example:nextjs   # Next.js pattern (Parcel, port 1234)
 npm run example:remix    # Remix pattern (Parcel, port 1234)
-npm run example:vanilla  # Vanilla JS (builds first, port 3000)
+npm run example:vanilla  # Vanilla JS EPUB reader (port 3000)
+npm run example:pdf      # Standalone PDF viewer (port 3001)
 ```
 
 ---
