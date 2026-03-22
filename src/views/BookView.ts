@@ -60,5 +60,6 @@ interface BookView {
   goToNextPage?(): void;
   getCurrentPage(): number;
   getPageCount(): number;
+  padOddColumns?(): void;
 }
 export default BookView;

@@ -97,6 +97,7 @@ export default class ReflowableBookView implements BookView {
         }
       }
       this.setSize();
+      this.padOddColumns();
     }
     if (this.navigator.rights.enableContentProtection) {
       this.navigator.contentProtectionModule?.recalculate();
@@ -324,10 +325,12 @@ export default class ReflowableBookView implements BookView {
       // Sub-pixel rounding: getRightColumnsWidth() can return fractional values
       // like 0.09 due to browser layout — Math.floor normalizes to 0.
       const rightWidth = Math.floor(this.getRightColumnsWidth());
-      return (
-        rightWidth <= 0 ||
-        Math.ceil(this.getCurrentPage()) === this.getPageCount()
-      );
+      if (rightWidth <= 0) return true;
+      // If a spacer was injected, don't use page count check — it can
+      // trigger too early. Only rightWidth determines the real end.
+      const doc = this.iframe.contentDocument;
+      if (doc?.getElementById("r2d2bc-column-spacer")) return rightWidth <= 5;
+      return Math.ceil(this.getCurrentPage()) === this.getPageCount();
     }
   }
 
@@ -535,7 +538,7 @@ export default class ReflowableBookView implements BookView {
   /** Returns the total width of the columns that are currently
      positioned to the left of the iframe viewport. */
   private getLeftColumnsWidth(): number {
-    return Math.ceil(this.scrollingElement.scrollLeft);
+    return Math.round(this.scrollingElement.scrollLeft);
   }
 
   /** Returns the total width of the columns that are currently
@@ -581,7 +584,48 @@ export default class ReflowableBookView implements BookView {
   get scrollWidth() {
     const scrollWidth = this.scrollingElement?.scrollWidth;
     const width = this.getColumnWidth();
-    const pages = Math.ceil(scrollWidth / width);
-    return pages * width;
+    // Subtract 1px before ceil to absorb sub-pixel rounding that
+    // creates phantom pages (html/body scrollWidth off by 1-2px)
+    const pages = Math.ceil((scrollWidth - 1) / width);
+    return Math.max(1, pages) * width;
+  }
+
+  /**
+   * In multi-column paginated mode, if the content produces an odd number
+   * of CSS columns the last page will only show one column and navigation
+   * may skip it. This injects an invisible spacer to force an even column
+   * count so every page is full.
+   */
+  padOddColumns(): boolean {
+    if (this.scrollMode) return false;
+
+    const doc = this.iframe.contentDocument;
+    if (!doc) return false;
+
+    // If a spacer already exists, don't re-evaluate
+    const existing = doc.getElementById("r2d2bc-column-spacer");
+    if (existing) return false;
+
+    const body = doc.body;
+    if (!body) return false;
+
+    const rawScrollWidth = body.scrollWidth;
+    const viewportWidth = this.getColumnWidth();
+    const remainder = rawScrollWidth % viewportWidth;
+
+    // Only inject spacer when remainder is at least 25% of viewport —
+    // an actual odd column is ~50% of viewport
+    if (remainder > viewportWidth * 0.25) {
+      const spacer = doc.createElement("div");
+      spacer.id = "r2d2bc-column-spacer";
+      spacer.style.breakBefore = "column";
+      spacer.style.height = "100%";
+      spacer.style.visibility = "hidden";
+      body.appendChild(spacer);
+      // Force synchronous reflow
+      void body.scrollWidth;
+      return true;
+    }
+    return false;
   }
 }

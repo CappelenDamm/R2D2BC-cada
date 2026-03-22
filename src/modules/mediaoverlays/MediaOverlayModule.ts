@@ -269,7 +269,9 @@ export class MediaOverlayModule implements ReaderModule {
               }
             }
           } catch (e) {
-            log.log("handleContentClick() - failed to load MO for clicked page");
+            log.log(
+              "handleContentClick() - failed to load MO for clicked page"
+            );
             return;
           }
         } else {
@@ -294,11 +296,7 @@ export class MediaOverlayModule implements ReaderModule {
     if (moTextAudioPair && moTextAudioPair.Audio) {
       // Clear previous highlight before jumping
       this.mediaOverlayHighlight(undefined);
-      await this.playMediaOverlaysAudio(
-        moTextAudioPair,
-        undefined,
-        undefined
-      );
+      await this.playMediaOverlaysAudio(moTextAudioPair, undefined, undefined);
     }
   }
 
