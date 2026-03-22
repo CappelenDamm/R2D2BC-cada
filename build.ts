@@ -4,12 +4,12 @@ import chalk from "chalk";
 import { promises as fs } from "fs";
 import { watch } from "chokidar";
 import debounce from "debounce";
-import copy0 from "copy";
 import child_process0 from "child_process";
 import sass0 from "sass";
 import { rimraf } from "rimraf";
+import { glob } from "glob";
+import path from "path";
 
-const copy = util.promisify(copy0);
 const exec = util.promisify(child_process0.exec);
 const sass = util.promisify(sass0.render);
 
@@ -88,20 +88,17 @@ async function compileCss(input: string, filename: string) {
   }
 }
 
-async function copyCssInjectables() {
+async function copyInjectables(pattern: string, label: string) {
   try {
-    await copy("injectables/**/*.css", "dist/injectables");
-    logBundled("Copied CSS injectables", "dist/injectables/**/*.css");
+    const files = await glob(pattern);
+    for (const file of files) {
+      const dest = path.join("dist", file);
+      await fs.mkdir(path.dirname(dest), { recursive: true });
+      await fs.copyFile(file, dest);
+    }
+    logBundled(`Copied ${label} injectables`, `dist/${pattern}`);
   } catch (e) {
-    err("CSS Copy Error: ", e);
-  }
-}
-async function copyJsInjectables() {
-  try {
-    await copy("injectables/**/*.js", "dist/injectables");
-    logBundled("Copied JS injectables", "dist/injectables/**/*.js");
-  } catch (e) {
-    err("CSS Copy Error: ", e);
+    err(`${label} Copy Error: `, e as string);
   }
 }
 
@@ -206,8 +203,8 @@ async function buildAll() {
   );
 
   // copy over the css and js injectables
-  const p5 = copyCssInjectables();
-  const p6 = copyJsInjectables();
+  const p5 = copyInjectables("injectables/**/*.css", "CSS");
+  const p6 = copyInjectables("injectables/**/*.js", "JS");
 
   // compile sass files into reader.css and material.css
   const p7 = compileCss("src/styles/sass/reader.scss", "reader");
