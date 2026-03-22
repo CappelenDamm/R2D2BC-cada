@@ -118,6 +118,8 @@ export interface NavigatorAPI {
   updateCurrentLocation?: (
     locator: import("../model/Locator").ReadingPosition
   ) => Promise<void>;
+  positionInfo?: (locator: import("../model/Locator").Locator) => void;
+  chapterInfo?: (title: string | undefined) => void;
   keydownFallthrough?: (event: KeyboardEvent | undefined) => void;
   clickThrough?: (event: MouseEvent | TouchEvent) => void;
   direction?: (dir: string) => void;
@@ -130,6 +132,10 @@ export interface IFrameAttributes {
   iframePaddingTop?: number;
   bottomInfoHeight?: number;
   sideNavPosition?: "left" | "right";
+  /** Margin (in px) around fixed-layout content. Defaults to 100. */
+  fixedLayoutMargin?: number;
+  /** Whether to show a drop shadow on fixed-layout spreads. Defaults to true. */
+  fixedLayoutShadow?: boolean;
 }
 export interface IFrameNavigatorConfig {
   mainElement: HTMLElement;
@@ -615,16 +621,20 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
             this.iframes.push(iframe2);
 
             secondSpread.appendChild(this.iframes[1]);
-            this.firstSpread.style.clipPath =
-              "polygon(0% -20%, 100% -20%, 100% 120%, -20% 120%)";
-            this.firstSpread.style.boxShadow = "0 0 8px 2px #ccc";
-            secondSpread.style.clipPath =
-              "polygon(0% -20%, 100% -20%, 120% 100%, 0% 120%)";
-            secondSpread.style.boxShadow = "0 0 8px 2px #ccc";
+            if (this.attributes?.fixedLayoutShadow !== false) {
+              this.firstSpread.style.clipPath =
+                "polygon(0% -20%, 100% -20%, 100% 120%, -20% 120%)";
+              this.firstSpread.style.boxShadow = "0 0 8px 2px #ccc";
+              secondSpread.style.clipPath =
+                "polygon(0% -20%, 100% -20%, 120% 100%, 0% 120%)";
+              secondSpread.style.boxShadow = "0 0 8px 2px #ccc";
+            }
           } else {
-            this.firstSpread.style.clipPath =
-              "polygon(0% -20%, 100% -20%, 120% 100%, -20% 120%)";
-            this.firstSpread.style.boxShadow = "0 0 8px 2px #ccc";
+            if (this.attributes?.fixedLayoutShadow !== false) {
+              this.firstSpread.style.clipPath =
+                "polygon(0% -20%, 100% -20%, 120% 100%, -20% 120%)";
+              this.firstSpread.style.boxShadow = "0 0 8px 2px #ccc";
+            }
           }
         } else {
           this.iframes[0].style.paddingTop =
@@ -1465,9 +1475,14 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
         if (this.chapterTitle)
           this.chapterTitle.innerHTML =
             "(" + this.currentChapterLink.title + ")";
+        if (this.api?.chapterInfo)
+          this.api.chapterInfo(this.currentChapterLink.title);
+        this.emit("chapterinfo", this.currentChapterLink.title);
       } else {
         if (this.chapterTitle)
           this.chapterTitle.innerHTML = "(Current Chapter)";
+        if (this.api?.chapterInfo) this.api.chapterInfo(undefined);
+        this.emit("chapterinfo", undefined);
       }
 
       await this.injectInjectablesIntoIframeHead(iframe);
@@ -2145,13 +2160,14 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
             ? this.iframes[1].parentElement?.parentElement
             : (this.iframes[0].parentElement?.parentElement as HTMLElement);
         if (iframeParent && width) {
+          const fxlMargin = this.attributes?.fixedLayoutMargin ?? 100;
           var widthRatio =
-            (parseInt(getComputedStyle(iframeParent).width) - 100) /
+            (parseInt(getComputedStyle(iframeParent).width) - fxlMargin) /
             (this.iframes.length === 2
-              ? parseInt(width.toString().replace("px", "")) * 2 + 200
+              ? parseInt(width.toString().replace("px", "")) * 2 + fxlMargin * 2
               : parseInt(width.toString().replace("px", "")));
           var heightRatio =
-            (parseInt(getComputedStyle(iframeParent).height) - 100) /
+            (parseInt(getComputedStyle(iframeParent).height) - fxlMargin) /
             parseInt(height.toString().replace("px", ""));
           var scale = Math.min(widthRatio, heightRatio);
           iframeParent.style.transform = "scale(" + scale + ")";
@@ -2548,12 +2564,14 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
         this.spreads.appendChild(secondSpread);
         secondSpread.appendChild(this.iframes[1]);
 
-        this.firstSpread.style.clipPath =
-          "polygon(0% -20%, 100% -20%, 100% 120%, -20% 120%)";
-        this.firstSpread.style.boxShadow = "0 0 8px 2px #ccc";
-        secondSpread.style.clipPath =
-          "polygon(0% -20%, 100% -20%, 120% 100%, 0% 120%)";
-        secondSpread.style.boxShadow = "0 0 8px 2px #ccc";
+        if (this.attributes?.fixedLayoutShadow !== false) {
+          this.firstSpread.style.clipPath =
+            "polygon(0% -20%, 100% -20%, 100% 120%, -20% 120%)";
+          this.firstSpread.style.boxShadow = "0 0 8px 2px #ccc";
+          secondSpread.style.clipPath =
+            "polygon(0% -20%, 100% -20%, 120% 100%, 0% 120%)";
+          secondSpread.style.boxShadow = "0 0 8px 2px #ccc";
+        }
       } else {
         if (this.iframes.length === 2) {
           this.iframes.pop();
@@ -2561,9 +2579,11 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
             this.spreads.removeChild(this.spreads.lastChild);
           }
         }
-        this.firstSpread.style.clipPath =
-          "polygon(0% -20%, 100% -20%, 120% 100%, -20% 120%)";
-        this.firstSpread.style.boxShadow = "0 0 8px 2px #ccc";
+        if (this.attributes?.fixedLayoutShadow !== false) {
+          this.firstSpread.style.clipPath =
+            "polygon(0% -20%, 100% -20%, 120% 100%, -20% 120%)";
+          this.firstSpread.style.boxShadow = "0 0 8px 2px #ccc";
+        }
       }
       this.precessContentForIframe();
     }
@@ -2631,8 +2651,9 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
           }
         }
 
+        const fxlMargin = this.attributes?.fixedLayoutMargin ?? 100;
         var widthRatio =
-          (parseInt(getComputedStyle(iframeParent).width) - 100) /
+          (parseInt(getComputedStyle(iframeParent).width) - fxlMargin) /
           (this.iframes.length === 2
             ? parseInt(
                 width.toString().endsWith("px")
@@ -2640,14 +2661,14 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                   : width
               ) *
                 2 +
-              200
+              fxlMargin * 2
             : parseInt(
                 width.toString().endsWith("px")
                   ? width?.replace("px", "")
                   : width
               ));
         var heightRatio =
-          (parseInt(getComputedStyle(iframeParent).height) - 100) /
+          (parseInt(getComputedStyle(iframeParent).height) - fxlMargin) /
           parseInt(height.toString().replace("px", ""));
         var scale = Math.min(widthRatio, heightRatio);
         iframeParent.style.transform = "scale(" + scale + ")";
@@ -2745,6 +2766,10 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
             this.chapterPosition.innerHTML =
               "Page " + currentPage + " of " + pageCount;
           }
+          if (this.api?.positionInfo) {
+            this.api.positionInfo(locator);
+          }
+          this.emit("positioninfo", locator);
         }
       } else {
         if (this.chapterPosition) this.chapterPosition.innerHTML = "";
@@ -3042,9 +3067,14 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
           if (this.chapterTitle)
             this.chapterTitle.innerHTML =
               "(" + this.currentChapterLink.title + ")";
+          if (this.api?.chapterInfo)
+            this.api.chapterInfo(this.currentChapterLink.title);
+          this.emit("chapterinfo", this.currentChapterLink.title);
         } else {
           if (this.chapterTitle)
             this.chapterTitle.innerHTML = "(Current Chapter)";
+          if (this.api?.chapterInfo) this.api.chapterInfo(undefined);
+          this.emit("chapterinfo", undefined);
         }
         await this.updatePositionInfo();
       } else {
