@@ -540,6 +540,11 @@ export default class D2Reader {
     return (await this.annotationModule?.updateAnnotation(highlight)) ?? false;
   };
 
+  /** Change highlighter color to a specific HEX string */
+  changeHighlighterColor = (color: string) => {
+    this.highlighter?.setColor(color);
+  };
+
   /** Hide Annotation Layer */
   hideAnnotationLayer = () => {
     return this.annotationModule?.hideAnnotationLayer();
