@@ -910,11 +910,11 @@
         let d2reader;
         D2Reader.load({
             url: new URL(urlParams["url"]),
-            requestConfig: {
-                method: "GET",
-                mode: "cors",
-                credentials: "include",
-            },
+            // requestConfig: {
+            //     method: "GET",
+            //     mode: "cors",
+            //     credentials: "include",
+            // },
             attributes: { // TODO: review these attributes and eventually needs better naming.
                 margin: 75, // subtract this from the iframe height , when setting the iframe minimum height
                 navHeight: 10, // used for positioning the toolbox
@@ -933,7 +933,7 @@
                 enablePageBreaks: true,
                 autoGeneratePositions: true,
                 enableLineFocus: true,
-                customKeyboardEvents: true,
+                customKeyboardEvents: false,
                 enableHistory: true,
                 enableCitations: true,
                 enableConsumption: true,
