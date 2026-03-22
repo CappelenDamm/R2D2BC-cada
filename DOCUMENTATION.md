@@ -337,6 +337,8 @@ interface NavigatorAPI {
 
   // Position tracking
   updateCurrentLocation?(locator: ReadingPosition): Promise<void>;
+  positionInfo?(locator: Locator): void;             // Page position updated (no delay)
+  chapterInfo?(title: string | undefined): void;     // Chapter title updated (no delay)
 
   // Settings sync
   updateSettings?(settings: Record<string, unknown>): Promise<void>;
@@ -382,6 +384,8 @@ interface IFrameAttributes {
   iframePaddingTop?: number;    // Top padding in pixels
   bottomInfoHeight?: number;    // Bottom info bar height in pixels
   sideNavPosition?: "left" | "right";
+  fixedLayoutMargin?: number;   // FXL margin in pixels (default: 100)
+  fixedLayoutShadow?: boolean;  // FXL drop shadow (default: true)
 }
 ```
 
@@ -470,6 +474,9 @@ await reader.updateAnnotation(annotation: Annotation): Promise<boolean>;
 
 // Delete an annotation
 await reader.deleteAnnotation(annotation: Annotation): Promise<boolean>;
+
+// Change the active highlighter color (hex string)
+reader.changeHighlighterColor(color: string): void;
 
 // Show/hide the annotation layer
 reader.showAnnotationLayer(): void;
@@ -856,6 +863,8 @@ These are set in the `api` config and called by the reader:
 | `resourceAtEnd()` | User at end |
 | `resourceFitsScreen()` | Resource fits on screen |
 | `updateCurrentLocation(locator)` | Reading position changed |
+| `positionInfo(locator)` | Page position updated (immediate, no delay) |
+| `chapterInfo(title)` | Chapter title updated (immediate, no delay) |
 | `updateSettings(settings)` | User settings changed |
 | `keydownFallthrough(event)` | Keyboard event not handled by reader |
 | `clickThrough(event)` | Click not handled by reader |
@@ -1048,6 +1057,23 @@ const reader = await D2Reader.load({
     ],
   },
 });
+```
+
+### Custom highlight colors
+
+You can customize the highlight color palette via the `highlighter.colors` config:
+
+```typescript
+highlighter: {
+  colors: ['#e2725b', '#00a693', '#87cefa', '#ffd700'],  // first color is the default
+  // ...
+}
+```
+
+When omitted, the built-in 7-color palette is used. You can also change the active color at runtime:
+
+```typescript
+reader.changeHighlighterColor('#ff0000');
 ```
 
 ### Layers
