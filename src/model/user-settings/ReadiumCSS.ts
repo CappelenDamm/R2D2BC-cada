@@ -23,7 +23,7 @@ export class ReadiumCSS {
   static readonly FONT_OVERRIDE_REF = "fontOverride";
   static readonly APPEARANCE_REF = "appearance";
   static readonly SCROLL_REF = "scroll";
-  // static readonly PUBLISHER_DEFAULT_REF = "advancedSettings";
+  static readonly ADVANCED_SETTINGS_REF = "advancedSettings";
   static readonly TEXT_ALIGNMENT_REF = "textAlign";
   static readonly COLUMN_COUNT_REF = "colCount";
   static readonly DIRECTION_REF = "direction";
@@ -31,14 +31,20 @@ export class ReadiumCSS {
   static readonly LETTER_SPACING_REF = "letterSpacing";
   static readonly PAGE_MARGINS_REF = "pageMargins";
   static readonly LINE_HEIGHT_REF = "lineHeight";
+  static readonly BODY_HYPHENS_REF = "bodyHyphens";
+  static readonly PARA_SPACING_REF = "paraSpacing";
+  static readonly PARA_INDENT_REF = "paraIndent";
+  static readonly TYPE_SCALE_REF = "typeScale";
+  static readonly BACKGROUND_COLOR_REF = "backgroundColor";
+  static readonly TEXT_COLOR_REF = "textColor";
 
   static readonly FONT_SIZE_KEY = "--USER__" + ReadiumCSS.FONT_SIZE_REF;
   static readonly FONT_FAMILY_KEY = "--USER__" + ReadiumCSS.FONT_FAMILY_REF;
   static readonly FONT_OVERRIDE_KEY = "--USER__" + ReadiumCSS.FONT_OVERRIDE_REF;
   static readonly APPEARANCE_KEY = "--USER__" + ReadiumCSS.APPEARANCE_REF;
   static readonly SCROLL_KEY = "--USER__" + ReadiumCSS.SCROLL_REF;
-  // static readonly PUBLISHER_DEFAULT_KEY =
-  //   "--USER__" + ReadiumCSS.PUBLISHER_DEFAULT_REF;
+  static readonly ADVANCED_SETTINGS_KEY =
+    "--USER__" + ReadiumCSS.ADVANCED_SETTINGS_REF;
   static readonly TEXT_ALIGNMENT_KEY =
     "--USER__" + ReadiumCSS.TEXT_ALIGNMENT_REF;
   static readonly COLUMN_COUNT_KEY = "--USER__" + ReadiumCSS.COLUMN_COUNT_REF;
@@ -48,4 +54,11 @@ export class ReadiumCSS {
     "--USER__" + ReadiumCSS.LETTER_SPACING_REF;
   static readonly PAGE_MARGINS_KEY = "--USER__" + ReadiumCSS.PAGE_MARGINS_REF;
   static readonly LINE_HEIGHT_KEY = "--USER__" + ReadiumCSS.LINE_HEIGHT_REF;
+  static readonly BODY_HYPHENS_KEY = "--USER__" + ReadiumCSS.BODY_HYPHENS_REF;
+  static readonly PARA_SPACING_KEY = "--USER__" + ReadiumCSS.PARA_SPACING_REF;
+  static readonly PARA_INDENT_KEY = "--USER__" + ReadiumCSS.PARA_INDENT_REF;
+  static readonly TYPE_SCALE_KEY = "--USER__" + ReadiumCSS.TYPE_SCALE_REF;
+  static readonly BACKGROUND_COLOR_KEY =
+    "--USER__" + ReadiumCSS.BACKGROUND_COLOR_REF;
+  static readonly TEXT_COLOR_KEY = "--USER__" + ReadiumCSS.TEXT_COLOR_REF;
 }

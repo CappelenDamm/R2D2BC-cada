@@ -52,8 +52,7 @@ export interface ContentProtectionModuleProperties {
   excludeNodes: string[];
 }
 
-export interface ContentProtectionModuleConfig
-  extends Partial<ContentProtectionModuleProperties> {
+export interface ContentProtectionModuleConfig extends Partial<ContentProtectionModuleProperties> {
   api?: ContentProtectionModuleAPI;
 }
 
@@ -1048,7 +1047,7 @@ export class ContentProtectionModule implements ReaderModule {
         selectionInfo =
           this.navigator.annotationModule?.annotator?.getTemporarySelectionInfo(
             doc
-          );
+          ) ?? undefined;
       }
 
       event.clipboardData.setData(
@@ -1097,7 +1096,7 @@ export class ContentProtectionModule implements ReaderModule {
           selectionInfo =
             this.navigator.annotationModule?.annotator?.getTemporarySelectionInfo(
               doc
-            );
+            ) ?? undefined;
         }
         this.copyToClipboard(
           selectionInfo?.cleanText?.substring(
@@ -1129,65 +1128,38 @@ export class ContentProtectionModule implements ReaderModule {
       0,
       this.properties?.charactersToCopy ?? 0
     );
+    if (!textToClipboard) return;
 
-    // @ts-ignore
-    if (window.clipboardData) {
-      // Internet Explorer
-      // @ts-ignore
-      window.clipboardData.setData("text/plain", textToClipboard);
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(textToClipboard).catch(() => {
+        this.execCommandCopy(textToClipboard!);
+      });
     } else {
-      // create a temporary element for the execCommand method
-      const forExecElement = this.createElementForExecCommand(textToClipboard);
-
-      /* Select the contents of the element
-          (the execCommand for 'copy' method works on the selection) */
-      this.selectContent(forExecElement);
-
-      // UniversalXPConnect privilege is required for clipboard access in Firefox
-      try {
-        // @ts-ignore
-        if (window.netscape && netscape.security) {
-          // @ts-ignore
-          netscape.security.PrivilegeManager.enablePrivilege(
-            "UniversalXPConnect"
-          );
-        }
-
-        // Copy the selected content to the clipboard
-        // Works in Firefox and in Safari before version 5
-        document.execCommand("copy", false);
-      } catch (e) {
-        //
-      }
-
-      // remove the temporary element
-      document.body.removeChild(forExecElement);
+      this.execCommandCopy(textToClipboard);
     }
   }
 
-  createElementForExecCommand(textToClipboard) {
-    const forExecElement = document.createElement("div");
-    // place outside the visible area
-    forExecElement.style.position = "absolute";
-    forExecElement.style.left = "-10000px";
-    forExecElement.style.top = "-10000px";
-    // write the necessary text into the element and append to the document
-    forExecElement.innerHTML = textToClipboard;
-    document.body.appendChild(forExecElement);
-    // the contentEditable mode is necessary for the  execCommand method in Firefox
-    // @ts-ignore
-    forExecElement.contentEditable = true;
-    return forExecElement;
-  }
+  private execCommandCopy(text: string) {
+    const el = document.createElement("div");
+    el.style.position = "absolute";
+    el.style.left = "-10000px";
+    el.style.top = "-10000px";
+    el.textContent = text;
+    el.contentEditable = "true";
+    document.body.appendChild(el);
 
-  selectContent(element) {
-    // first create a range
-    const rangeToSelect = document.createRange();
-    rangeToSelect.selectNodeContents(element);
-    // select the contents
+    const range = document.createRange();
+    range.selectNodeContents(el);
     const selection = window.getSelection();
     selection?.removeAllRanges();
-    selection?.addRange(rangeToSelect);
+    selection?.addRange(range);
+
+    try {
+      document.execCommand("copy", false);
+    } catch (e) {
+      // fallback failed silently
+    }
+    document.body.removeChild(el);
   }
   beforePrint(event: {
     preventDefault: () => void;

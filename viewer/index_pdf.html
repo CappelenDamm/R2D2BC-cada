@@ -1,5 +1,5 @@
 <!--
- * Copyright 2018-2020 DITA (AM Consulting LLC)
+ * Copyright 2018-2025 DITA (AM Consulting LLC)
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,119 +21,906 @@
 <html lang="en">
 
 <head>
-    <title>D2 Reader</title>
+    <title>D2 Reader — PDF</title>
     <meta charset="utf-8" />
     <meta name="author" content="Aferdita Muriqi" />
     <meta name="description" content="A viewer application for PDF files." />
     <meta name="viewport"
           content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
 
-    <!-- R2 Reader CSS -->
+    <!-- Material Icons -->
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
     <link rel="stylesheet" href="reader.css" />
+    <!--
+        PDF.js viewer CSS — required for text layer, annotation layer,
+        search highlights, and page spread / scroll layout.
+        Shipped to dist/ by the build step (copyPdfjsAssets).
+    -->
+    <link rel="stylesheet" href="pdf_viewer.css" />
     <script src="reader.js"></script>
 
+    <style>
+        /* Do NOT use * { box-sizing: border-box } — it breaks pdf.js text layer alignment */
+        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; font-size: 13px; background: #f5f5f5; overflow: hidden; }
+
+        /* ── Toolbar ── */
+        .reader-toolbar {
+            display: flex; align-items: center;
+            height: 42px; padding: 0 10px;
+            background: #fff; border-bottom: 1px solid #e0e0e0;
+            user-select: none; -webkit-user-select: none;
+            position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+        }
+        .toolbar-left { display: flex; align-items: center; gap: 2px; flex: 1; }
+        .toolbar-center { display: flex; align-items: center; gap: 4px; }
+        .toolbar-right { display: flex; align-items: center; gap: 2px; flex: 1; justify-content: flex-end; }
+        .toolbar-btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 3px;
+            height: 28px; min-width: 28px; padding: 0 6px;
+            border: 1px solid rgba(128,128,128,0.25); background: #fff;
+            color: #555; cursor: pointer; border-radius: 14px; transition: all .15s;
+            font-size: 10px; font-family: inherit;
+        }
+        .toolbar-btn:hover { background: #f0f0f0; border-color: rgba(128,128,128,0.4); }
+        .toolbar-btn.active { background: #fef0ec; color: #e44d26; border-color: #e44d26; font-weight: 600; }
+        .toolbar-btn i { font-size: 16px; }
+        .toolbar-sep { width: 1px; height: 20px; background: #e0e0e0; margin: 0 4px; }
+        .toolbar-badge {
+            display: inline-flex; align-items: center; gap: 4px;
+            background: #e44d26; color: #fff; border-radius: 10px;
+            padding: 2px 10px 2px 6px; font-size: 8pt; font-weight: 600;
+            letter-spacing: 0.5px; text-transform: uppercase;
+        }
+        .toolbar-badge i { font-size: 13px; }
+        .toolbar-page-info {
+            font-size: 11px; color: #666; white-space: nowrap;
+            padding: 0 6px; min-width: 90px; text-align: center;
+        }
+
+        /* ── Sidebar overlay ── */
+        .sidebar-overlay {
+            display: none; position: fixed; inset: 0; z-index: 500;
+            background: rgba(0,0,0,.3); transition: opacity .25s;
+        }
+        .sidebar-overlay.open { display: block; }
+
+        /* ── Sidebars ── */
+        .sidebar {
+            position: fixed; top: 0; z-index: 510; height: 100vh; width: 280px;
+            background: #fff; box-shadow: 2px 0 8px rgba(0,0,0,.1);
+            transform: translateX(-100%); transition: transform .25s ease;
+            overflow: hidden; display: flex; flex-direction: column;
+            border-radius: 0; margin: 0; padding: 0;
+        }
+        .sidebar.sidebar-right { right: 0; left: auto; transform: translateX(100%); box-shadow: -2px 0 8px rgba(0,0,0,.1); }
+        .sidebar.open { transform: translateX(0); }
+
+        .sidebar-header {
+            display: flex; align-items: center; justify-content: space-between;
+            height: 36px; padding: 0 12px; flex-shrink: 0; margin: 0;
+            background: #e44d26; color: #fff;
+            font-size: 11px; font-weight: 600; letter-spacing: 0.3px;
+        }
+        .sidebar-header button { background: none; border: none; cursor: pointer; color: rgba(255,255,255,0.7); display: inline-flex; align-items: center; }
+        .sidebar-header button:hover { color: #fff; }
+        .sidebar-body { flex: 1; overflow-y: auto; overflow-x: hidden; margin: 0; padding: 0; }
+
+        /* ── Tab bar ── */
+        .sidebar-tabs {
+            display: flex; border-bottom: 1px solid #e0e0e0; flex-shrink: 0;
+            background: #fff; margin: 0; padding: 0;
+        }
+        .sidebar-tabs button {
+            flex: 1; padding: 7px 2px; font-size: 10px; font-weight: 500;
+            letter-spacing: 0.3px;
+            border: none; border-bottom: 2px solid transparent;
+            background: transparent; cursor: pointer; color: #999;
+            transition: color .15s, border-color .15s;
+        }
+        .sidebar-tabs button:hover { color: #555; }
+        .sidebar-tabs button.active { color: #e44d26; border-bottom-color: #e44d26; font-weight: 600; }
+
+        /* ── Panel views ── */
+        .pdf-panel-view { display: none; padding: 0; }
+        .pdf-panel-view.active { display: block; }
+
+        /* ── TOC tree ── */
+        .toc-list { list-style: none; margin: 0; padding: 0; }
+        .toc-list .toc-list { padding-left: 12px; border-left: 2px solid #f0e0e0; margin-left: 4px; }
+        .toc-item {
+            display: block; padding: 7px 10px; cursor: pointer; border-radius: 4px;
+            color: #444; line-height: 1.3; font-size: 12px; word-break: break-word;
+            border-bottom: 1px solid #f5f5f5;
+        }
+        .toc-item:hover { background: #fef0ec; color: #c0392b; }
+        .toc-toggle {
+            display: inline-block; width: 14px; font-size: 9px;
+            color: #bbb; cursor: pointer; user-select: none;
+        }
+        .toc-children { display: block; }
+        .toc-children.collapsed { display: none; }
+
+        /* ── Bookmarks list ── */
+        .panel-list-header {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 8px 10px; border-bottom: 1px solid #f0f0f0;
+        }
+        .panel-list-header span { font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: 0.3px; font-weight: 600; }
+        .panel-list-header button {
+            font-size: 10px; padding: 3px 10px; cursor: pointer;
+            border: 1px solid rgba(192,57,43,.3); border-radius: 14px;
+            background: transparent; color: #c0392b; transition: all .15s;
+        }
+        .panel-list-header button:hover { background: #c0392b; color: #fff; }
+
+        /* ── Annotation / bookmark items ── */
+        .ann-item {
+            background: #fff; border: 1px solid rgba(0,0,0,.06);
+            border-radius: 8px; padding: 8px 10px; margin: 6px 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,.04);
+        }
+        .ann-item-header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 3px;
+        }
+        .ann-type {
+            font-size: 9px; font-weight: 700; text-transform: uppercase;
+            letter-spacing: .4px; padding: 2px 7px; border-radius: 14px; color: #fff;
+        }
+        .ann-type-highlight { background: #f0a500; }
+        .ann-type-freetext  { background: #3a7bd5; }
+        .ann-type-ink       { background: #2a9d5c; }
+        .ann-type-stamp     { background: #9b59b6; }
+        .ann-type-unknown   { background: #999; }
+        .ann-page { font-size: 11px; color: #555; }
+        .ann-page a { color: #e44d26; cursor: pointer; text-decoration: none; font-weight: 600; }
+        .ann-page a:hover { text-decoration: underline; }
+        .ann-content {
+            font-size: 11px; color: #666; margin-top: 4px;
+            word-break: break-word; white-space: pre-wrap;
+        }
+        .ann-empty {
+            color: #bbb; font-size: 12px; text-align: center;
+            margin-top: 32px; line-height: 1.6;
+        }
+        .bkm-link {
+            font-size: 12px; cursor: pointer; color: #e44d26; font-weight: 600;
+            text-decoration: none;
+        }
+        .bkm-link:hover { text-decoration: underline; }
+        .bkm-delete {
+            font-size: 10px; padding: 2px 8px; cursor: pointer;
+            color: #c0392b; border: 1px solid rgba(192,57,43,.25);
+            border-radius: 14px; background: transparent; transition: all .15s;
+        }
+        .bkm-delete:hover { background: #c0392b; color: #fff; }
+
+        /* ── Settings sidebar ── */
+        .settings-section-label {
+            font-size: 9px; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.5px; color: #999; padding: 12px 14px 4px;
+        }
+        .settings-row {
+            display: flex; align-items: center; justify-content: center;
+            padding: 6px 14px; gap: 0;
+        }
+        .seg-btn {
+            height: 30px; min-width: 70px; padding: 0 14px;
+            font-size: 8pt; text-transform: uppercase; letter-spacing: 0.5px;
+            border: 1px solid #d0d0d0; background: #fff; color: #555;
+            cursor: pointer; transition: all .15s;
+        }
+        .seg-btn:hover { background: #f5f5f5; }
+        .seg-btn.active { background: #e44d26; color: #fff; border-color: #c0392b; }
+        .seg-left { border-radius: 14px 0 0 14px; }
+        .seg-mid { border-left: none; border-right: none; }
+        .seg-right { border-radius: 0 14px 14px 0; }
+
+        /* Layout mode buttons with SVG diagrams */
+        .layout-btn {
+            display: inline-flex; flex-direction: column; align-items: center; gap: 3px;
+            padding: 6px 8px; border: 1px solid #d0d0d0; background: #fff;
+            color: #888; cursor: pointer; transition: all .15s; font-size: 9px;
+            min-width: 55px;
+        }
+        .layout-btn:first-child { border-radius: 8px 0 0 8px; }
+        .layout-btn:last-child { border-radius: 0 8px 8px 0; }
+        .layout-btn:hover { background: #f5f5f5; color: #555; }
+        .layout-btn.active { background: #fef0ec; color: #e44d26; border-color: #e44d26; }
+        .layout-btn span { font-weight: 500; letter-spacing: 0.3px; }
+
+        .rotate-btn {
+            display: inline-flex; align-items: center; gap: 4px;
+            height: 30px; padding: 0 16px; font-size: 8pt;
+            border: 1px solid #d0d0d0; border-radius: 14px;
+            background: #fff; color: #555; cursor: pointer; transition: all .15s;
+        }
+        .rotate-btn:hover { background: #f5f5f5; color: #333; }
+        .rotate-btn i { font-size: 16px; }
+
+        /* ── Search bar ── */
+        #pdf-search-bar {
+            display: none; align-items: center; gap: 6px;
+            padding: 6px 12px;
+            background: #fff; border-bottom: 1px solid #e0e0e0;
+            position: fixed; top: 42px; left: 0; right: 0; z-index: 90;
+        }
+        #pdf-search-bar.visible { display: flex; }
+        #pdf-search-bar input {
+            flex: 1; padding: 6px 12px; font-size: 13px;
+            border: 1px solid rgba(0,0,0,.12); border-radius: 14px;
+            outline: none; transition: border-color .15s;
+        }
+        #pdf-search-bar input:focus { border-color: #e44d26; }
+        #pdf-search-bar button {
+            padding: 4px 10px; font-size: 12px; cursor: pointer;
+            border: 1px solid rgba(0,0,0,.1); border-radius: 14px;
+            background: #fff; color: #555; transition: all .15s;
+        }
+        #pdf-search-bar button:hover { background: #f0f0f0; }
+        #pdf-search-bar .match-count { font-size: 11px; color: #999; white-space: nowrap; }
+
+        /* ── Reader container ── */
+        .content { position: absolute; top: 42px; left: 0; right: 0; bottom: 0; }
+        #D2Reader-Container { position: relative; width: 100%; height: 100%; }
+        /* Shrink page height to avoid scrollbar from 9px border in paginated/vertical */
+        .pdfViewer .page { height: calc(round(down, var(--total-scale-factor) * 792px, var(--scale-round-y)) - 9px) !important; }
+    </style>
 </head>
 
 <body>
-<header id="sideMenu" style="position:fixed;top:0;right:10px;z-index: 2;">
-    <div id="container-toc"></div>
-    <div id="container-bookmarks"></div>
-    <div id="container-annotations"></div>
-</header>
 
-<div style="position:fixed;top:0;left:0;z-index: 1000;bottom: 0; overflow: scroll;">
+<!-- Sidebar overlay -->
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeAllSidebars()"></div>
 
-        <button onclick="javascript:d2reader.previousResource()">previous resource</button><br>
-        <button onclick="javascript:d2reader.nextResource()">next resource</button><br>
-        <button onclick="javascript:d2reader.previousPage()">previous page</button><br>
-        <button onclick="javascript:d2reader.nextPage()">next page</button><br>
-
-        <button onclick="javascript:d2reader.goToPage(5)">Go to Page #5</button><br><br>
-
-        <button onclick="javascript:d2reader.scroll(false)">paginated</button><br>
-        <button onclick="javascript:d2reader.scroll(true, 'horizontal')">horizontal scroll</button><br>
-        <button onclick="javascript:d2reader.scroll(true, 'vertical')">vertical scroll</button><br><br>
-
-        <button onclick="
-                let result = d2reader.tableOfContents;
-                console.log(result)
-                console.log(result.length)
-                let container = document.getElementById('container-toc');
-                let tocString = ''
-                result.forEach(function (item, index) {
-                    if (index == 0) {
-                        console.log('first')
-                        console.log(index)
-                        tocString += '<ul><li onclick=\'d2reader.goTo(' + JSON.stringify(item) + ')\'>' + item.title + '</li>'
-                    } else if (index == result.length - 1) {
-                        console.log('last')
-                        console.log(index)
-                        tocString += '<li onclick=\'d2reader.goTo(' + JSON.stringify(item) + ')\'>' + item.title + '</li></ul>'
-                    } else {
-                        console.log('middle')
-                        console.log(index)
-                        tocString += '<li onclick=\'d2reader.goTo(' + JSON.stringify(item) + ')\'>' + item.title + '</li>'
-                    }
-                });
-                container.innerHTML = tocString
-            ">show TOC</button><br>
-        <button><del>Bookmarks</del></button><br>
-        <button><del>Highlights</del></button><br><br>
-
-        <button onclick="javascript:d2reader.zoomIn()">zoom in</button><br>
-        <button onclick="javascript:d2reader.zoomOut()">zoom out</button><br>
-        <button onclick="javascript:d2reader.activateHand()">activate pan tool</button><br>
-        <button onclick="javascript:d2reader.deactivateHand()">deactivate pan tool</button><br>
-        <button onclick="javascript:d2reader.fitToPage()">Fit to Page</button><br>
-        <button onclick="javascript:d2reader.fitToWidth()">Fit to Width</button><br><br>
-
-        <button><del>Read Aloud</del></button><br>
-        <button><del>Appearance</del></button><br>
-        <button><del>Search</del></button><br>
-
-
+<!-- Left sidebar: TOC / Bookmarks / Annotations -->
+<div class="sidebar" id="leftSidebar">
+    <div class="sidebar-header">
+        <span>Document</span>
+        <button onclick="toggleLeftSidebar()"><i class="material-icons" style="font-size:20px">close</i></button>
     </div>
+    <div class="sidebar-tabs" id="pdf-panel-tabs">
+        <button id="tab-toc" class="active" onclick="switchTab('toc')">Contents</button>
+        <button id="tab-bkm" onclick="switchTab('bkm')">Bookmarks</button>
+        <button id="tab-ann" onclick="switchTab('ann')">Annotations</button>
+    </div>
+    <div class="sidebar-body">
+        <!-- TOC view -->
+        <div id="panel-toc" class="pdf-panel-view active">
+            <p style="color:#bbb;font-size:12px;text-align:center;margin-top:32px;" id="toc-empty">
+                Loading...
+            </p>
+        </div>
 
-    <div class="content" id="root">
-        <div id="D2Reader-Container" style="border: solid 5px rebeccapurple;margin-left: 200px;margin-right: 50px">
-            <main style="height: calc(100vh - 10px);" tabindex=-1 id="iframe-wrapper" >
-                <div id="pdf-container" style="height: calc(100vh - 10px);overflow:auto;display: flex;align-items: center;"></div>
-            </main>
+        <!-- Bookmarks view -->
+        <div id="panel-bkm" class="pdf-panel-view">
+            <div class="panel-list-header">
+                <span id="bkm-count">0 bookmarks</span>
+                <button onclick="refreshBookmarkList()">Refresh</button>
+            </div>
+            <div id="bookmark-list">
+                <p class="ann-empty">No bookmarks yet.<br>Tap the star icon to save your place.</p>
+            </div>
+        </div>
+
+        <!-- Annotations view -->
+        <div id="panel-ann" class="pdf-panel-view">
+            <div class="panel-list-header">
+                <span id="ann-count">0 annotations</span>
+                <button onclick="clearAllAnnotations()" title="Delete all annotations">Clear all</button>
+            </div>
+            <div id="annotation-list">
+                <p class="ann-empty">No annotations yet.<br>Use the annotation tools to add some.</p>
+            </div>
         </div>
     </div>
+</div>
 
-    <script>
+<!-- Settings sidebar (right) -->
+<div class="sidebar sidebar-right" id="settingsSidebar">
+    <div class="sidebar-header">
+        <span>Settings</span>
+        <button onclick="toggleSettingsSidebar()"><i class="material-icons" style="font-size:20px">close</i></button>
+    </div>
+    <div class="sidebar-body">
+        <div class="settings-section-label">Scroll Mode</div>
+        <div class="settings-row">
+            <button class="layout-btn active" id="scroll-paginated" onclick="setScrollMode('paginated')" title="Paginated">
+                <svg width="32" height="28" viewBox="0 0 32 28"><rect x="8" y="2" width="16" height="24" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                <span>Page</span>
+            </button>
+            <button class="layout-btn" id="scroll-vertical" onclick="setScrollMode('vertical')" title="Vertical Scroll">
+                <svg width="32" height="28" viewBox="0 0 32 28"><rect x="10" y="1" width="12" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="10" y="13" width="12" height="10" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><line x1="16" y1="24" x2="16" y2="27" stroke="currentColor" stroke-width="1" stroke-dasharray="1 1"/></svg>
+                <span>Vertical</span>
+            </button>
+            <button class="layout-btn" id="scroll-horizontal" onclick="setScrollMode('horizontal')" title="Horizontal Scroll">
+                <svg width="32" height="28" viewBox="0 0 32 28"><rect x="1" y="5" width="10" height="18" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="13" y="5" width="10" height="18" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><line x1="25" y1="14" x2="31" y2="14" stroke="currentColor" stroke-width="1" stroke-dasharray="1 1"/></svg>
+                <span>Horizontal</span>
+            </button>
+            <button class="layout-btn" id="scroll-wrapped" onclick="setScrollMode('wrapped')" title="Wrapped">
+                <svg width="32" height="28" viewBox="0 0 32 28"><rect x="1" y="1" width="9" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="12" y="1" width="9" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="23" y="1" width="9" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="1" y="15" width="9" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="12" y="15" width="9" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="23" y="15" width="9" height="12" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/></svg>
+                <span>Wrapped</span>
+            </button>
+        </div>
 
-        let d2reader = undefined;
-        D2Reader.load({
-            // url: new URL('http://localhost:4444/viewer/pdf/sample.pdf'),
-            url: new URL('https://alicepdf.dita.digital/alice.json'),
-            injectables: [],
-            injectablesFixed: [],
-        }).then(instance => {
-            d2reader = instance
+        <div class="settings-section-label">Spread Mode</div>
+        <div class="settings-row">
+            <button class="layout-btn active" id="spread-none" onclick="setSpreadMode(0)" title="No Spread">
+                <svg width="32" height="28" viewBox="0 0 32 28"><rect x="8" y="2" width="16" height="24" rx="1" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+                <span>Single</span>
+            </button>
+            <button class="layout-btn" id="spread-odd" onclick="setSpreadMode(1)" title="Odd Pages Spread">
+                <svg width="32" height="28" viewBox="0 0 32 28"><rect x="1" y="4" width="14" height="20" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><rect x="17" y="4" width="14" height="20" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><line x1="16" y1="4" x2="16" y2="24" stroke="currentColor" stroke-width="0.5"/></svg>
+                <span>Odd</span>
+            </button>
+            <button class="layout-btn" id="spread-even" onclick="setSpreadMode(2)" title="Even Pages Spread">
+                <svg width="32" height="28" viewBox="0 0 32 28"><rect x="1" y="4" width="14" height="20" rx="1" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="2 1"/><rect x="17" y="4" width="14" height="20" rx="1" fill="none" stroke="currentColor" stroke-width="1.2"/><line x1="16" y1="4" x2="16" y2="24" stroke="currentColor" stroke-width="0.5"/></svg>
+                <span>Even</span>
+            </button>
+        </div>
+
+        <div class="settings-section-label">Rotation</div>
+        <div class="settings-row" style="gap: 8px;">
+            <button class="rotate-btn" onclick="d2reader?.navigator?.rotateCw()"><i class="material-icons">rotate_right</i> CW</button>
+            <button class="rotate-btn" onclick="d2reader?.navigator?.rotateCcw()"><i class="material-icons">rotate_left</i> CCW</button>
+        </div>
+    </div>
+</div>
+
+<!-- Toolbar -->
+<div class="reader-toolbar">
+    <div class="toolbar-left">
+        <button class="toolbar-btn" onclick="toggleLeftSidebar()" title="Table of Contents"><i class="material-icons">menu</i></button>
+        <span class="toolbar-badge"><i class="material-icons">picture_as_pdf</i> PDF</span>
+    </div>
+    <div class="toolbar-center">
+        <button class="toolbar-btn" onclick="d2reader?.previousPage()" title="Previous page"><i class="material-icons">chevron_left</i></button>
+        <span class="toolbar-page-info" id="pdf-page-info" aria-live="polite">Page ? of ?</span>
+        <button class="toolbar-btn" onclick="d2reader?.nextPage()" title="Next page"><i class="material-icons">chevron_right</i></button>
+        <span class="toolbar-sep"></span>
+        <button class="toolbar-btn" onclick="d2reader?.zoomIn()" title="Zoom in"><i class="material-icons">zoom_in</i></button>
+        <button class="toolbar-btn" onclick="d2reader?.zoomOut()" title="Zoom out"><i class="material-icons">zoom_out</i></button>
+        <button class="toolbar-btn" onclick="d2reader?.fitToPage()" title="Fit page"><i class="material-icons">fit_screen</i></button>
+        <button class="toolbar-btn" onclick="d2reader?.fitToWidth()" title="Fit width"><i class="material-icons">width_full</i></button>
+    </div>
+    <div class="toolbar-right">
+        <!-- Annotation tools -->
+        <button class="toolbar-btn" id="ann-btn-highlight" onclick="setAnnotationTool(9)" title="Highlight (click again to deactivate)"><i class="material-icons">highlight</i>Highlight</button>
+        <button class="toolbar-btn" id="ann-btn-text" onclick="setAnnotationTool(3)" title="Text note"><i class="material-icons">text_fields</i>Text</button>
+        <button class="toolbar-btn" id="ann-btn-ink" onclick="setAnnotationTool(15)" title="Draw"><i class="material-icons">draw</i>Draw</button>
+        <span class="toolbar-sep"></span>
+        <button class="toolbar-btn" id="bkm-toggle-btn" onclick="toggleBookmark()" title="Bookmark"><i class="material-icons">star_border</i></button>
+        <button class="toolbar-btn" id="pan-btn" onclick="togglePan()" title="Pan tool"><i class="material-icons">pan_tool</i></button>
+        <span class="toolbar-sep"></span>
+        <button class="toolbar-btn" onclick="toggleSearch()" title="Search (Ctrl+F)"><i class="material-icons">search</i></button>
+        <button class="toolbar-btn" onclick="toggleSettingsSidebar()" title="Settings"><i class="material-icons">settings</i></button>
+    </div>
+</div>
+
+<!-- Search bar -->
+<div id="pdf-search-bar">
+    <input id="pdf-search-input" type="search" placeholder="Find in document..." aria-label="Search" />
+    <button onclick="pdfFindPrev()" title="Shift+Enter"><i class="material-icons" style="font-size:16px;vertical-align:middle;">keyboard_arrow_up</i></button>
+    <button onclick="pdfFindNext()" title="Enter"><i class="material-icons" style="font-size:16px;vertical-align:middle;">keyboard_arrow_down</i></button>
+    <span class="match-count" id="pdf-match-count" aria-live="polite"></span>
+    <button onclick="toggleSearch()" title="Close"><i class="material-icons" style="font-size:16px;vertical-align:middle;">close</i></button>
+</div>
+
+<!-- Reader container -->
+<div class="content" id="root">
+    <div id="D2Reader-Container">
+        <!--
+            #iframe-wrapper  -> pdfjs-dist v5 requires a <div>, absolutely positioned, overflow:auto.
+            #pdf-container   -> gets class="pdfViewer"; PDFViewer appends .page divs here.
+        -->
+        <div role="main" tabindex="-1" id="iframe-wrapper">
+            <div id="pdf-container"></div>
+        </div>
+    </div>
+</div>
+
+<script>
+    let d2reader = undefined;
+
+    // Read manifest URL from query string (?url=...)
+    let defined_url = 'https://alicepdf.dita.digital/alice.json';
+    const query = window.location.search;
+    if (query) {
+        const params = {};
+        query.substring(1).split('&').forEach(function(kv) {
+            const pair = kv.split('=');
+            if (pair.length > 1) params[pair[0]] = decodeURIComponent(pair[1]);
+        });
+        if (params['url']) defined_url = params['url'];
+    }
+
+    D2Reader.load({
+        url: new URL(defined_url),
+        injectables: [],
+        injectablesFixed: [],
+        workerSrc: '/viewer/pdf.worker.min.mjs',
+        useLocalStorage: true,
+    }).then(instance => {
+        d2reader = instance;
+        updatePageInfo();
+        updateBookmarkButton();
+        renderToc();
+        syncSettingsUI();
+
+        const nav = d2reader.navigator;
+        if (!nav?.eventBus) return;
+
+        // -- Page indicator + bookmark state --
+        nav.eventBus.on('pagechanging', ({ pageNumber }) => {
+            updatePageInfo(pageNumber);
+            updateBookmarkButton();
         });
 
-    </script>
+        // In wrapped mode, clicking a page switches to paginated and navigates to it
+        document.getElementById('pdf-container')?.addEventListener('click', (e) => {
+            const pdfViewer = d2reader?.navigator?.pdfViewer;
+            if (!pdfViewer || pdfViewer.scrollMode !== 2) return; // 2 = WRAPPED
+            const pageEl = e.target.closest('.page');
+            if (!pageEl) return;
+            const pageNum = parseInt(pageEl.dataset.pageNumber);
+            if (!pageNum) return;
+            setScrollMode('paginated');
+            setTimeout(() => d2reader?.goToPage(pageNum), 100);
+        });
 
-    <noscript>
-        <style>
-            noscript {
-                width: 100%;
-                height: 100vh;
-                display: flex;
-                align-items: center;
-                justify-content: center;
+        // -- Annotation list: refresh when editor state changes --
+        nav.eventBus.on('annotationeditorstateschanged', () => {
+            refreshAnnotationList();
+        });
+        nav.eventBus.on('annotationeditormodechanged', ({ mode }) => {
+            updateAnnotationToolButtons(mode);
+            // Switching back to select often signals annotations were just committed.
+            if (mode === 0) refreshAnnotationList();
+        });
+        // Refresh annotation list after document loads (shows restored annotations).
+        nav.eventBus.on('pagesloaded', () => {
+            refreshAnnotationList();
+        });
+        // Also refresh when each page's annotation layer renders so the sidebar
+        // updates as pending annotations are restored page-by-page on scroll.
+        nav.eventBus.on('annotationeditorlayerrendered', () => {
+            refreshAnnotationList();
+        });
+
+        // -- Find match count --
+        nav.eventBus.on('updatefindmatchescount', ({ matchesCount }) => {
+            const el = document.getElementById('pdf-match-count');
+            if (!el) return;
+            el.textContent = matchesCount.total > 0
+                ? `${matchesCount.current} of ${matchesCount.total}`
+                : '';
+        });
+        nav.eventBus.on('updatefindcontrolstate', ({ state }) => {
+            const el = document.getElementById('pdf-match-count');
+            if (el && state === 1) el.textContent = 'Not found';
+        });
+
+    }).catch(err => {
+        console.error('D2Reader failed to load:', err);
+        document.getElementById('toc-empty').textContent = 'Failed to load document.';
+    });
+
+    // -- Page info --
+
+    function updatePageInfo(page) {
+        const el = document.getElementById('pdf-page-info');
+        if (!el) return;
+        const current = page ?? d2reader?.navigator?.pageNum ?? '?';
+        const total   = d2reader?.navigator?.numPages ?? '?';
+        el.textContent = `Page ${current} of ${total}`;
+    }
+
+    // -- Panel tab switching --
+
+    function switchTab(name) {
+        document.querySelectorAll('.pdf-panel-view').forEach(v => v.classList.remove('active'));
+        document.querySelectorAll('#pdf-panel-tabs button').forEach(b => b.classList.remove('active'));
+        document.getElementById('panel-' + name).classList.add('active');
+        document.getElementById('tab-' + name).classList.add('active');
+        if (name === 'ann') refreshAnnotationList();
+        if (name === 'bkm') refreshBookmarkList();
+    }
+
+    // -- Bookmarks --
+
+    function toggleBookmark() {
+        const nav = d2reader?.navigator;
+        if (!nav) return;
+        if (nav.isCurrentPageBookmarked()) {
+            // Find and delete the existing bookmark for this page
+            const existing = nav.getBookmarks().find(b =>
+                b.locations?.position === nav.pageNum
+            );
+            if (existing) nav.deleteBookmark(existing);
+        } else {
+            nav.saveBookmark();
+        }
+        updateBookmarkButton();
+        refreshBookmarkList();
+    }
+
+    function updateBookmarkButton() {
+        const btn = document.getElementById('bkm-toggle-btn');
+        if (!btn) return;
+        const bookmarked = d2reader?.navigator?.isCurrentPageBookmarked?.() ?? false;
+        const icon = btn.querySelector('i');
+        if (icon) {
+            icon.textContent = bookmarked ? 'star' : 'star_border';
+        }
+        btn.classList.toggle('active', bookmarked);
+        btn.title = bookmarked ? 'Remove bookmark' : 'Add bookmark';
+    }
+
+    function refreshBookmarkList() {
+        const nav = d2reader?.navigator;
+        const container = document.getElementById('bookmark-list');
+        const countEl   = document.getElementById('bkm-count');
+        if (!nav || !container) return;
+
+        const bookmarks = nav.getBookmarks();
+        countEl.textContent = `${bookmarks.length} bookmark${bookmarks.length !== 1 ? 's' : ''}`;
+
+        if (bookmarks.length === 0) {
+            container.innerHTML = '<p class="ann-empty">No bookmarks yet.<br>Tap the star icon to save your place.</p>';
+            return;
+        }
+
+        // Sort by page number
+        bookmarks.sort((a, b) => (a.locations?.position ?? 0) - (b.locations?.position ?? 0));
+
+        container.innerHTML = '';
+        bookmarks.forEach(bkm => {
+            const page = bkm.locations?.position ?? '?';
+            const label = bkm.title || `Page ${page}`;
+            const created = bkm.created ? new Date(bkm.created).toLocaleString() : '';
+
+            const item = document.createElement('div');
+            item.className = 'ann-item';
+            item.innerHTML = `
+                <div class="ann-item-header">
+                    <span class="bkm-link" onclick="d2reader?.goToPage(${page})" title="Go to page ${page}">
+                        <i class="material-icons" style="font-size:14px;vertical-align:-2px;color:#e44d26;">star</i>
+                        ${escapeHtml(label)}
+                    </span>
+                    <button class="bkm-delete" onclick="deleteBookmarkById('${bkm.id}')" title="Remove bookmark">
+                        <i class="material-icons" style="font-size:12px;vertical-align:-2px;">close</i>
+                    </button>
+                </div>
+                ${created ? `<div style="font-size:10px;color:#bbb;margin-top:2px;">${created}</div>` : ''}
+            `;
+            container.appendChild(item);
+        });
+    }
+
+    function deleteBookmarkById(id) {
+        const nav = d2reader?.navigator;
+        if (!nav) return;
+        const bkm = nav.getBookmarks().find(b => String(b.id) === String(id));
+        if (bkm) {
+            nav.deleteBookmark(bkm);
+            updateBookmarkButton();
+            refreshBookmarkList();
+        }
+    }
+
+    // -- TOC --
+
+    function renderToc() {
+        const el = document.getElementById('panel-toc');
+        if (!d2reader) return;
+        const items = d2reader.tableOfContents;
+        if (!items || items.length === 0) {
+            el.innerHTML = '<p style="color:#bbb;font-size:12px;text-align:center;margin-top:32px;">No table of contents available.</p>';
+            return;
+        }
+        el.innerHTML = '';
+        el.appendChild(buildTocList(items, 0));
+    }
+
+    function buildTocList(items, depth) {
+        const ul = document.createElement('ul');
+        ul.className = 'toc-list';
+        items.forEach(item => {
+            const li = document.createElement('li');
+            const hasChildren = item.children && item.children.length > 0;
+
+            // Toggle arrow for items with children
+            if (hasChildren) {
+                const toggle = document.createElement('span');
+                toggle.className = 'toc-toggle';
+                toggle.textContent = '\u25BE';
+                toggle.onclick = (e) => {
+                    e.stopPropagation();
+                    const childList = li.querySelector('.toc-children');
+                    const collapsed = childList.classList.toggle('collapsed');
+                    toggle.textContent = collapsed ? '\u25B8' : '\u25BE';
+                };
+                li.appendChild(toggle);
+            } else {
+                const spacer = document.createElement('span');
+                spacer.className = 'toc-toggle';
+                li.appendChild(spacer);
             }
 
-            .warning {
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                font-size: 1.5rem;
-                font-weight: bold;
+            const link = document.createElement('span');
+            link.className = 'toc-item';
+            link.textContent = item.title || '(untitled)';
+            link.title = item.title || '';
+            link.onclick = () => d2reader?.goTo(item);
+            li.appendChild(link);
+
+            if (hasChildren) {
+                const childContainer = document.createElement('div');
+                childContainer.className = 'toc-children';
+                childContainer.appendChild(buildTocList(item.children, depth + 1));
+                li.appendChild(childContainer);
             }
-        </style>
-        <p class="warning">To use this viewer, please enable JavaScript.</p>
-    </noscript>
+
+            ul.appendChild(li);
+        });
+        return ul;
+    }
+
+    // -- Annotation list --
+
+    const ANN_TYPE_LABELS = { 3: 'Text', 9: 'Highlight', 13: 'Stamp', 15: 'Ink' };
+    const ANN_TYPE_CSS    = { 3: 'freetext', 9: 'highlight', 13: 'stamp', 15: 'ink' };
+
+    function clearAllAnnotations() {
+        if (!confirm('Delete all annotations?')) return;
+        d2reader?.navigator?.clearAnnotations();
+        refreshAnnotationList();
+    }
+
+    function refreshAnnotationList() {
+        const nav = d2reader?.navigator;
+        const container = document.getElementById('annotation-list');
+        const countEl   = document.getElementById('ann-count');
+        if (!nav || !container) return;
+
+        // getAllAnnotations() merges live (annotationStorage) + pending (not-yet-rendered pages)
+        // so the sidebar always shows the complete picture regardless of scroll position.
+        const entries = nav.getAllAnnotations?.() ?? [];
+
+        if (entries.length === 0) {
+            container.innerHTML = '<p class="ann-empty">No annotations yet.<br>Use the annotation tools to add some.</p>';
+            countEl.textContent = '0 annotations';
+            return;
+        }
+
+        countEl.textContent = `${entries.length} annotation${entries.length !== 1 ? 's' : ''}`;
+
+        container.innerHTML = '';
+        entries.forEach(ann => {
+            const page = (ann.pageIndex ?? 0) + 1;
+            const typeNum = ann.annotationType ?? ann.type ?? 0;
+            const label = ANN_TYPE_LABELS[typeNum] ?? 'Unknown';
+            const css   = ANN_TYPE_CSS[typeNum] ?? 'unknown';
+
+            // Extract a human-readable snippet
+            let content = '';
+            if (ann.value)                content = ann.value;
+            else if (ann.contentsObj?.str) content = ann.contentsObj.str;
+            else if (ann.quadPoints)       content = '';
+
+            const item = document.createElement('div');
+            item.className = 'ann-item';
+            item.innerHTML = `
+                <div class="ann-item-header">
+                    <span class="ann-type ann-type-${css}">${label}</span>
+                    <span class="ann-page">p. <a onclick="d2reader?.goToPage(${page})" title="Go to page ${page}">${page}</a></span>
+                </div>
+                ${content ? `<div class="ann-content">${escapeHtml(content)}</div>` : ''}
+            `;
+            container.appendChild(item);
+        });
+    }
+
+    function escapeHtml(str) {
+        return String(str)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    // -- Annotation tool buttons --
+
+    let _activeAnnotationTool = 0;
+
+    function setAnnotationTool(mode) {
+        // Toggle: clicking the active tool deactivates it (back to select)
+        if (mode !== 0 && mode === _activeAnnotationTool) mode = 0;
+        d2reader?.navigator?.setAnnotationEditorMode(mode);
+        updateAnnotationToolButtons(mode);
+    }
+
+    function updateAnnotationToolButtons(mode) {
+        _activeAnnotationTool = mode;
+        const map = { 9: 'highlight', 3: 'text', 15: 'ink' };
+        Object.entries(map).forEach(([m, name]) => {
+            const btn = document.getElementById('ann-btn-' + name);
+            if (!btn) return;
+            btn.classList.toggle('active', String(m) === String(mode));
+        });
+    }
+
+    // -- Pan tool --
+
+    let _panActive = false;
+
+    function togglePan() {
+        _panActive = !_panActive;
+        if (_panActive) {
+            d2reader?.activateHand();
+        } else {
+            d2reader?.deactivateHand();
+        }
+        document.getElementById('pan-btn')?.classList.toggle('active', _panActive);
+    }
+
+    // -- Sidebar toggles --
+
+    function toggleLeftSidebar() {
+        const sidebar = document.getElementById('leftSidebar');
+        const overlay = document.getElementById('sidebarOverlay');
+        const isOpen = sidebar.classList.contains('open');
+        closeAllSidebars();
+        if (!isOpen) {
+            sidebar.classList.add('open');
+            overlay.classList.add('open');
+        }
+    }
+
+    function toggleSettingsSidebar() {
+        const sidebar = document.getElementById('settingsSidebar');
+        const overlay = document.getElementById('sidebarOverlay');
+        const isOpen = sidebar.classList.contains('open');
+        closeAllSidebars();
+        if (!isOpen) {
+            sidebar.classList.add('open');
+            overlay.classList.add('open');
+        }
+    }
+
+    function closeAllSidebars() {
+        document.querySelectorAll('.sidebar').forEach(s => s.classList.remove('open'));
+        document.getElementById('sidebarOverlay').classList.remove('open');
+    }
+
+    // -- Settings: Scroll mode --
+
+    function syncSettingsUI() {
+        // Find the saved settings by scanning localStorage for the pdf keys
+        let scroll = null, spread = null;
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key?.endsWith('-pdf-scroll-mode')) scroll = localStorage.getItem(key);
+            if (key?.endsWith('-pdf-spread-mode')) spread = localStorage.getItem(key);
+        }
+
+        // pdf.js ScrollMode: VERTICAL=0, HORIZONTAL=1, WRAPPED=2, PAGE=3
+        document.querySelectorAll('[id^="scroll-"]').forEach(b => b.classList.remove('active'));
+        if (scroll === '0') document.getElementById('scroll-vertical')?.classList.add('active');
+        else if (scroll === '1') document.getElementById('scroll-horizontal')?.classList.add('active');
+        else if (scroll === '2') document.getElementById('scroll-wrapped')?.classList.add('active');
+        else document.getElementById('scroll-paginated')?.classList.add('active');
+
+        document.querySelectorAll('[id^="spread-"]').forEach(b => b.classList.remove('active'));
+        if (spread === '1') document.getElementById('spread-odd')?.classList.add('active');
+        else if (spread === '2') document.getElementById('spread-even')?.classList.add('active');
+        else document.getElementById('spread-none')?.classList.add('active');
+
+        // Disable spread in horizontal/wrapped modes
+        const spreadEnabled = (scroll === '3' || scroll === '0' || scroll === null || scroll === undefined);
+        document.querySelectorAll('[id^="spread-"]').forEach(b => {
+            b.disabled = !spreadEnabled;
+            b.style.opacity = spreadEnabled ? '1' : '0.3';
+            b.style.pointerEvents = spreadEnabled ? '' : 'none';
+        });
+    }
+
+    function setScrollMode(mode) {
+        document.querySelectorAll('[id^="scroll-"]').forEach(b => b.classList.remove('active'));
+        document.getElementById('scroll-' + mode)?.classList.add('active');
+        if (mode === 'paginated') d2reader?.scroll(false);
+        else if (mode === 'vertical') d2reader?.scroll(true, 'vertical');
+        else if (mode === 'horizontal') d2reader?.scroll(true, 'horizontal');
+        else if (mode === 'wrapped') d2reader?.scroll(true, 'wrapped');
+
+        // Set default zoom per mode
+        if (mode === 'wrapped') {
+            const nav = d2reader?.navigator;
+            if (nav?.pdfViewer) {
+                nav.pdfViewer.currentScaleValue = '0.25';
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key?.endsWith('-pdf-scale-value')) { localStorage.setItem(key, '0.25'); break; }
+                }
+            }
+        } else {
+            d2reader?.fitToPage();
+        }
+
+        // Spread only applies to paginated and vertical
+        const spreadEnabled = (mode === 'paginated' || mode === 'vertical');
+        document.querySelectorAll('[id^="spread-"]').forEach(b => {
+            b.disabled = !spreadEnabled;
+            b.style.opacity = spreadEnabled ? '1' : '0.3';
+            b.style.pointerEvents = spreadEnabled ? '' : 'none';
+        });
+    }
+
+    // -- Settings: Spread mode --
+
+    function setSpreadMode(mode) {
+        document.querySelectorAll('[id^="spread-"]').forEach(b => b.classList.remove('active'));
+        const names = { 0: 'none', 1: 'odd', 2: 'even' };
+        document.getElementById('spread-' + names[mode])?.classList.add('active');
+        d2reader?.navigator?.setSpreadMode(mode);
+    }
+
+    // -- Search --
+
+    function toggleSearch() {
+        const bar = document.getElementById('pdf-search-bar');
+        const root = document.getElementById('root');
+        bar.classList.toggle('visible');
+        root.classList.toggle('search-open', bar.classList.contains('visible'));
+        if (bar.classList.contains('visible')) {
+            document.getElementById('pdf-search-input').focus();
+        } else {
+            d2reader?.navigator?.find('');
+            document.getElementById('pdf-match-count').textContent = '';
+        }
+    }
+
+    function pdfFind() {
+        d2reader?.navigator?.find(document.getElementById('pdf-search-input').value, { highlightAll: true });
+    }
+    function pdfFindNext() {
+        if (!document.getElementById('pdf-search-input').value) return;
+        d2reader?.navigator?.findNext();
+    }
+    function pdfFindPrev() {
+        if (!document.getElementById('pdf-search-input').value) return;
+        d2reader?.navigator?.findPrevious();
+    }
+
+    // -- Keyboard shortcuts --
+
+    document.addEventListener('DOMContentLoaded', () => {
+        const input = document.getElementById('pdf-search-input');
+        input.addEventListener('input', pdfFind);
+        input.addEventListener('keydown', e => {
+            if (e.key === 'Enter')  e.shiftKey ? pdfFindPrev() : pdfFindNext();
+            if (e.key === 'Escape') toggleSearch();
+        });
+    });
+
+    document.addEventListener('keydown', e => {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+            e.preventDefault();
+            if (!document.getElementById('pdf-search-bar').classList.contains('visible')) toggleSearch();
+        }
+        if (document.activeElement?.tagName === 'INPUT') return;
+        if (e.key === 'ArrowRight' || e.key === 'ArrowDown') d2reader?.nextPage();
+        if (e.key === 'ArrowLeft'  || e.key === 'ArrowUp')   d2reader?.previousPage();
+    });
+</script>
+
+<noscript>
+    <style>
+        noscript { width:100%; height:100vh; display:flex; align-items:center; justify-content:center; }
+        .warning { font-family: system-ui, sans-serif; font-size: 1.5rem; font-weight: bold; }
+    </style>
+    <p class="warning">To use this viewer, please enable JavaScript.</p>
+</noscript>
 </body>
-
 </html>

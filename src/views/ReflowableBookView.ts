@@ -321,7 +321,8 @@ export default class ReflowableBookView implements BookView {
         BrowserUtilities.getHeight()
       );
     } else {
-      // TODO: need to double check this, why sometimes we get "rightWidth 0.091064453125"
+      // Sub-pixel rounding: getRightColumnsWidth() can return fractional values
+      // like 0.09 due to browser layout — Math.floor normalizes to 0.
       const rightWidth = Math.floor(this.getRightColumnsWidth());
       return (
         rightWidth <= 0 ||

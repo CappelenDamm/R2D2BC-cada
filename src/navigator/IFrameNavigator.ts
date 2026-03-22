@@ -97,8 +97,6 @@ import {
   ConsumptionModule,
   ConsumptionModuleConfig,
 } from "../modules/consumption/ConsumptionModule";
-import KeyDownEvent = JQuery.KeyDownEvent;
-
 export type GetContent = (href: string) => Promise<string>;
 export type GetContentBytesLength = (
   href: string,
@@ -110,17 +108,19 @@ export interface RequestConfig extends RequestInit {
 }
 
 export interface NavigatorAPI {
-  updateSettings: any;
+  updateSettings?: (settings: Record<string, unknown>) => Promise<void>;
   getContent: GetContent;
   getContentBytesLength: GetContentBytesLength;
-  resourceReady: any;
-  resourceAtStart: any;
-  resourceAtEnd: any;
-  resourceFitsScreen: any;
-  updateCurrentLocation: any;
-  keydownFallthrough: any;
-  clickThrough: any;
-  direction: any;
+  resourceReady?: () => void;
+  resourceAtStart?: () => void;
+  resourceAtEnd?: () => void;
+  resourceFitsScreen?: () => void;
+  updateCurrentLocation?: (
+    locator: import("../model/Locator").ReadingPosition
+  ) => Promise<void>;
+  keydownFallthrough?: (event: KeyboardEvent | undefined) => void;
+  clickThrough?: (event: MouseEvent | TouchEvent) => void;
+  direction?: (dir: string) => void;
   onError?: (e: Error) => void;
 }
 
@@ -147,7 +147,7 @@ export interface IFrameNavigatorConfig {
   services?: PublicationServices;
   sample?: SampleRead;
   requestConfig?: RequestConfig;
-  modules: ReaderModule[];
+  modules: Array<ReaderModule | undefined>;
   highlighter: TextHighlighter;
 }
 export interface PublicationServices {
@@ -193,12 +193,25 @@ export interface ReaderRights {
 export interface ReaderUI {
   settings: UserSettingsUIConfig;
 }
+
+/**
+ * Shape of the initial annotations object passed to `D2Reader.load()`.
+ * Both `bookmarks` and `highlights` are optional arrays of their respective types.
+ */
+export interface InitialAnnotations {
+  bookmarks?: import("../model/Locator").Bookmark[];
+  highlights?: import("../model/Locator").Annotation[];
+}
+
 export interface ReaderConfig {
-  publication?: any;
+  /** Pre-parsed publication manifest JSON — if omitted the manifest is fetched from `url`. */
+  publication?: Record<string, unknown>;
   url: URL;
-  userSettings?: any;
-  initialAnnotations?: any;
-  lastReadingPosition?: any;
+  userSettings?: Partial<
+    import("../model/user-settings/UserSettings").InitialUserSettings
+  >;
+  initialAnnotations?: InitialAnnotations;
+  lastReadingPosition?: import("../model/Locator").ReadingPosition;
   rights?: Partial<ReaderRights>;
   api?: Partial<NavigatorAPI>;
   tts?: Partial<TTSModuleConfig>;
@@ -221,6 +234,12 @@ export interface ReaderConfig {
   services?: PublicationServices;
   sample?: SampleRead;
   requestConfig?: RequestConfig;
+  /**
+   * Override the PDF.js worker URL (PDF publications only).
+   * Defaults to the unpkg CDN for the bundled pdfjs-dist version.
+   * Set to a local path when self-hosting the worker, e.g. `"/viewer/pdf.worker.min.mjs"`.
+   */
+  workerSrc?: string;
 }
 
 /** Class that shows webpub resources in an iframe, with navigation controls outside the iframe. */
@@ -365,75 +384,44 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     sample?: SampleRead,
     requestConfig?: RequestConfig,
     highlighter?: TextHighlighter,
-    modules?: ReaderModule[]
+    modules?: Array<ReaderModule | undefined>
   ) {
     super();
     this.highlighter = highlighter;
     if (this.highlighter) {
       this.highlighter.navigator = this;
     }
-    for (const index in modules) {
-      let module = modules[index];
-      if (module) {
-        module.navigator = this;
-      }
-      if (modules[index] instanceof AnnotationModule) {
+    for (const module of modules ?? []) {
+      if (!module) continue;
+      // Allow modules to back-reference the navigator for coordination
+      (module as any).navigator = this;
+      if (module instanceof AnnotationModule) {
         this.annotationModule = module;
-      }
-      if (modules[index] instanceof BookmarkModule) {
+      } else if (module instanceof BookmarkModule) {
         this.bookmarkModule = module;
-      }
-      if (modules[index] instanceof TTSModule2) {
+      } else if (module instanceof TTSModule2) {
         this.ttsModule = module;
-      }
-      if (modules[index] instanceof TTSModule2) {
-        this.ttsModule = module;
-      }
-      if (modules[index] instanceof SearchModule) {
+      } else if (module instanceof SearchModule) {
         this.searchModule = module;
-      }
-      if (modules[index] instanceof DefinitionsModule) {
+      } else if (module instanceof DefinitionsModule) {
         this.definitionsModule = module;
-      }
-      if (modules[index] instanceof TimelineModule) {
+      } else if (module instanceof TimelineModule) {
         this.timelineModule = module;
-      }
-      if (modules[index] instanceof ContentProtectionModule) {
+      } else if (module instanceof ContentProtectionModule) {
         this.contentProtectionModule = module;
-      }
-      if (modules[index] instanceof CitationModule) {
+      } else if (module instanceof CitationModule) {
         this.citationModule = module;
-      }
-      if (modules[index] instanceof MediaOverlayModule) {
+      } else if (module instanceof MediaOverlayModule) {
         this.mediaOverlayModule = module;
-      }
-      if (modules[index] instanceof PageBreakModule) {
+      } else if (module instanceof PageBreakModule) {
         this.pageBreakModule = module;
-      }
-      if (modules[index] instanceof LineFocusModule) {
+      } else if (module instanceof LineFocusModule) {
         this.lineFocusModule = module;
-      }
-      if (modules[index] instanceof HistoryModule) {
+      } else if (module instanceof HistoryModule) {
         this.historyModule = module;
-      }
-      if (modules[index] instanceof ConsumptionModule) {
+      } else if (module instanceof ConsumptionModule) {
         this.consumptionModule = module;
       }
-      // modules: [
-      //   bookmarkModule,
-      //   annotationModule,
-      //   ttsModule,
-      //   searchModule,
-      //   definitionsModule,
-      //   timelineModule,
-      //   contentProtectionModule,
-      //   citationModule,
-      //   mediaOverlayModule,
-      //   pageBreakModule,
-      //   lineFocusModule,
-      //   historyModule,
-      //   consumptionModule,
-      // ],
     }
     this.settings = settings;
     this.annotator = annotator;
@@ -2390,6 +2378,9 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
       }
     }
     if (position) {
+      if (!position.title && this.currentChapterLink.title) {
+        position.title = this.currentChapterLink.title;
+      }
       position.locations.progression = this.view?.getCurrentPosition();
       position.displayInfo = {
         resourceScreenIndex: Math.round(this.view?.getCurrentPage() ?? 0),
@@ -2399,8 +2390,8 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     return position;
   }
 
-  positions(): any {
-    return this.publication.positions ? this.publication.positions : [];
+  positions(): Locator[] {
+    return this.publication.positions ?? [];
   }
   goToPosition(position: number) {
     if (this.publication.positions) {
@@ -2618,13 +2609,18 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
           );
           if (viewport) {
             var dimensionsStr = viewport.content;
-            var obj = dimensionsStr.split(",").reduce((obj, s) => {
-              // @ts-ignore
-              var [key, value] = s.match(/[^\s;=]+/g);
-              obj[key] = isNaN(Number(value)) ? value : +value;
-              return obj;
-            }, {});
-            if (parseInt(obj["height"]) !== 0 || parseInt(obj["width"]) !== 0) {
+            var obj: Record<string, number | string> = {};
+            dimensionsStr.split(",").forEach((s) => {
+              const parts = s.match(/[^\s;=]+/g);
+              if (parts && parts.length >= 2) {
+                const [key, value] = parts;
+                obj[key] = isNaN(Number(value)) ? value : +value;
+              }
+            });
+            if (
+              parseInt(String(obj["height"])) !== 0 ||
+              parseInt(String(obj["width"])) !== 0
+            ) {
               height = obj["height"].toString().endsWith("px")
                 ? obj["height"]
                 : obj["height"] + "px";
@@ -2848,7 +2844,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     }
   }
 
-  private handleKeydownFallthrough(event: KeyDownEvent | undefined): void {
+  private handleKeydownFallthrough(event: KeyboardEvent | undefined): void {
     if (this.api?.keydownFallthrough) this.api?.keydownFallthrough(event);
     this.emit("keydown", event);
   }

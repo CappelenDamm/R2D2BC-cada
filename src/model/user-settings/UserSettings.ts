@@ -21,6 +21,7 @@ import Store from "../../store/Store";
 import {
   Enumerable,
   Incremental,
+  Stringable,
   Switchable,
   UserProperties,
   UserProperty,
@@ -38,7 +39,7 @@ import log from "loglevel";
 export interface UserSettingsConfig {
   /** Store to save the user's selections in. */
   store: Store;
-  initialUserSettings: InitialUserSettings;
+  initialUserSettings?: Partial<InitialUserSettings>;
   headerMenu?: HTMLElement | null;
   api?: Partial<NavigatorAPI>;
   injectables?: Array<Injectable>;
@@ -78,6 +79,12 @@ export interface IUserSettings {
   letterSpacing: number;
   pageMargins: number;
   lineHeight: number;
+  bodyHyphens: boolean;
+  paraSpacing: number;
+  paraIndent: number;
+  typeScale: number;
+  backgroundColor: string;
+  textColor: string;
 }
 
 /**
@@ -106,6 +113,12 @@ export interface InitialUserSettings {
   letterSpacing: number;
   pageMargins: number;
   lineHeight: number;
+  bodyHyphens?: boolean;
+  paraSpacing?: number;
+  paraIndent?: number;
+  typeScale?: number;
+  backgroundColor?: string;
+  textColor?: string;
 }
 
 export class UserSettings implements IUserSettings {
@@ -149,6 +162,12 @@ export class UserSettings implements IUserSettings {
   letterSpacing = 0.0;
   pageMargins = 2.0;
   lineHeight = 1.0;
+  bodyHyphens = false;
+  paraSpacing = 0.0;
+  paraIndent = 1.0;
+  typeScale = 1.2;
+  backgroundColor = "";
+  textColor = "";
 
   userProperties?: UserProperties;
 
@@ -305,6 +324,60 @@ export class UserSettings implements IUserSettings {
         }
         log.log(settings.lineHeight);
       }
+      if (initialUserSettings.bodyHyphens !== undefined) {
+        settings.bodyHyphens = initialUserSettings.bodyHyphens;
+        let prop = settings.userProperties.getByRef(
+          ReadiumCSS.BODY_HYPHENS_REF
+        );
+        if (prop) {
+          prop.value = settings.bodyHyphens;
+          await settings.saveProperty(prop);
+        }
+      }
+      if (initialUserSettings.paraSpacing !== undefined) {
+        settings.paraSpacing = initialUserSettings.paraSpacing;
+        let prop = settings.userProperties.getByRef(
+          ReadiumCSS.PARA_SPACING_REF
+        );
+        if (prop) {
+          prop.value = settings.paraSpacing;
+          await settings.saveProperty(prop);
+        }
+      }
+      if (initialUserSettings.paraIndent !== undefined) {
+        settings.paraIndent = initialUserSettings.paraIndent;
+        let prop = settings.userProperties.getByRef(ReadiumCSS.PARA_INDENT_REF);
+        if (prop) {
+          prop.value = settings.paraIndent;
+          await settings.saveProperty(prop);
+        }
+      }
+      if (initialUserSettings.typeScale !== undefined) {
+        settings.typeScale = initialUserSettings.typeScale;
+        let prop = settings.userProperties.getByRef(ReadiumCSS.TYPE_SCALE_REF);
+        if (prop) {
+          prop.value = settings.typeScale;
+          await settings.saveProperty(prop);
+        }
+      }
+      if (initialUserSettings.backgroundColor !== undefined) {
+        settings.backgroundColor = initialUserSettings.backgroundColor;
+        let prop = settings.userProperties.getByRef(
+          ReadiumCSS.BACKGROUND_COLOR_REF
+        );
+        if (prop) {
+          prop.value = settings.backgroundColor;
+          await settings.saveProperty(prop);
+        }
+      }
+      if (initialUserSettings.textColor !== undefined) {
+        settings.textColor = initialUserSettings.textColor;
+        let prop = settings.userProperties.getByRef(ReadiumCSS.TEXT_COLOR_REF);
+        if (prop) {
+          prop.value = settings.textColor;
+          await settings.saveProperty(prop);
+        }
+      }
       settings.userProperties = settings.getUserSettings();
       await settings.initialise();
     }
@@ -404,6 +477,30 @@ export class UserSettings implements IUserSettings {
       "lineHeight",
       ReadiumCSS.LINE_HEIGHT_KEY
     );
+    this.bodyHyphens = await this.getPropertyAndFallback<Switchable>(
+      "bodyHyphens",
+      ReadiumCSS.BODY_HYPHENS_KEY
+    );
+    this.paraSpacing = await this.getPropertyAndFallback<Incremental>(
+      "paraSpacing",
+      ReadiumCSS.PARA_SPACING_KEY
+    );
+    this.paraIndent = await this.getPropertyAndFallback<Incremental>(
+      "paraIndent",
+      ReadiumCSS.PARA_INDENT_KEY
+    );
+    this.typeScale = await this.getPropertyAndFallback<Incremental>(
+      "typeScale",
+      ReadiumCSS.TYPE_SCALE_KEY
+    );
+    this.backgroundColor = await this.getPropertyAndFallback<Stringable>(
+      "backgroundColor",
+      ReadiumCSS.BACKGROUND_COLOR_KEY
+    );
+    this.textColor = await this.getPropertyAndFallback<Stringable>(
+      "textColor",
+      ReadiumCSS.TEXT_COLOR_KEY
+    );
     this.userProperties = this.getUserSettings();
   }
 
@@ -423,6 +520,12 @@ export class UserSettings implements IUserSettings {
     this.letterSpacing = 0.0;
     this.pageMargins = 2.0;
     this.lineHeight = 1.0;
+    this.bodyHyphens = false;
+    this.paraSpacing = 0.0;
+    this.paraIndent = 1.0;
+    this.typeScale = 1.2;
+    this.backgroundColor = "";
+    this.textColor = "";
 
     this.userProperties = this.getUserSettings();
 
@@ -456,6 +559,13 @@ export class UserSettings implements IUserSettings {
         html.style.removeProperty(ReadiumCSS.LINE_HEIGHT_KEY);
         // Apply page margins
         html.style.removeProperty(ReadiumCSS.PAGE_MARGINS_KEY);
+        // Remove new properties
+        html.style.removeProperty(ReadiumCSS.BODY_HYPHENS_KEY);
+        html.style.removeProperty(ReadiumCSS.PARA_SPACING_KEY);
+        html.style.removeProperty(ReadiumCSS.PARA_INDENT_KEY);
+        html.style.removeProperty(ReadiumCSS.TYPE_SCALE_KEY);
+        html.style.removeProperty(ReadiumCSS.BACKGROUND_COLOR_KEY);
+        html.style.removeProperty(ReadiumCSS.TEXT_COLOR_KEY);
 
         // Apply appearance
         html.style.removeProperty(ReadiumCSS.APPEARANCE_KEY);
@@ -589,6 +699,60 @@ export class UserSettings implements IUserSettings {
               ReadiumCSS.PAGE_MARGINS_KEY,
               this.userProperties
                 .getByRef(ReadiumCSS.PAGE_MARGINS_REF)
+                ?.toString() ?? null
+            );
+          }
+          // Apply body hyphens
+          if (await this.getProperty(ReadiumCSS.BODY_HYPHENS_KEY)) {
+            html.style.setProperty(
+              ReadiumCSS.BODY_HYPHENS_KEY,
+              this.userProperties
+                .getByRef(ReadiumCSS.BODY_HYPHENS_REF)
+                ?.toString() ?? null
+            );
+          }
+          // Apply paragraph spacing
+          if (await this.getProperty(ReadiumCSS.PARA_SPACING_KEY)) {
+            html.style.setProperty(
+              ReadiumCSS.PARA_SPACING_KEY,
+              this.userProperties
+                .getByRef(ReadiumCSS.PARA_SPACING_REF)
+                ?.toString() ?? null
+            );
+          }
+          // Apply paragraph indent
+          if (await this.getProperty(ReadiumCSS.PARA_INDENT_KEY)) {
+            html.style.setProperty(
+              ReadiumCSS.PARA_INDENT_KEY,
+              this.userProperties
+                .getByRef(ReadiumCSS.PARA_INDENT_REF)
+                ?.toString() ?? null
+            );
+          }
+          // Apply type scale
+          if (await this.getProperty(ReadiumCSS.TYPE_SCALE_KEY)) {
+            html.style.setProperty(
+              ReadiumCSS.TYPE_SCALE_KEY,
+              this.userProperties
+                .getByRef(ReadiumCSS.TYPE_SCALE_REF)
+                ?.toString() ?? null
+            );
+          }
+          // Apply background color
+          if (await this.getProperty(ReadiumCSS.BACKGROUND_COLOR_KEY)) {
+            html.style.setProperty(
+              ReadiumCSS.BACKGROUND_COLOR_KEY,
+              this.userProperties
+                .getByRef(ReadiumCSS.BACKGROUND_COLOR_REF)
+                ?.toString() ?? null
+            );
+          }
+          // Apply text color
+          if (await this.getProperty(ReadiumCSS.TEXT_COLOR_KEY)) {
+            html.style.setProperty(
+              ReadiumCSS.TEXT_COLOR_KEY,
+              this.userProperties
+                .getByRef(ReadiumCSS.TEXT_COLOR_REF)
                 ?.toString() ?? null
             );
           }
@@ -843,6 +1007,19 @@ export class UserSettings implements IUserSettings {
       // ).value,
       verticalScroll: this.userProperties?.getByRef(ReadiumCSS.SCROLL_REF)
         ?.value,
+      bodyHyphens: this.userProperties?.getByRef(ReadiumCSS.BODY_HYPHENS_REF)
+        ?.value,
+      paraSpacing: this.userProperties?.getByRef(ReadiumCSS.PARA_SPACING_REF)
+        ?.value,
+      paraIndent: this.userProperties?.getByRef(ReadiumCSS.PARA_INDENT_REF)
+        ?.value,
+      typeScale: this.userProperties?.getByRef(ReadiumCSS.TYPE_SCALE_REF)
+        ?.value,
+      backgroundColor: this.userProperties?.getByRef(
+        ReadiumCSS.BACKGROUND_COLOR_REF
+      )?.value,
+      textColor: this.userProperties?.getByRef(ReadiumCSS.TEXT_COLOR_REF)
+        ?.value,
     };
     if (this.api?.updateSettings) {
       this.api?.updateSettings(userSettings).then((_) => {
@@ -962,6 +1139,56 @@ export class UserSettings implements IUserSettings {
       ReadiumCSS.SCROLL_REF,
       ReadiumCSS.SCROLL_KEY
     );
+    // Body hyphens
+    userProperties.addSwitchable(
+      "auto",
+      "none",
+      this.bodyHyphens,
+      ReadiumCSS.BODY_HYPHENS_REF,
+      ReadiumCSS.BODY_HYPHENS_KEY
+    );
+    // Paragraph spacing
+    userProperties.addIncremental(
+      this.paraSpacing,
+      0,
+      3,
+      0.5,
+      "rem",
+      ReadiumCSS.PARA_SPACING_REF,
+      ReadiumCSS.PARA_SPACING_KEY
+    );
+    // Paragraph indent
+    userProperties.addIncremental(
+      this.paraIndent,
+      0,
+      3,
+      0.5,
+      "em",
+      ReadiumCSS.PARA_INDENT_REF,
+      ReadiumCSS.PARA_INDENT_KEY
+    );
+    // Type scale
+    userProperties.addIncremental(
+      this.typeScale,
+      1.0,
+      1.5,
+      0.1,
+      "",
+      ReadiumCSS.TYPE_SCALE_REF,
+      ReadiumCSS.TYPE_SCALE_KEY
+    );
+    // Background color
+    userProperties.addStringable(
+      this.backgroundColor,
+      ReadiumCSS.BACKGROUND_COLOR_REF,
+      ReadiumCSS.BACKGROUND_COLOR_KEY
+    );
+    // Text color
+    userProperties.addStringable(
+      this.textColor,
+      ReadiumCSS.TEXT_COLOR_REF,
+      ReadiumCSS.TEXT_COLOR_KEY
+    );
 
     return userProperties;
   }
@@ -1043,6 +1270,12 @@ export class UserSettings implements IUserSettings {
       letterSpacing: this.letterSpacing,
       pageMargins: this.pageMargins,
       lineHeight: this.lineHeight,
+      bodyHyphens: this.bodyHyphens,
+      paraSpacing: this.paraSpacing,
+      paraIndent: this.paraIndent,
+      typeScale: this.typeScale,
+      backgroundColor: this.backgroundColor,
+      textColor: this.textColor,
     };
   }
 
@@ -1165,6 +1398,60 @@ export class UserSettings implements IUserSettings {
       this.viewChangeCallback();
     }
 
+    if (userSettings.bodyHyphens !== undefined) {
+      this.bodyHyphens = userSettings.bodyHyphens;
+      let prop = this.userProperties?.getByRef(ReadiumCSS.BODY_HYPHENS_REF);
+      if (prop) {
+        prop.value = this.bodyHyphens;
+        await this.storeProperty(prop);
+      }
+    }
+
+    if (userSettings.paraSpacing !== undefined) {
+      this.paraSpacing = userSettings.paraSpacing;
+      let prop = this.userProperties?.getByRef(ReadiumCSS.PARA_SPACING_REF);
+      if (prop) {
+        prop.value = this.paraSpacing;
+        await this.storeProperty(prop);
+      }
+    }
+
+    if (userSettings.paraIndent !== undefined) {
+      this.paraIndent = userSettings.paraIndent;
+      let prop = this.userProperties?.getByRef(ReadiumCSS.PARA_INDENT_REF);
+      if (prop) {
+        prop.value = this.paraIndent;
+        await this.storeProperty(prop);
+      }
+    }
+
+    if (userSettings.typeScale !== undefined) {
+      this.typeScale = userSettings.typeScale;
+      let prop = this.userProperties?.getByRef(ReadiumCSS.TYPE_SCALE_REF);
+      if (prop) {
+        prop.value = this.typeScale;
+        await this.storeProperty(prop);
+      }
+    }
+
+    if (userSettings.backgroundColor !== undefined) {
+      this.backgroundColor = userSettings.backgroundColor;
+      let prop = this.userProperties?.getByRef(ReadiumCSS.BACKGROUND_COLOR_REF);
+      if (prop) {
+        prop.value = this.backgroundColor;
+        await this.storeProperty(prop);
+      }
+    }
+
+    if (userSettings.textColor !== undefined) {
+      this.textColor = userSettings.textColor;
+      let prop = this.userProperties?.getByRef(ReadiumCSS.TEXT_COLOR_REF);
+      if (prop) {
+        prop.value = this.textColor;
+        await this.storeProperty(prop);
+      }
+    }
+
     await this.applyProperties();
     this.settingsChangeCallback();
   }
@@ -1276,12 +1563,47 @@ export class UserSettings implements IUserSettings {
       if (prop) {
         await this.storeProperty(prop);
       }
+    } else if (incremental === "paraSpacing") {
+      (
+        this.userProperties?.getByRef(
+          ReadiumCSS.PARA_SPACING_REF
+        ) as Incremental
+      ).increment();
+      this.paraSpacing = this.userProperties?.getByRef(
+        ReadiumCSS.PARA_SPACING_REF
+      )?.value;
+      let prop = this.userProperties?.getByRef(ReadiumCSS.PARA_SPACING_REF);
+      if (prop) {
+        await this.storeProperty(prop);
+      }
+    } else if (incremental === "paraIndent") {
+      (
+        this.userProperties?.getByRef(ReadiumCSS.PARA_INDENT_REF) as Incremental
+      ).increment();
+      this.paraIndent = this.userProperties?.getByRef(
+        ReadiumCSS.PARA_INDENT_REF
+      )?.value;
+      let prop = this.userProperties?.getByRef(ReadiumCSS.PARA_INDENT_REF);
+      if (prop) {
+        await this.storeProperty(prop);
+      }
+    } else if (incremental === "typeScale") {
+      (
+        this.userProperties?.getByRef(ReadiumCSS.TYPE_SCALE_REF) as Incremental
+      ).increment();
+      this.typeScale = this.userProperties?.getByRef(
+        ReadiumCSS.TYPE_SCALE_REF
+      )?.value;
+      let prop = this.userProperties?.getByRef(ReadiumCSS.TYPE_SCALE_REF);
+      if (prop) {
+        await this.storeProperty(prop);
+      }
     }
     await this.applyProperties();
     this.settingsChangeCallback();
   }
 
-  async decrease(incremental): Promise<void> {
+  async decrease(incremental: UserSettingsIncrementable): Promise<void> {
     if (incremental === "fontSize") {
       (
         this.userProperties?.getByRef(ReadiumCSS.FONT_SIZE_REF) as Incremental
@@ -1323,10 +1645,45 @@ export class UserSettings implements IUserSettings {
       (
         this.userProperties?.getByRef(ReadiumCSS.LINE_HEIGHT_REF) as Incremental
       ).decrement();
-      this.wordSpacing = this.userProperties?.getByRef(
+      this.lineHeight = this.userProperties?.getByRef(
         ReadiumCSS.LINE_HEIGHT_REF
       )?.value;
       let prop = this.userProperties?.getByRef(ReadiumCSS.LINE_HEIGHT_REF);
+      if (prop) {
+        await this.storeProperty(prop);
+      }
+    } else if (incremental === "paraSpacing") {
+      (
+        this.userProperties?.getByRef(
+          ReadiumCSS.PARA_SPACING_REF
+        ) as Incremental
+      ).decrement();
+      this.paraSpacing = this.userProperties?.getByRef(
+        ReadiumCSS.PARA_SPACING_REF
+      )?.value;
+      let prop = this.userProperties?.getByRef(ReadiumCSS.PARA_SPACING_REF);
+      if (prop) {
+        await this.storeProperty(prop);
+      }
+    } else if (incremental === "paraIndent") {
+      (
+        this.userProperties?.getByRef(ReadiumCSS.PARA_INDENT_REF) as Incremental
+      ).decrement();
+      this.paraIndent = this.userProperties?.getByRef(
+        ReadiumCSS.PARA_INDENT_REF
+      )?.value;
+      let prop = this.userProperties?.getByRef(ReadiumCSS.PARA_INDENT_REF);
+      if (prop) {
+        await this.storeProperty(prop);
+      }
+    } else if (incremental === "typeScale") {
+      (
+        this.userProperties?.getByRef(ReadiumCSS.TYPE_SCALE_REF) as Incremental
+      ).decrement();
+      this.typeScale = this.userProperties?.getByRef(
+        ReadiumCSS.TYPE_SCALE_REF
+      )?.value;
+      let prop = this.userProperties?.getByRef(ReadiumCSS.TYPE_SCALE_REF);
       if (prop) {
         await this.storeProperty(prop);
       }

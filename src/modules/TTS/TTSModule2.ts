@@ -275,7 +275,7 @@ export class TTSModule2 implements ReaderModule {
             self.navigator.annotationModule?.annotator?.getTemporarySelectionInfo(
               doc
             );
-          selection.addRange(selectionInfo.range);
+          if (selectionInfo?.range) selection.addRange(selectionInfo.range);
         }
 
         if (rootEl) {
