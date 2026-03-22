@@ -1847,6 +1847,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                 }
               } else {
                 this.iframes[1].src = "about:blank";
+                this.currentSpreadLinks.right = undefined;
               }
             }
           } else {
@@ -1877,6 +1878,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
               }
             } else {
               this.iframes[0].src = "about:blank";
+              this.currentSpreadLinks.left = undefined;
             }
             if (this.iframes.length === 2 && this.publication.isFixedLayout) {
               this.currentSpreadLinks.right = {
@@ -1983,6 +1985,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                   }
                 } else {
                   this.iframes[1].src = "about:blank";
+                  this.currentSpreadLinks.right = undefined;
                 }
               }
             } else {
@@ -2017,6 +2020,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                   }
                 } else {
                   this.iframes[1].src = "about:blank";
+                  this.currentSpreadLinks.right = undefined;
                 }
               }
             }
@@ -2062,6 +2066,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
               }
             } else {
               this.iframes[0].src = "about:blank";
+              this.currentSpreadLinks.left = undefined;
               if (this.iframes.length === 2) {
                 this.currentSpreadLinks.right = {
                   href: this.currentChapterLink.href,
