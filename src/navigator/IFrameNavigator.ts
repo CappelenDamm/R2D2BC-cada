@@ -3270,6 +3270,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
         this.loadingMessage.classList.remove("is-loading");
       }
       if (this.view?.layout !== "fixed") {
+        this.view?.padOddColumns?.();
         if (this.view?.atStart() && this.view?.atEnd()) {
           if (this.api?.resourceFitsScreen) this.api?.resourceFitsScreen();
           this.emit("resource.fits");
