@@ -92,9 +92,12 @@ export default class D2Reader {
     private readonly consumptionModule?: ConsumptionModule
   ) {}
 
-  addEventListener() {
-    if (this.navigator instanceof IFrameNavigator) {
-      this.navigator.addListener(arguments[0], arguments[1]);
+  addEventListener(event: string, handler: (...args: any[]) => void) {
+    if (
+      this.navigator instanceof IFrameNavigator ||
+      this.navigator instanceof PDFNavigator
+    ) {
+      this.navigator.addListener(event, handler);
     }
   }
 
@@ -187,6 +190,10 @@ export default class D2Reader {
         publication: publication,
         settings: settings,
         api: initialConfig.api,
+        workerSrc: initialConfig.workerSrc,
+        annotator: annotator,
+        initialLastReadingPosition: initialConfig.lastReadingPosition,
+        store: store,
       });
       return new D2Reader(settings, navigator);
     } else {
@@ -389,7 +396,7 @@ export default class D2Reader {
         requestConfig: initialConfig.requestConfig,
         injectables:
           (publication.Metadata.Rendition?.Layout ?? "unknown") === "fixed"
-            ? initialConfig.injectablesFixed ?? []
+            ? (initialConfig.injectablesFixed ?? [])
             : initialConfig.injectables,
         attributes: initialConfig.attributes,
         services: initialConfig.services,
@@ -522,15 +529,20 @@ export default class D2Reader {
   addAnnotation = async (highlight: Annotation) => {
     return (await this.annotationModule?.addAnnotation(highlight)) ?? false;
   };
-  /** 
+  /**
    * Update annotation
-   * 
+   *
    * This should be used only when the add/delete of the annotation note
    * is not directly handled in the `addAnnotation`/`addCommentToAnnotation`
    * callback defined in the configuration of the D2Reader.load() method
    *  */
   updateAnnotation = async (highlight: Annotation) => {
     return (await this.annotationModule?.updateAnnotation(highlight)) ?? false;
+  };
+
+  /** Change highlighter color to a specific HEX string */
+  changeHighlighterColor = (color: string) => {
+    this.highlighter?.setColor(color);
   };
 
   /** Hide Annotation Layer */

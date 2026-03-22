@@ -38,6 +38,10 @@ import log from "loglevel";
 
 export interface SearchModuleAPI {}
 
+// Default search highlight colors
+const DEFAULT_SEARCH_COLOR = "#fff059"; // yellow — all results
+const DEFAULT_SEARCH_CURRENT = "#ff6600"; // orange — selected result
+
 export interface SearchModuleProperties {
   color?: string;
   current?: string;
@@ -53,7 +57,6 @@ export interface SearchModuleConfig extends SearchModuleProperties {
 
 export class SearchModule implements ReaderModule {
   private properties: SearchModuleProperties;
-  // @ts-ignore
   private api?: SearchModuleAPI;
   private publication: Publication;
   private readonly headerMenu?: HTMLElement | null;
@@ -87,7 +90,11 @@ export class SearchModule implements ReaderModule {
   ) {
     this.headerMenu = headerMenu;
     this.publication = publication;
-    this.properties = properties;
+    this.properties = {
+      ...properties,
+      color: properties.color ?? DEFAULT_SEARCH_COLOR,
+      current: properties.current ?? DEFAULT_SEARCH_CURRENT,
+    };
     this.api = api;
     this.highlighter = highlighter;
   }
@@ -302,7 +309,7 @@ export class SearchModule implements ReaderModule {
     }
     let localSearchResultChapter: any = [];
 
-    // clear search results // needs more works
+    // Clear previous search highlights before redrawing
     this.highlighter?.destroyHighlights(HighlightType.Search);
     if (this.navigator.rights.enableSearch) {
       this.drawSearch();
@@ -446,9 +453,12 @@ export class SearchModule implements ReaderModule {
           locations: locations,
           title: "title",
         };
-        // TODO search index and total progression.
-        // position.locations.totalProgression = self.delegate.calculateTotalProgresion(position)
-        // position.locations.index = filteredIndex
+        const hrefPositions = this.publication.positionsByHref(position.href);
+        if (hrefPositions?.length > 0) {
+          position.locations.totalProgression =
+            hrefPositions[0].locations.totalProgression;
+          position.locations.position = hrefPositions[0].locations.position;
+        }
 
         this.navigator.navigate(position);
         // Navigate to new chapter and search only in new current chapter,
@@ -496,9 +506,12 @@ export class SearchModule implements ReaderModule {
           locations: locations,
           title: "title",
         };
-        // TODO search index and total progression.
-        // position.locations.totalProgression = self.delegate.calculateTotalProgresion(position)
-        // position.locations.index = filteredIndex
+        const hrefPositions = this.publication.positionsByHref(position.href);
+        if (hrefPositions?.length > 0) {
+          position.locations.totalProgression =
+            hrefPositions[0].locations.totalProgression;
+          position.locations.position = hrefPositions[0].locations.position;
+        }
 
         this.navigator.navigate(position);
         // Navigate to new chapter and search only in new current chapter,
@@ -607,9 +620,15 @@ export class SearchModule implements ReaderModule {
                     locations: locations,
                     title: "title",
                   };
-                  // TODO search index and total progression.
-                  // position.locations.totalProgression = self.delegate.calculateTotalProgresion(position)
-                  // position.locations.index = filteredIndex
+                  const hrefPositions = self.publication.positionsByHref(
+                    position.href
+                  );
+                  if (hrefPositions?.length > 0) {
+                    position.locations.totalProgression =
+                      hrefPositions[0].locations.totalProgression;
+                    position.locations.position =
+                      hrefPositions[0].locations.position;
+                  }
 
                   self.navigator.navigate(position);
                   // Navigate to new chapter and search only in new current chapter,

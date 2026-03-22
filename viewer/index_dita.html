@@ -53,6 +53,43 @@
 
     <script src="https://unpkg.com/sweetalert/dist/sweetalert.min.js"></script>
 
+    <style>
+        /* Modern toggle switch */
+        .toggle-switch { position: relative; display: inline-block; width: 40px; height: 22px; flex-shrink: 0; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; }
+        .toggle-switch .slider { position: absolute; cursor: pointer; inset: 0; background: #ccc; border-radius: 22px; transition: .25s; }
+        .toggle-switch .slider::before { content: ""; position: absolute; height: 16px; width: 16px; left: 3px; bottom: 3px; background: white; border-radius: 50%; transition: .25s; }
+        .toggle-switch input:checked + .slider { background: #4a90d9; }
+        .toggle-switch input:checked + .slider::before { transform: translateX(18px); }
+
+        /* Compact setting row */
+        .setting-row { display: flex; align-items: center; justify-content: space-between; padding: 5px 12px; }
+        .setting-row label { font-size: 8.5pt; color: #555; margin: 0; flex-shrink: 0; white-space: nowrap; }
+        .setting-row .setting-value { font-size: 8pt; color: #999; min-width: 32px; text-align: right; }
+        .setting-row input[type="range"] { flex: 1; margin: 0 8px; height: 3px; -webkit-appearance: none; appearance: none; background: #e0e0e0; border-radius: 2px; outline: none; }
+        .setting-row input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #4a90d9; cursor: pointer; border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+
+        /* Segmented control buttons */
+        .seg-btn { height: 32px; min-width: 70px; padding: 0 12px; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.5px; border: 1px solid #d0d0d0; background: #fff; color: #555; cursor: pointer; transition: all .15s; }
+        .seg-btn:hover { background: #f5f5f5; }
+        .seg-btn.active, .seg-btn:active { background: #e8e8e8; color: #000; }
+        .seg-left { border-radius: 16px 0 0 16px; }
+        .seg-mid { border-left: none; border-right: none; }
+        .seg-right { border-radius: 0 16px 16px 0; }
+
+        /* Select dropdown */
+        .setting-select { flex: 1; margin-left: 10px; height: 30px; font-size: 8.5pt; border: 1px solid #d0d0d0; border-radius: 6px; padding: 0 8px; background: #fff; color: #555; outline: none; }
+
+        /* Color swatch */
+        .color-swatch { width: 28px; height: 28px; border: 2px solid #e0e0e0; border-radius: 50%; cursor: pointer; padding: 0; -webkit-appearance: none; appearance: none; flex-shrink: 0; }
+        .color-swatch::-webkit-color-swatch-wrapper { padding: 0; }
+        .color-swatch::-webkit-color-swatch { border: none; border-radius: 50%; }
+
+        /* Reset button */
+        .reset-btn { height: 32px; padding: 0 24px; font-size: 8.5pt; text-transform: uppercase; letter-spacing: 0.5px; border: 1px solid #d0d0d0; border-radius: 16px; background: #fff; color: #555; cursor: pointer; transition: all .15s; }
+        .reset-btn:hover { background: #f5f5f5; color: #000; }
+    </style>
+
 </head>
 
 <body>
@@ -171,254 +208,136 @@
                 </div>
                 <div class="mui-divider"></div>
                 <div id="container-view-settings-custom" class="dropdown-content settings-view"
-                     style="width: 300px;padding: 10px;">
-                    <div class="range-slider" style="padding: 5px;">
-                        <label style="display: block;
-        text-align: center;
-        line-height: 12pt;">Fontsize</label>
-                        <input class="range-slider__range_settings" type="range" min="100" max="300" step="25"
-                               value="100" id="fontSize" name="fontSize"
-                               onchange="d2reader.applyUserSettings({ fontSize: this.value })"/>
-                    </div>
-                    <div style="padding: 5px;">
-                        <label style="display: block;
-        text-align: center;
-        line-height: 12pt;">Font</label>
-                        <center>
-                            <select style="width: 80%;" onchange="d2reader.applyUserSettings({fontFamily:value});reload();"
-                                    id="fontFamily">
-                                <option value="Original">Publisher</option>
-                                <option value="serif">Serif</option>
-                                <option value="sans-serif">Sans-serif</option>
-                                <option value="opendyslexic">Open Dyslexic</option>
-                            </select>
-                        </center>
-                    </div>
-                    <div style="padding: 5px;">
-                        <center>
-                            <button style="width: 30%;
-        background-color: white;
-        height: 50px;
-        border-radius: 25px 0px 0px 25px;
-        border-color: #00000020;
-        border-width: 1px;
-        border-style: solid;
-        color: black;
-        font-size: 9pt;text-transform: uppercase" onclick="d2reader.applyUserSettings({appearance:'day'})">DAY
-                            </button><button style="width: 30%;
-        background-color: wheat;
-        height: 50px;
-        /*border-radius: 25px;*/
-        border-color: #00000020;
-        border-width: 1px;
-        border-style: solid;
-        color: black;
-        font-size: 9pt;text-transform: uppercase" onclick="d2reader.applyUserSettings({appearance:'sepia'})">SEPIA
-                        </button><button style="width: 30%;
-        background-color: black;
-        height: 50px;
-        border-radius: 0px 25px 25px 0px;
-        border-color: #00000020;
-        border-width: 1px;
-        border-style: solid;
-        color: white;
-        font-size: 9pt;text-transform: uppercase" onclick="d2reader.applyUserSettings({appearance:'night'})">NIGHT
-                        </button>
-                        </center>
-                    </div>
-                    <div id="scrollMode" style="padding: 5px;padding-bottom: 10px">
-                        <label style="display: block;
-                                   text-align: center;
-                                   line-height: 12pt;">Layout</label>
-                        <center>
-                            <button style="width: 100px;
-            background-color: white;
-    height: 50px;
-        border-radius: 25px 0px 0px 25px;
-        border-color: #00000020;
-        border-width: 1px;
-        border-style: solid;
-        color: black;
-        font-size: 9pt; text-transform: uppercase"
-                                    onclick="d2reader.applyUserSettings({verticalScroll:true});setScroll('true')">Scroll
-                            </button><button style="width: 100px;
-            background-color: white;
-    height: 50px;
-        border-radius: 0px 25px 25px 0px;
-        border-color: #00000020;
-        border-width: 1px;
-        border-style: solid;
-        color: black;
-        font-size: 9pt;text-transform: uppercase"
-                                             onclick="d2reader.applyUserSettings({verticalScroll:false});setScroll('false')">
-                            Paginated
-                        </button>
-                        </center>
-                    </div>
-                    <div id="textAlignment" style="padding: 5px;">
-                        <label style="display: block;
-        text-align: center;
-        line-height: 12pt;">Alignment</label>
-                        <center>
-                            <button style="width: 30%;
-           background-color: white;
-     height: 50px;
-        border-radius: 25px 0px 0px 25px;
-        border-color: #00000020;
-        border-width: 1px;
-        border-style: solid;
-        color: black;
-        font-size: 9pt;text-transform: uppercase"
-                                    onclick="d2reader.applyUserSettings({textAlignment:'auto'});setAlignment('auto')">Auto
-                            </button><button style="width: 30%;
-            background-color: white;
-    height: 50px;
-        /*border-radius: 25px;*/
-        border-color: #00000020;
-        border-width: 1px;
-        border-style: solid;
-        color: black;
-        font-size: 9pt;text-transform: uppercase"
-                                             onclick="d2reader.applyUserSettings({textAlignment:'justify'});setAlignment('justify')">
-                            justify
-                        </button><button style="width: 30%;
-            background-color: white;
-    height: 50px;
-        border-radius: 0px 25px 25px 0px;
-        border-color: #00000020;
-        border-width: 1px;
-        border-style: solid;
-        color: black;
-        font-size: 9pt;text-transform: uppercase"
-                                         onclick="d2reader.applyUserSettings({textAlignment:'start'});setAlignment('start')">
-                            start
-                        </button>
-                        </center>
-                    </div>
-                    <div id="columnCount" style="padding: 5px;">
-                        <label style="display: block;
-        text-align: center;
-        line-height: 12pt;">Page Mode</label>
-                        <center>
-                            <button style="width: 30%;
-            background-color: white;
-    height: 50px;
-        border-radius: 25px 0px 0px 25px;
-        border-color: #00000020;
-        border-width: 1px;
-        border-style: solid;
-        color: black;
-        font-size: 9pt;text-transform: uppercase"
-                                    onclick="d2reader.applyUserSettings({columnCount:'auto'});setColumns('auto')">Auto
-                            </button><button style="width: 30%;
-            background-color: white;
-    height: 50px;
-        /*border-radius: 25px;*/
-        border-color: #00000020;
-        border-width: 1px;
-        border-style: solid;
-        color: black;
-        font-size: 9pt;text-transform: uppercase" onclick="d2reader.applyUserSettings({columnCount:'1'});setColumns('1')">
-                            Single
-                        </button><button style="width: 30%;
-            background-color: white;
-    height: 50px;
-        border-radius: 0px 25px 25px 0px;
-        border-color: #00000020;
-        border-width: 1px;
-        border-style: solid;
-        color: black;
-        font-size: 9pt;text-transform: uppercase" onclick="d2reader.applyUserSettings({columnCount:'2'});setColumns('2')">
-                            Double
-                        </button>
-                        </center>
-                    </div>
-                    <div id="direction" style="padding: 5px;">
-                        <label style="display: block;
-        text-align: center;
-        line-height: 12pt;">Direction</label>
-                        <center>
-                            <button style="width: 30%;
-            background-color: white;
-    height: 50px;
-        border-radius: 25px 0px 0px 25px;
-        border-color: #00000020;
-        border-width: 1px;
-        border-style: solid;
-        color: black;
-        font-size: 9pt;text-transform: uppercase"
-                                    onclick="d2reader.applyUserSettings({direction:'auto'});setDirection('auto')">Auto
-                            </button><button style="width: 30%;
-            background-color: white;
-    height: 50px;
-        /*border-radius: 25px;*/
-        border-color: #00000020;
-        border-width: 1px;
-        border-style: solid;
-        color: black;
-        font-size: 9pt;text-transform: uppercase" onclick="d2reader.applyUserSettings({direction:'ltr'});setDirection('ltr')">
-                            LTR
-                        </button><button style="width: 30%;
-            background-color: white;
-    height: 50px;
-        border-radius: 0px 25px 25px 0px;
-        border-color: #00000020;
-        border-width: 1px;
-        border-style: solid;
-        color: black;
-        font-size: 9pt;text-transform: uppercase" onclick="d2reader.applyUserSettings({direction:'rtl'});setDirection('rtl')">
-                            RTL
-                        </button>
-                        </center>
-                    </div>
-                    <div class="range-slider" style="padding: 5px;">
-                        <label  style="display: block;
-        text-align: center;
-        line-height: 12pt;">Word Spacing</label>
-                        <input class="range-slider__range_settings"  type="range" min="0" max="1" step="0.25"
-                               value="0" id="wordSpacing" name="wordSpacing"
-                               onchange="d2reader.applyUserSettings({ wordSpacing: this.value});"/>
-                    </div>
-                    <div class="range-slider" style="padding: 5px;">
-                        <label  style="display: block;
-        text-align: center;
-        line-height: 12pt;">Letter Spacing</label>
-                        <input class="range-slider__range_settings" type="range" min="0" max="0.5"
-                               step="0.0625"
-                               value="0" id="letterSpacing" name="letterSpacing"
-                               onchange="d2reader.applyUserSettings({ letterSpacing: this.value });"/>
-                    </div>
-                    <div class="range-slider" style="padding: 5px;">
-                        <label  style="display: block;
-        text-align: center;
-        line-height: 12pt;">Page Margins</label>
-                        <input class="range-slider__range_settings" type="range" min="0.5" max="4" step="0.25"
-                               value="1" id="pageMargins" name="pageMargins"
-                               onchange="d2reader.applyUserSettings({ pageMargins: this.value});"/>
-                    </div>
-                    <div class="range-slider" style="padding: 5px;">
-                        <label  style="display: block;
-        text-align: center;
-        line-height: 12pt;">Line Height</label>
-                        <input class="range-slider__range_settings"  type="range" min="1" max="2" step="0.25"
-                               value="1" id="lineHeight" name="lineHeight"
-                               onchange="d2reader.applyUserSettings({ lineHeight: this.value});"/>
-                    </div>
-                    <div id="reset" style="padding: 5px;padding-bottom: 10px">
+                     style="width: 300px; padding: 8px 0;">
 
-                        <center>
-                            <button style="width: 100px;
-            background-color: white;
-        height: 50px;
-        border-radius: 25px 25px 25px 25px;
-        border-color: #00000020;
-        border-width: 1px;
-        border-style: solid;
-        color: black;
-        font-size: 9pt; text-transform: uppercase"
-                                    onclick="d2reader.resetUserSettings();">Reset
-                            </button>
-                        </center>
+                    <!-- Font Size -->
+                    <div class="setting-row">
+                        <label>Font Size</label>
+                        <input type="range" min="100" max="300" step="25" value="100" id="fontSize"
+                               oninput="document.getElementById('fontSizeValue').textContent = this.value + '%'"
+                               onchange="d2reader.applyUserSettings({ fontSize: this.value })"/>
+                        <span class="setting-value" id="fontSizeValue">100%</span>
+                    </div>
+
+                    <!-- Font Family -->
+                    <div class="setting-row">
+                        <label>Font</label>
+                        <select id="fontFamily" class="setting-select"
+                                onchange="d2reader.applyUserSettings({fontFamily:value});reload();">
+                            <option value="Original">Publisher</option>
+                            <option value="serif">Serif</option>
+                            <option value="sans-serif">Sans-serif</option>
+                            <option value="opendyslexic">Open Dyslexic</option>
+                        </select>
+                    </div>
+
+                    <div style="border-top: 1px solid #eee; margin: 6px 12px;"></div>
+
+                    <!-- Appearance -->
+                    <div id="appearance" class="setting-row" style="justify-content: center; gap: 0;">
+                        <button class="seg-btn seg-left" onclick="d2reader.applyUserSettings({appearance:'day'});setAppearance('day')" style="background:#fff;color:#000;">Day</button><button class="seg-btn seg-mid" onclick="d2reader.applyUserSettings({appearance:'sepia'});setAppearance('sepia')" style="background:#f5e6c8;color:#000;">Sepia</button><button class="seg-btn seg-right" onclick="d2reader.applyUserSettings({appearance:'night'});setAppearance('night')" style="background:#121212;color:#fff;">Night</button>
+                    </div>
+
+                    <!-- Layout -->
+                    <div id="scrollMode" class="setting-row" style="justify-content: center; gap: 0;">
+                        <button class="seg-btn seg-left" onclick="d2reader.applyUserSettings({verticalScroll:true});setScroll('true')">Scroll</button><button class="seg-btn seg-right" onclick="d2reader.applyUserSettings({verticalScroll:false});setScroll('false')">Paginated</button>
+                    </div>
+
+                    <!-- Alignment -->
+                    <div id="textAlignment" class="setting-row" style="justify-content: center; gap: 0;">
+                        <button class="seg-btn seg-left" onclick="d2reader.applyUserSettings({textAlignment:'auto'});setAlignment('auto')">Auto</button><button class="seg-btn seg-mid" onclick="d2reader.applyUserSettings({textAlignment:'justify'});setAlignment('justify')">Justify</button><button class="seg-btn seg-right" onclick="d2reader.applyUserSettings({textAlignment:'start'});setAlignment('start')">Start</button>
+                    </div>
+
+                    <!-- Columns -->
+                    <div id="columnCount" class="setting-row" style="justify-content: center; gap: 0;">
+                        <button class="seg-btn seg-left" onclick="d2reader.applyUserSettings({columnCount:'auto'});setColumns('auto')">Auto</button><button class="seg-btn seg-mid" onclick="d2reader.applyUserSettings({columnCount:'1'});setColumns('1')">Single</button><button class="seg-btn seg-right" onclick="d2reader.applyUserSettings({columnCount:'2'});setColumns('2')">Double</button>
+                    </div>
+
+                    <!-- Direction -->
+                    <div id="direction" class="setting-row" style="justify-content: center; gap: 0;">
+                        <button class="seg-btn seg-left" onclick="d2reader.applyUserSettings({direction:'auto'});setDirection('auto')">Auto</button><button class="seg-btn seg-mid" onclick="d2reader.applyUserSettings({direction:'ltr'});setDirection('ltr')">LTR</button><button class="seg-btn seg-right" onclick="d2reader.applyUserSettings({direction:'rtl'});setDirection('rtl')">RTL</button>
+                    </div>
+
+                    <div style="border-top: 1px solid #eee; margin: 6px 12px;"></div>
+
+                    <!-- Spacing & sizing sliders -->
+                    <div class="setting-row">
+                        <label>Word Spacing</label>
+                        <input type="range" min="0" max="1" step="0.25" value="0" id="wordSpacing"
+                               oninput="document.getElementById('wordSpacingValue').textContent = this.value"
+                               onchange="d2reader.applyUserSettings({ wordSpacing: this.value })"/>
+                        <span class="setting-value" id="wordSpacingValue">0</span>
+                    </div>
+                    <div class="setting-row">
+                        <label>Letter Spacing</label>
+                        <input type="range" min="0" max="0.5" step="0.0625" value="0" id="letterSpacing"
+                               oninput="document.getElementById('letterSpacingValue').textContent = parseFloat(this.value).toFixed(2)"
+                               onchange="d2reader.applyUserSettings({ letterSpacing: this.value })"/>
+                        <span class="setting-value" id="letterSpacingValue">0</span>
+                    </div>
+                    <div class="setting-row">
+                        <label>Page Margins</label>
+                        <input type="range" min="0.5" max="4" step="0.25" value="1" id="pageMargins"
+                               oninput="document.getElementById('pageMarginsValue').textContent = this.value"
+                               onchange="d2reader.applyUserSettings({ pageMargins: this.value })"/>
+                        <span class="setting-value" id="pageMarginsValue">1</span>
+                    </div>
+                    <div class="setting-row">
+                        <label>Line Height</label>
+                        <input type="range" min="1" max="2" step="0.25" value="1" id="lineHeight"
+                               oninput="document.getElementById('lineHeightValue').textContent = this.value"
+                               onchange="d2reader.applyUserSettings({ lineHeight: this.value })"/>
+                        <span class="setting-value" id="lineHeightValue">1</span>
+                    </div>
+                    <div class="setting-row">
+                        <label>Paragraph Spacing</label>
+                        <input type="range" min="0" max="3" step="0.5" value="0" id="paraSpacing"
+                               oninput="document.getElementById('paraSpacingValue').textContent = this.value"
+                               onchange="d2reader.applyUserSettings({ paraSpacing: parseFloat(this.value) })"/>
+                        <span class="setting-value" id="paraSpacingValue">0</span>
+                    </div>
+                    <div class="setting-row">
+                        <label>Paragraph Indent</label>
+                        <input type="range" min="0" max="3" step="0.5" value="1" id="paraIndent"
+                               oninput="document.getElementById('paraIndentValue').textContent = this.value"
+                               onchange="d2reader.applyUserSettings({ paraIndent: parseFloat(this.value) })"/>
+                        <span class="setting-value" id="paraIndentValue">1</span>
+                    </div>
+                    <div class="setting-row">
+                        <label>Type Scale</label>
+                        <input type="range" min="1.0" max="1.5" step="0.1" value="1.2" id="typeScale"
+                               oninput="document.getElementById('typeScaleValue').textContent = parseFloat(this.value).toFixed(1)"
+                               onchange="d2reader.applyUserSettings({ typeScale: parseFloat(this.value) })"/>
+                        <span class="setting-value" id="typeScaleValue">1.2</span>
+                    </div>
+
+                    <div style="border-top: 1px solid #eee; margin: 6px 12px;"></div>
+
+                    <!-- Toggles -->
+                    <div class="setting-row">
+                        <label>Hyphens</label>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="bodyHyphens"
+                                   onchange="d2reader.applyUserSettings({ bodyHyphens: this.checked })">
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <!-- Colors -->
+                    <div class="setting-row">
+                        <label>Background</label>
+                        <input type="color" id="backgroundColor" value="#ffffff" class="color-swatch"
+                               onchange="d2reader.applyUserSettings({ backgroundColor: this.value })"/>
+                        <label style="margin-left: 12px;">Text</label>
+                        <input type="color" id="textColor" value="#000000" class="color-swatch"
+                               onchange="d2reader.applyUserSettings({ textColor: this.value })"/>
+                    </div>
+
+                    <div style="border-top: 1px solid #eee; margin: 6px 12px;"></div>
+
+                    <!-- Reset -->
+                    <div class="setting-row" style="justify-content: center; padding: 8px 12px;">
+                        <button class="reset-btn" onclick="d2reader.resetUserSettings().then(()=>reload());">Reset</button>
                     </div>
                 </div>
             </div>
@@ -782,21 +701,18 @@
             return params;
         };
         let urlParams = getURLQueryParams();
+        let defined_origin = window.location.origin;
         let injectables = [
-            { type: 'style', url: '/viewer/readium-css/ReadiumCSS-before.css', r2before: true },
-            { type: 'style', url: '/viewer/readium-css/ReadiumCSS-default.css', r2default: true },
-            { type: 'style', url: '/viewer/readium-css/ReadiumCSS-after.css', r2after: true },
-            // { type: 'script', url: 'https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.6/MathJax.js?config=TeX-MML-AM_CHTML&latest' },
+            { type: 'style', url: defined_origin + '/viewer/readium-css/ReadiumCSS-before.css', r2before: true },
+            { type: 'style', url: defined_origin + '/viewer/readium-css/ReadiumCSS-default.css', r2default: true },
+            { type: 'style', url: defined_origin + '/viewer/readium-css/ReadiumCSS-after.css', r2after: true },
             { type: 'style', url: 'https://fonts.googleapis.com/icon?family=Material+Icons'},
-            { type: 'style', url: '/viewer/fonts/opendyslexic/opendyslexic.css', fontFamily: 'opendyslexic' },
+            { type: 'style', url: defined_origin + '/viewer/fonts/opendyslexic/opendyslexic.css', fontFamily: 'opendyslexic' },
             { type: 'style', fontFamily: 'Courier', systemFont: true },
-            { type: 'style', url: '/viewer/injectables/style/popup.css' },
-            { type: 'style', url: '/viewer/injectables/style/popover.css' },
-            { type: 'style', url: '/viewer/injectables/style/style.css' },
+            { type: 'style', url: defined_origin + '/viewer/injectables/style/popup.css' },
+            { type: 'style', url: defined_origin + '/viewer/injectables/style/popover.css' },
+            { type: 'style', url: defined_origin + '/viewer/injectables/style/style.css' },
             {
-                type: 'script',
-                url: 'https://polyfill.io/v3/polyfill.min.js?features=es6',
-            }, {
                 async: true,
                 type: 'script',
                 url: 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js',
@@ -813,6 +729,12 @@
             // letterSpacing: 4.0,
             // pageMargins: 4.0,
             // lineHeight: 4.0
+            // bodyHyphens: true,        // true = auto, false = none
+            // paraSpacing: 1.0,         // 0–3 rem, step 0.5
+            // paraIndent: 1.0,          // 0–3 em, step 0.5
+            // typeScale: 1.2,           // 1.0–1.5, step 0.1
+            // backgroundColor: "#fefefe", // hex color pass-through
+            // textColor: "#333333",       // hex color pass-through
         }
         let selectionMenuItems = [
             {
@@ -988,11 +910,11 @@
         let d2reader;
         D2Reader.load({
             url: new URL(urlParams["url"]),
-            requestConfig: {
-                method: "GET",
-                mode: "cors",
-                credentials: "include",
-            },
+            // requestConfig: {
+            //     method: "GET",
+            //     mode: "cors",
+            //     credentials: "include",
+            // },
             attributes: { // TODO: review these attributes and eventually needs better naming.
                 margin: 75, // subtract this from the iframe height , when setting the iframe minimum height
                 navHeight: 10, // used for positioning the toolbox
@@ -1006,7 +928,7 @@
                 enableSearch: true,
                 enableTimeline: true,
                 enableDefinitions: true,
-                enableContentProtection: true,
+                enableContentProtection: false,
                 enableMediaOverlays: true,
                 enablePageBreaks: true,
                 autoGeneratePositions: true,
@@ -1422,7 +1344,7 @@
             useStorageType: "local", // local, session or memory !! use either this or useLocalStorage,
                                      // but ideally not both, this is a newer setting which
                                      // allows for in memory storage additionally to local and session
-                                     // if not set then useLocalStorage will be used as default 
+                                     // if not set then useLocalStorage will be used as default
         }).then(instance => {
             console.log("D2reader instance ready", instance);
             d2reader = instance;
@@ -1467,89 +1389,67 @@
             document.getElementById("reader-error").innerHTML = "<span>"+error.message +"</span>";
         });
 
-        function setColumns(columnCount) {
-            let buttons = document.getElementById('columnCount').getElementsByTagName('button');
-            if (columnCount == 'auto') {
-                buttons[0].style.backgroundColor = '#d7dcdf'
-                buttons[1].style.backgroundColor = 'white'
-                buttons[2].style.backgroundColor = 'white'
-            } else if (columnCount == '1') {
-                buttons[1].style.backgroundColor = '#d7dcdf'
-                buttons[0].style.backgroundColor = 'white'
-                buttons[2].style.backgroundColor = 'white'
-            } else if (columnCount === '2') {
-                buttons[2].style.backgroundColor = '#d7dcdf'
-                buttons[0].style.backgroundColor = 'white'
-                buttons[1].style.backgroundColor = 'white'
+        // Highlight the active button in a segmented control
+        function setSegActive(containerId, index) {
+            let buttons = document.getElementById(containerId).getElementsByTagName('button');
+            for (let i = 0; i < buttons.length; i++) {
+                buttons[i].style.background = i === index ? '#e0e0e0' : '#fff';
+                buttons[i].style.fontWeight = i === index ? '600' : '400';
             }
         }
 
-        function setDirection(direction) {
-            let buttons = document.getElementById('direction').getElementsByTagName('button');
-            if (direction === 'auto') {
-                buttons[0].style.backgroundColor = '#d7dcdf'
-                buttons[1].style.backgroundColor = 'white'
-                buttons[2].style.backgroundColor = 'white'
-            } else if (direction === 'ltr') {
-                buttons[1].style.backgroundColor = '#d7dcdf'
-                buttons[0].style.backgroundColor = 'white'
-                buttons[2].style.backgroundColor = 'white'
-            } else if (direction === 'rtl') {
-                buttons[2].style.backgroundColor = '#d7dcdf'
-                buttons[0].style.backgroundColor = 'white'
-                buttons[1].style.backgroundColor = 'white'
+        function setColumns(v) { setSegActive('columnCount', v === '2' ? 2 : v === '1' ? 1 : 0); }
+        function setDirection(v) { setSegActive('direction', v === 'rtl' ? 2 : v === 'ltr' ? 1 : 0); }
+        function setScroll(v) { setSegActive('scrollMode', v === 'false' ? 1 : 0); }
+        function setAlignment(v) { setSegActive('textAlignment', v === 'start' ? 2 : v === 'justify' ? 1 : 0); }
+
+        // Appearance has fixed bg colors, so highlight with border/outline instead
+        function setAppearance(v) {
+            let buttons = document.getElementById('appearance').getElementsByTagName('button');
+            let idx = v === 'night' ? 2 : v === 'sepia' ? 1 : 0;
+            for (let i = 0; i < buttons.length; i++) {
+                buttons[i].style.outline = i === idx ? '2px solid #4a90d9' : 'none';
+                buttons[i].style.outlineOffset = '-2px';
             }
         }
 
-        function setScroll(scroll) {
-            let buttons = document.getElementById('scrollMode').getElementsByTagName('button');
-            if (scroll === 'true') {
-                buttons[0].style.backgroundColor = '#d7dcdf'
-                buttons[1].style.backgroundColor = 'white'
-            } else if (scroll === 'false') {
-                buttons[1].style.backgroundColor = '#d7dcdf'
-                buttons[0].style.backgroundColor = 'white'
-            }
-        }
-
-        function setAlignment(textAlignment) {
-            let buttons = document.getElementById('textAlignment').getElementsByTagName('button');
-            if (textAlignment === 'auto') {
-                buttons[0].style.backgroundColor = '#d7dcdf'
-                buttons[1].style.backgroundColor = 'white'
-                buttons[2].style.backgroundColor = 'white'
-            } else if (textAlignment === 'justify') {
-                buttons[1].style.backgroundColor = '#d7dcdf'
-                buttons[0].style.backgroundColor = 'white'
-                buttons[2].style.backgroundColor = 'white'
-            } else if (textAlignment === 'start') {
-                buttons[2].style.backgroundColor = '#d7dcdf'
-                buttons[0].style.backgroundColor = 'white'
-                buttons[1].style.backgroundColor = 'white'
-            }
+        // Sync a slider + its value label
+        function syncSlider(id, value, fmt) {
+            let el = document.getElementById(id);
+            if (el) el.value = value;
+            let lbl = document.getElementById(id + 'Value');
+            if (lbl) lbl.textContent = fmt ? fmt(value) : value;
         }
 
         function reload() {
-            let result = d2reader.currentSettings;
-            document.getElementById("fontSize").value = result['fontSize'];
-            document.getElementById("fontFamily").value = result['fontFamily'];
+            let r = d2reader.currentSettings;
 
-            let columnCount = result['columnCount']
-            setColumns(columnCount)
+            // Sliders
+            syncSlider('fontSize', r.fontSize, v => v + '%');
+            syncSlider('wordSpacing', r.wordSpacing);
+            syncSlider('letterSpacing', r.letterSpacing, v => parseFloat(v).toFixed(2));
+            syncSlider('pageMargins', r.pageMargins);
+            syncSlider('lineHeight', r.lineHeight);
+            syncSlider('paraSpacing', r.paraSpacing);
+            syncSlider('paraIndent', r.paraIndent);
+            syncSlider('typeScale', r.typeScale, v => parseFloat(v).toFixed(1));
 
-            let direction = result['direction']
-            setDirection(direction)
+            // Select
+            document.getElementById("fontFamily").value = r.fontFamily;
 
-            let scrollMode = result['verticalScroll']
-            setScroll(String(scrollMode).toLowerCase())
+            // Segmented controls
+            setAppearance(r.appearance);
+            setColumns(r.columnCount);
+            setDirection(r.direction);
+            setScroll(String(r.verticalScroll).toLowerCase());
+            setAlignment(r.textAlignment);
 
-            let textAlignment = result['textAlignment']
-            setAlignment(textAlignment)
+            // Toggle
+            document.getElementById("bodyHyphens").checked = r.bodyHyphens;
 
-            document.getElementById("wordSpacing").value = result['wordSpacing'];
-            document.getElementById("letterSpacing").value = result['letterSpacing'];
-            document.getElementById("lineHeight").value = result['lineHeight'];
-            document.getElementById("pageMargins").value = result['pageMargins'];
+            // Colors
+            document.getElementById("backgroundColor").value = r.backgroundColor || '#ffffff';
+            document.getElementById("textColor").value = r.textColor || '#000000';
         }
 
         function toast(text) {
