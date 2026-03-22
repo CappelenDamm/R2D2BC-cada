@@ -85,6 +85,7 @@ export class MediaOverlayModule implements ReaderModule {
   private mediaOverlayTextAudioPair: MediaOverlayNode | undefined;
   private pid: string | undefined = undefined;
   private __ontimeupdate = false;
+  private clickHandler: ((event: MouseEvent) => void) | undefined;
 
   public static create(config: MediaOverlayModuleConfig) {
     const mediaOverlay = new this(
@@ -198,6 +199,109 @@ export class MediaOverlayModule implements ReaderModule {
     }
   }
 
+  private bindClickHandler() {
+    this.unbindClickHandler();
+    const handler = this.handleContentClick.bind(this);
+    this.clickHandler = handler;
+    for (const iframe of this.navigator.iframes) {
+      iframe.contentDocument?.body?.addEventListener("click", handler);
+    }
+  }
+
+  private unbindClickHandler() {
+    const handler = this.clickHandler;
+    if (handler) {
+      for (const iframe of this.navigator.iframes) {
+        iframe.contentDocument?.body?.removeEventListener("click", handler);
+      }
+      this.clickHandler = undefined;
+    }
+  }
+
+  private async handleContentClick(event: MouseEvent) {
+    if (!this.settings.playing) return;
+
+    // Walk up from clicked element to find one with an ID matching a MO sync point
+    let el = event.target as HTMLElement | null;
+    const fragmentIDChain: string[] = [];
+    while (el) {
+      if (el.id) {
+        fragmentIDChain.push(el.id);
+      }
+      el = el.parentElement;
+    }
+    if (fragmentIDChain.length === 0) return;
+
+    // Determine which iframe was clicked to get the correct link index
+    const clickedDoc = (event.target as HTMLElement)?.ownerDocument;
+    let clickedLinkIndex = this.currentLinkIndex;
+    for (let i = 0; i < this.navigator.iframes.length; i++) {
+      if (this.navigator.iframes[i].contentDocument === clickedDoc) {
+        clickedLinkIndex = i;
+        break;
+      }
+    }
+
+    // Get the link for the clicked page
+    const link = this.currentLinks[clickedLinkIndex];
+    if (!link) return;
+
+    // If clicking on a different page, load its MO first
+    if (clickedLinkIndex !== this.currentLinkIndex || !this.mediaOverlayRoot) {
+      if (!link.MediaOverlays?.initialized) {
+        // MO not loaded for this page yet — load it
+        if (link.Properties?.MediaOverlay) {
+          const moUrl = link.Properties.MediaOverlay;
+          const moUrlObjFull = new URL(moUrl, this.publication.manifestUrl);
+          try {
+            const response = await fetch(
+              moUrlObjFull.toString(),
+              this.navigator.requestConfig
+            );
+            if (response.ok) {
+              const moJson = await response.json();
+              if (moJson) {
+                link.MediaOverlays = TaJsonDeserialize<MediaOverlayNode>(
+                  moJson,
+                  MediaOverlayNode
+                );
+                link.MediaOverlays.initialized = true;
+              }
+            }
+          } catch (e) {
+            log.log("handleContentClick() - failed to load MO for clicked page");
+            return;
+          }
+        } else {
+          return; // No MO for this page
+        }
+      }
+      this.currentLinkIndex = clickedLinkIndex;
+      this.mediaOverlayRoot = link.MediaOverlays!;
+    }
+
+    const href = link.HrefDecoded || link.Href;
+    const hrefUrlObj = new URL("https://dita.digital/" + href);
+    const textHref = hrefUrlObj.pathname.substr(1);
+
+    // Find the matching text/audio pair
+    const moTextAudioPair = this.findDepthFirstTextAudioPair(
+      textHref,
+      this.mediaOverlayRoot,
+      fragmentIDChain
+    );
+
+    if (moTextAudioPair && moTextAudioPair.Audio) {
+      // Clear previous highlight before jumping
+      this.mediaOverlayHighlight(undefined);
+      await this.playMediaOverlaysAudio(
+        moTextAudioPair,
+        undefined,
+        undefined
+      );
+    }
+  }
+
   async startReadAloud() {
     if (this.navigator.rights.enableMediaOverlays) {
       this.settings.playing = true;
@@ -227,11 +331,13 @@ export class MediaOverlayModule implements ReaderModule {
       }
       if (this.play) this.play.style.display = "none";
       if (this.pause) this.pause.style.removeProperty("display");
+      this.bindClickHandler();
     }
   }
   async stopReadAloud() {
     if (this.navigator.rights.enableMediaOverlays) {
       this.settings.playing = false;
+      this.unbindClickHandler();
 
       if (this.audioElement) this.audioElement.pause();
 
@@ -824,20 +930,12 @@ export class MediaOverlayModule implements ReaderModule {
     }
 
     if (this.pid) {
-      let prevElement;
-
-      if (this.currentLinkIndex === 0) {
-        prevElement = this.navigator.iframes[0].contentDocument?.getElementById(
-          this.pid
-        );
-      } else {
-        prevElement = this.navigator.iframes[1].contentDocument?.getElementById(
-          this.pid
-        );
-      }
-
-      if (prevElement) {
-        prevElement.classList.remove(classActive);
+      // Search all iframes for the previous highlight to ensure cleanup across spreads
+      for (const iframe of this.navigator.iframes) {
+        const prevElement = iframe.contentDocument?.getElementById(this.pid);
+        if (prevElement) {
+          prevElement.classList.remove(classActive);
+        }
       }
     }
 

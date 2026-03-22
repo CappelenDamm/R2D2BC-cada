@@ -533,6 +533,8 @@ await reader.applyMediaOverlaySettings(settings: Partial<IMediaOverlayUserSettin
 reader.hasMediaOverlays: boolean;
 ```
 
+**Click to advance:** While media overlays are playing, clicking on any text element jumps narration to the nearest SMIL sync point. This works across both pages in a two-page FXL spread. The granularity depends on the EPUB's SMIL structure (sentence-level, paragraph-level, etc.).
+
 ### Search
 
 Requires `rights.enableSearch: true`.
