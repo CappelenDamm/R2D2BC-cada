@@ -1063,44 +1063,6 @@ export class TextHighlighter {
         return;
       }
 
-      if (this.isIOS()) {
-        setTimeout(function () {
-          let doc = self.navigator.iframes[0].contentDocument;
-          if (doc) {
-            let selection = self.dom(doc.body).getSelection();
-            selection.removeAllRanges();
-            setTimeout(function () {
-              selection.addRange(range);
-              function getCssSelector(element: Element): string | undefined {
-                const options = {
-                  className: (str: string) => {
-                    return _blacklistIdClassForCssSelectors.indexOf(str) < 0;
-                  },
-                  idName: (str: string) => {
-                    return _blacklistIdClassForCssSelectors.indexOf(str) < 0;
-                  },
-                };
-                let doc = self.navigator.iframes[0].contentDocument;
-                if (doc) {
-                  return uniqueCssSelector(element, doc, options);
-                } else {
-                  return undefined;
-                }
-              }
-
-              let win = self.navigator.iframes[0].contentWindow;
-              const selectionInfo = getCurrentSelectionInfo(
-                win!,
-                getCssSelector
-              );
-              self.navigator.annotationModule?.annotator?.saveTemporarySelectionInfo(
-                selectionInfo
-              );
-            }, 5);
-          }
-        }, 100);
-      }
-
       this.toolboxPlacement();
       this.toolboxHandler();
     }
