@@ -21,6 +21,7 @@ import Annotator, { AnnotationType } from "./Annotator";
 import Store from "./Store";
 import { Annotation, Bookmark, ReadingPosition } from "../model/Locator";
 import { IHighlight } from "../modules/highlight/common/highlight";
+import { ISelectionInfo } from "../modules/highlight/common/selection";
 import { TextHighlighter } from "../modules/highlight/TextHighlighter";
 import { convertRangeInfo } from "../modules/highlight/renderer/iframe/selection";
 
@@ -146,7 +147,7 @@ export default class LocalAnnotator implements Annotator {
           if (n1.locations.progression && n2.locations.progression) {
             return n1.locations.progression - n2.locations.progression;
           } else {
-            return undefined;
+            return 0;
           }
         });
         return filteredResult;
@@ -208,17 +209,20 @@ export default class LocalAnnotator implements Annotator {
     return annotationsToStore;
   }
 
-  public saveTemporarySelectionInfo(selectionInfo: any) {
+  public saveTemporarySelectionInfo(selectionInfo: ISelectionInfo) {
     this.store.set(LocalAnnotator.SELECTIONINFO, JSON.stringify(selectionInfo));
   }
-  public getTemporarySelectionInfo(doc: any): any {
+  public getTemporarySelectionInfo(
+    doc: Document | null
+  ): ISelectionInfo | null {
+    if (!doc) return null;
     const selectionInfos = this.store.get(LocalAnnotator.SELECTIONINFO);
     if (selectionInfos) {
-      let selectionInfo = JSON.parse(selectionInfos);
-      selectionInfo!.range = convertRangeInfo(doc!, selectionInfo!.rangeInfo);
+      let selectionInfo: ISelectionInfo = JSON.parse(selectionInfos);
+      selectionInfo.range = convertRangeInfo(doc, selectionInfo.rangeInfo);
       return selectionInfo;
     }
-    return [];
+    return null;
   }
   public deleteTemporarySelectionInfo() {
     this.store.remove(LocalAnnotator.SELECTIONINFO);
@@ -295,7 +299,7 @@ export default class LocalAnnotator implements Annotator {
     return [];
   }
 
-  public getAnnotationPosition(id: any, iframeWin): any {
+  public getAnnotationPosition(id: string, iframeWin: Window): number | null {
     const savedAnnotations = this.store.get(LocalAnnotator.ANNOTATIONS);
     if (savedAnnotations) {
       const annotations = JSON.parse(savedAnnotations);
@@ -308,7 +312,7 @@ export default class LocalAnnotator implements Annotator {
         );
         if (foundElement) {
           let position = 0;
-          if (foundElement.hasChildNodes) {
+          if (foundElement.hasChildNodes()) {
             for (let i = 0; i < foundElement.childNodes.length; i++) {
               let childNode = foundElement.childNodes[i] as HTMLDivElement;
               let top = parseInt(childNode.style.top.replace("px", ""));
@@ -328,7 +332,10 @@ export default class LocalAnnotator implements Annotator {
     return null;
   }
 
-  public getAnnotationElement(id: any, iframeWin): any {
+  public getAnnotationElement(
+    id: string,
+    iframeWin: Window
+  ): HTMLElement | null {
     const savedAnnotations = this.store.get(LocalAnnotator.ANNOTATIONS);
     if (savedAnnotations) {
       const annotations = JSON.parse(savedAnnotations);
@@ -341,7 +348,7 @@ export default class LocalAnnotator implements Annotator {
         );
         if (foundElement) {
           let position = 0;
-          if (foundElement.hasChildNodes) {
+          if (foundElement.hasChildNodes()) {
             for (let i = 0; i < foundElement.childNodes.length; i++) {
               let childNode = foundElement.childNodes[i] as HTMLDivElement;
               let top = parseInt(childNode.style.top.replace("px", ""));

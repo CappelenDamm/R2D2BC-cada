@@ -144,6 +144,7 @@ export interface TextHighlighterProperties {
 export interface TextHighlighterConfig extends TextHighlighterProperties {
   api?: TextSelectorAPI;
   layerSettings: LayerSettings;
+  colors?: string[];
 }
 
 export class TextHighlighter {
@@ -155,6 +156,15 @@ export class TextHighlighter {
   private api?: TextSelectorAPI;
   private hasEventListener: boolean;
   activeAnnotationMarkerId?: string = undefined;
+  colors: string[] = [
+    "#fce300",
+    "#48e200",
+    "#00bae5",
+    "#157cf9",
+    "#6a39b7",
+    "#ea426a",
+    "#ff8500",
+  ];
 
   public static async create(config: TextHighlighterConfig): Promise<any> {
     const module = new this(
@@ -162,7 +172,8 @@ export class TextHighlighter {
       config as TextHighlighterProperties,
       false,
       {},
-      config.api
+      config.api,
+      config.colors
     );
     return new Promise((resolve) => resolve(module));
   }
@@ -172,7 +183,8 @@ export class TextHighlighter {
     properties: TextHighlighterProperties,
     hasEventListener: boolean,
     options: any,
-    api?: TextSelectorAPI
+    api?: TextSelectorAPI,
+    colors?: string[]
   ) {
     this.layerSettings = layerSettings;
     this.properties = properties;
@@ -181,8 +193,11 @@ export class TextHighlighter {
     }
     this.api = api;
     this.hasEventListener = hasEventListener;
+    if (colors && colors.length > 0) {
+      this.colors = colors;
+    }
     this.options = this.defaults(options, {
-      color: "#fce300",
+      color: this.colors[0],
       highlightedClass: "highlighted",
       contextClass: "highlighter-context",
       onBeforeHighlight: function () {
@@ -750,15 +765,6 @@ export class TextHighlighter {
       "highlight-toolbox-mode-colors"
     );
     let toolboxOptions = document.getElementById("highlight-toolbox-mode-add");
-    let colors = [
-      "#fce300",
-      "#48e200",
-      "#00bae5",
-      "#157cf9",
-      "#6a39b7",
-      "#ea426a",
-      "#ff8500",
-    ];
     let colorIcon = document.getElementById("colorIcon");
     let actionIcon = document.getElementById("actionIcon");
     let dismissIcon = document.getElementById("dismissIcon");
@@ -785,7 +791,7 @@ export class TextHighlighter {
       colorIcon.style.position = "relative";
       colorIcon.style.zIndex = "20";
 
-      colors.forEach((color) => {
+      this.colors.forEach((color) => {
         let colorButton = document.getElementById(color);
         let cButton = document.getElementById(`c${color}`);
         if (colorButton && toolboxColorsOptions?.contains(colorButton)) {
@@ -806,7 +812,7 @@ export class TextHighlighter {
 
       if (this.navigator.rights.enableAnnotations) {
         let index = 10;
-        colors.forEach((color) => {
+        this.colors.forEach((color) => {
           index--;
           const colorButton = colorIcon?.cloneNode(true) as HTMLButtonElement;
           const colorButtonSymbol = colorButton.lastChild as HTMLElement;
@@ -825,7 +831,7 @@ export class TextHighlighter {
       }
 
       // Generate color options
-      colors.forEach((color) => {
+      this.colors.forEach((color) => {
         const colorButton = colorIcon?.cloneNode(true) as HTMLButtonElement;
         const colorButtonSymbol = colorButton.lastChild as HTMLElement;
         colorButtonSymbol.style.backgroundColor = color;
@@ -1093,9 +1099,11 @@ export class TextHighlighter {
                 win!,
                 getCssSelector
               );
-              self.navigator.annotationModule?.annotator?.saveTemporarySelectionInfo(
-                selectionInfo
-              );
+              if (selectionInfo) {
+                self.navigator.annotationModule?.annotator?.saveTemporarySelectionInfo(
+                  selectionInfo
+                );
+              }
             }, 5);
           }
         }, 100);
@@ -1335,7 +1343,7 @@ export class TextHighlighter {
                   selectionInfo =
                     self.navigator.annotationModule?.annotator?.getTemporarySelectionInfo(
                       doc
-                    );
+                    ) ?? undefined;
                 }
 
                 if (selectionInfo !== undefined) {
@@ -1448,7 +1456,7 @@ export class TextHighlighter {
         selectionInfo =
           this.navigator.annotationModule?.annotator?.getTemporarySelectionInfo(
             doc
-          );
+          ) ?? undefined;
       }
 
       if (selectionInfo) {
@@ -1526,7 +1534,7 @@ export class TextHighlighter {
           selectionInfo =
             self.navigator.annotationModule?.annotator?.getTemporarySelectionInfo(
               doc
-            );
+            ) ?? undefined;
         }
 
         if (selectionInfo !== undefined) {
@@ -2476,13 +2484,14 @@ export class TextHighlighter {
             }
           }
         } else {
-          if (foundElement.dataset.definition) {
+          const defElement = foundElement.parentElement ?? foundElement;
+          if (defElement.dataset.definition) {
             const popup = new Popup(this.navigator);
-            popup.showPopup(foundElement.dataset.definition, ev);
+            popup.showPopup(defElement.dataset.definition, ev);
           }
           let result =
             this.navigator.definitionsModule?.properties?.definitions?.filter(
-              (el: any) => el.order === Number(foundElement?.dataset.order)
+              (el: any) => el.order === Number(defElement?.dataset.order)
             )[0];
           log.log(result);
           if (this.navigator.definitionsModule?.api?.click) {

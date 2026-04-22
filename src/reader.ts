@@ -56,9 +56,25 @@ import LineFocusModule from "./modules/linefocus/LineFocusModule";
 import { HistoryModule } from "./modules/history/HistoryModule";
 import CitationModule from "./modules/citation/CitationModule";
 import { TaJsonDeserialize } from "./utils/JsonUtil";
-import { PDFNavigator } from "./navigator/PDFNavigator";
+import type { PDFNavigator } from "./navigator/PDFNavigator";
 import Navigator from "./navigator/Navigator";
 import { ConsumptionModule } from "./modules/consumption/ConsumptionModule";
+
+/**
+ * Dynamically import PDFNavigator to avoid loading pdfjs-dist in SSR/Node.
+ * pdfjs-dist references browser-only APIs (DOMMatrix, canvas) at import time.
+ */
+let _PDFNavigatorClass: (typeof import("./navigator/PDFNavigator"))["PDFNavigator"] | undefined;
+async function loadPDFNavigator() {
+  if (!_PDFNavigatorClass) {
+    const mod = await import("./navigator/PDFNavigator");
+    _PDFNavigatorClass = mod.PDFNavigator;
+  }
+  return _PDFNavigatorClass;
+}
+function isPDFNavigator(nav: any): nav is PDFNavigator {
+  return nav?.isPDF === true;
+}
 
 /**
  * A class that, once instantiated using the public `.build` method,
@@ -92,9 +108,12 @@ export default class D2Reader {
     private readonly consumptionModule?: ConsumptionModule
   ) {}
 
-  addEventListener() {
-    if (this.navigator instanceof IFrameNavigator) {
-      this.navigator.addListener(arguments[0], arguments[1]);
+  addEventListener(event: string, handler: (...args: any[]) => void) {
+    if (
+      this.navigator instanceof IFrameNavigator ||
+      isPDFNavigator(this.navigator)
+    ) {
+      (this.navigator as any).addListener(event, handler);
     }
   }
 
@@ -182,11 +201,16 @@ export default class D2Reader {
         initialUserSettings: initialConfig.userSettings,
         layout: "",
       });
-      const navigator = await PDFNavigator.create({
+      const PDFNav = await loadPDFNavigator();
+      const navigator = await PDFNav.create({
         mainElement: mainElement,
         publication: publication,
         settings: settings,
         api: initialConfig.api,
+        workerSrc: initialConfig.workerSrc,
+        annotator: annotator,
+        initialLastReadingPosition: initialConfig.lastReadingPosition,
+        store: store,
       });
       return new D2Reader(settings, navigator);
     } else {
@@ -575,6 +599,11 @@ export default class D2Reader {
     return (await this.annotationModule?.updateAnnotation(highlight)) ?? false;
   };
 
+  /** Change highlighter color to a specific HEX string */
+  changeHighlighterColor = (color: string) => {
+    this.highlighter?.setColor(color);
+  };
+
   /** Hide Annotation Layer */
   hideAnnotationLayer = () => {
     return this.annotationModule?.hideAnnotationLayer();
@@ -735,7 +764,7 @@ export default class D2Reader {
     return await this.settings.applyUserSettings(userSettings);
   };
   scroll = async (value: boolean, direction?: string) => {
-    if (this.navigator instanceof PDFNavigator) {
+    if (isPDFNavigator(this.navigator)) {
       return this.navigator.scroll(value, direction);
     }
     return await this.settings.scroll(value);
@@ -906,32 +935,32 @@ export default class D2Reader {
     await this.navigator.goToPage(page);
   };
   fitToPage = () => {
-    if (this.navigator instanceof PDFNavigator) {
+    if (isPDFNavigator(this.navigator)) {
       (this.navigator as PDFNavigator).fitToPage();
     }
   };
   fitToWidth = () => {
-    if (this.navigator instanceof PDFNavigator) {
+    if (isPDFNavigator(this.navigator)) {
       (this.navigator as PDFNavigator).fitToWidth();
     }
   };
   zoomIn = () => {
-    if (this.navigator instanceof PDFNavigator) {
+    if (isPDFNavigator(this.navigator)) {
       (this.navigator as PDFNavigator).zoomIn();
     }
   };
   zoomOut = () => {
-    if (this.navigator instanceof PDFNavigator) {
+    if (isPDFNavigator(this.navigator)) {
       (this.navigator as PDFNavigator).zoomOut();
     }
   };
   activateHand = () => {
-    if (this.navigator instanceof PDFNavigator) {
+    if (isPDFNavigator(this.navigator)) {
       (this.navigator as PDFNavigator).activateHand();
     }
   };
   deactivateHand = () => {
-    if (this.navigator instanceof PDFNavigator) {
+    if (isPDFNavigator(this.navigator)) {
       (this.navigator as PDFNavigator).deactivateHand();
     }
   };

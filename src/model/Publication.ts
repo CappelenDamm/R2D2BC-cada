@@ -64,9 +64,12 @@ export class Publication extends R2Publication {
   }
 
   private limitedTOC() {
-    function disableChildren(item) {
-      for (let index = 0; index < item.Children.length; index++) {
-        let child = item.Children[index];
+    // R2Link.Href is typed string but we need to blank it for out-of-sample items.
+    type MutableHref = { Href: string | undefined; Children?: MutableHref[] };
+
+    function disableChildren(item: MutableHref) {
+      for (let index = 0; index < (item.Children?.length ?? 0); index++) {
+        let child = item.Children![index];
         child.Href = undefined;
         if (child.Children) {
           disableChildren(child);
@@ -87,8 +90,7 @@ export class Publication extends R2Publication {
           if (this.sample?.limit) {
             let valid = progress <= this.sample?.limit;
             if (!valid) {
-              // @ts-ignore
-              item.Href = undefined;
+              (item as MutableHref).Href = undefined;
               if (item.Children) {
                 disableChildren(item);
               }

@@ -69,7 +69,7 @@ export interface AnnotationModuleConfig extends AnnotationModuleProperties {
   headerMenu?: HTMLElement | null;
   rights: Partial<ReaderRights>;
   publication: Publication;
-  initialAnnotations?: any;
+  initialAnnotations?: import("../navigator/IFrameNavigator").InitialAnnotations;
   api?: AnnotationModuleAPI;
   highlighter: TextHighlighter;
 }
@@ -82,7 +82,7 @@ export class AnnotationModule implements ReaderModule {
   private commentGutter?: HTMLDivElement | null;
   private readonly headerMenu?: HTMLElement | null;
   private readonly highlighter?: TextHighlighter;
-  private readonly initialAnnotations: any;
+  private readonly initialAnnotations?: import("../navigator/IFrameNavigator").InitialAnnotations;
   navigator: IFrameNavigator;
   properties?: AnnotationModuleProperties;
   api?: AnnotationModuleAPI;
@@ -223,14 +223,16 @@ export class AnnotationModule implements ReaderModule {
       if (menuItems && menuItems?.length > 0) {
         let menuItem = lodash.cloneDeep(menuItems[0]);
         menuItem.marker = AnnotationMarker.Custom;
-        if (this.activeAnnotationMarkerPosition) {
+        if (this.activeAnnotationMarkerPosition && menuItem.icon) {
           menuItem.icon.position = this.activeAnnotationMarkerPosition;
         }
-        // menuItem.icon.svgPath = `<path d="M4,16v6h16v-6c0-1.1-0.9-2-2-2H6C4.9,14,4,14.9,4,16z M18,18H6v-2h12V18z M12,2C9.24,2,7,4.24,7,7l5,7l5-7 C17,4.24,14.76,2,12,2z M12,11L9,7c0-1.66,1.34-3,3-3s3,1.34,3,3L12,11z"/>`;
-        // menuItem.icon.color = `#dc491d`;
-        // menuItem.highlight.color = `#dc491d`;
-        menuItem.highlight.style.default = null;
-        menuItem.highlight.style.hover = null;
+        // menuItem.icon?.svgPath = `<path d="M4,16v6h16v-6c0-1.1-0.9-2-2-2H6C4.9,14,4,14.9,4,16z M18,18H6v-2h12V18z M12,2C9.24,2,7,4.24,7,7l5,7l5-7 C17,4.24,14.76,2,12,2z M12,11L9,7c0-1.66,1.34-3,3-3s3,1.34,3,3L12,11z"/>`;
+        // menuItem.icon?.color = `#dc491d`;
+        // menuItem.highlight?.color = `#dc491d`;
+        if (menuItem.highlight?.style) {
+          menuItem.highlight.style.default = undefined;
+          menuItem.highlight.style.hover = undefined;
+        }
         let doc = this.navigator.iframes[0].contentDocument;
         if (doc) {
           const selection = this.highlighter?.dom(doc.body).getSelection();
@@ -268,12 +270,12 @@ export class AnnotationModule implements ReaderModule {
             let book = this.navigator.highlighter?.createHighlight(
               this.navigator.highlighter?.dom(doc.body).getWindow(),
               selectionInfo,
-              menuItem.highlight.color,
+              menuItem.highlight?.color,
               true,
               AnnotationMarker.Bookmark,
               menuItem.icon,
               menuItem.popup,
-              menuItem.highlight.style
+              menuItem.highlight?.style
             );
             if (book) {
               this.saveAnnotation(book[0]).then((anno) => {
@@ -293,7 +295,7 @@ export class AnnotationModule implements ReaderModule {
       id,
       this.navigator.iframes[0].contentWindow as any
     );
-    element.scrollIntoView({
+    element?.scrollIntoView({
       block: "center",
       behavior: "smooth",
     });
@@ -366,7 +368,6 @@ export class AnnotationModule implements ReaderModule {
     }
   }
 
-  // @ts-ignore
   public async saveAnnotation(highlight: IHighlight): Promise<Annotation> {
     if (this.annotator) {
       var tocItem = this.publication.getTOCItem(

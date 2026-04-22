@@ -17,5 +17,11 @@
  * Licensed to: Bokbasen AS and CAST under one or more contributor license agreements.
  */
 
-export interface ReaderModule {}
-// export default ReaderModule;
+/**
+ * Base interface for all optional reader feature modules.
+ * Each module must implement `stop()` to clean up event listeners and resources
+ * when the reader is destroyed.
+ */
+export interface ReaderModule {
+  stop(): void;
+}
