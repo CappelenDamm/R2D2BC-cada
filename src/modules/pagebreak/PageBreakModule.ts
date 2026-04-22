@@ -168,7 +168,7 @@ export class PageBreakModule implements ReaderModule {
           let hide = false;
           if (img.innerHTML.length === 0) {
             title = img.getAttribute("title") ?? "";
-            img.innerHTML = title;
+            img.textContent = title;
             hide = true;
           }
           if (img.innerHTML.length === 0) {

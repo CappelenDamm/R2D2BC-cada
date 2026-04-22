@@ -20,7 +20,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <title>D2 Reader</title>
+    <title>D2 Reader - API Test</title>
     <meta charset="utf-8" />
     <meta name="author" content="Aferdita Muriqi" />
     <meta name="description" content="A viewer application for EPUB files." />
@@ -33,421 +33,619 @@
     <script src="reader.js"></script>
     <link rel="stylesheet" href="/viewer/injectables/style/linefocus.css" />
 
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: #f0f2f5; }
+
+        /* Left Sidebar */
+        #api-sidebar {
+            position: fixed; top: 0; left: 0; bottom: 0; width: 280px;
+            background: #1a1a2e; color: #e0e0e0; overflow-y: auto; z-index: 1000;
+            padding-bottom: 20px;
+        }
+        #api-sidebar::-webkit-scrollbar { width: 6px; }
+        #api-sidebar::-webkit-scrollbar-track { background: #16213e; }
+        #api-sidebar::-webkit-scrollbar-thumb { background: #555; border-radius: 3px; }
+
+        .sidebar-header {
+            padding: 16px 20px; background: #16213e;
+            border-bottom: 1px solid #0f3460; display: flex;
+            align-items: center; gap: 10px; position: sticky; top: 0; z-index: 1;
+        }
+        .sidebar-header h2 { font-size: 16px; font-weight: 600; color: #fff; }
+        .api-badge {
+            background: #e94560; color: #fff; font-size: 9px; font-weight: 700;
+            padding: 2px 6px; border-radius: 3px; letter-spacing: 1px; text-transform: uppercase;
+        }
+
+        .section { border-bottom: 1px solid #0f3460; }
+        .section-header {
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 10px 20px; cursor: pointer; user-select: none;
+            background: #16213e; transition: background 0.15s;
+        }
+        .section-header:hover { background: #1a2744; }
+        .section-header h3 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: #a0a0c0; }
+        .section-header .chevron { font-size: 18px; color: #666; transition: transform 0.2s; }
+        .section-header.collapsed .chevron { transform: rotate(-90deg); }
+
+        .section-body { padding: 8px 12px; }
+        .section-body.hidden { display: none; }
+
+        .section-body button {
+            display: block; width: 100%; text-align: left; padding: 6px 10px;
+            margin-bottom: 2px; background: transparent; border: none; color: #c0c0d8;
+            font-size: 12px; cursor: pointer; border-radius: 4px; transition: background 0.15s;
+        }
+        .section-body button:hover { background: #0f3460; color: #fff; }
+        .section-body button:active { background: #e94560; }
+
+        .section-body label {
+            display: flex; align-items: center; gap: 8px;
+            padding: 5px 10px; font-size: 12px; color: #c0c0d8; cursor: pointer;
+            border-radius: 4px; transition: background 0.15s;
+        }
+        .section-body label:hover { background: #0f3460; }
+        .section-body label input[type="checkbox"] { accent-color: #e94560; }
+
+        .section-body .sub-label {
+            font-size: 10px; color: #666; text-transform: uppercase; letter-spacing: 0.5px;
+            padding: 8px 10px 4px; font-weight: 600;
+        }
+        .section-body .btn-row { display: flex; gap: 4px; padding: 0 10px 4px; }
+        .section-body .btn-row button { width: auto; flex: 1; text-align: center; }
+
+        /* Right Panel */
+        #right-panel {
+            position: fixed; top: 0; right: 0; bottom: 0; width: 300px;
+            background: #fff; border-left: 1px solid #ddd; overflow-y: auto;
+            z-index: 1000; padding: 16px;
+        }
+        #right-panel h3 {
+            font-size: 13px; font-weight: 600; color: #333; text-transform: uppercase;
+            letter-spacing: 0.5px; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 2px solid #e94560;
+        }
+        #right-panel .result-section { margin-bottom: 20px; }
+        #right-panel ul { list-style: none; padding: 0; }
+        #right-panel li {
+            padding: 6px 8px; font-size: 12px; cursor: pointer; border-radius: 4px;
+            border-bottom: 1px solid #f0f0f0; color: #444; transition: background 0.15s;
+        }
+        #right-panel li:hover { background: #f5f5ff; }
+        #right-panel button {
+            display: block; width: 100%; text-align: left; padding: 6px 8px; margin-bottom: 2px;
+            background: #f8f8f8; border: 1px solid #e0e0e0; color: #333;
+            font-size: 11px; cursor: pointer; border-radius: 4px;
+        }
+        #right-panel button:hover { background: #eef; }
+
+        /* Reader Container */
+        .content#root {
+            margin-left: 280px; margin-right: 300px;
+        }
+        #D2Reader-Container {
+            border: 3px solid rebeccapurple; height: 100vh;
+        }
+    </style>
 </head>
 <body>
 
-    <header id="sideMenu" style="position:fixed;top:0;right:10px;z-index: 2;">
-        <div id="container-toc"></div>
-        <div id="container-bookmarks"></div>
-        <div id="container-annotations"></div>
-        <div id="container-history"></div>
-    </header>
+    <!-- Left Sidebar -->
+    <nav id="api-sidebar">
+        <div class="sidebar-header">
+            <h2>D2Reader</h2>
+            <span class="api-badge">API Test</span>
+        </div>
 
-    <div style="position:fixed;top:0;left:0;z-index: 1000;bottom: 0; overflow: scroll;">
-        <!--Navigate-->
-        <ul> <div>Navigate</div>
-            <button onclick="
-                var result = d2reader.tableOfContents;
-                console.log(result)
-                console.log(result.length)
-                var container = document.getElementById('container-toc');
-                var tocString = ''
-                result.forEach(function (item, index) {
-                    if (index == 0) {
-                        console.log('first')
-                        console.log(index)
-                        tocString += '<ul><li onclick=\'d2reader.goTo(' + JSON.stringify(item) + ')\'>' + item.title + '</li>'
-                    } else if (index == result.length - 1) {
-                        console.log('last')
-                        console.log(index)
-                        tocString += '<li onclick=\'d2reader.goTo(' + JSON.stringify(item) + ')\'>' + item.title + '</li></ul>'
-                    } else {
-                        console.log('middle')
-                        console.log(index)
-                        tocString += '<li onclick=\'d2reader.goTo(' + JSON.stringify(item) + ')\'>' + item.title + '</li>'
-                    }
-                });
-                container.innerHTML = tocString
-            ">show TOC</button><br>
-            <button onclick="
-                var result = d2reader.readingOrder;
-                console.log(result)
-                console.log(result.length)
-                var container = document.getElementById('container-toc');
-                var tocString = ''
-                result.forEach(function (item, index) {
-                    if (index == 0) {
-                        console.log('first')
-                        console.log(index)
-                        tocString += '<ul><li onclick=\'d2reader.goTo(' + JSON.stringify(item) + ')\'>' + item.href + '</li>'
-                    } else if (index == result.length - 1) {
-                        console.log('last')
-                        console.log(index)
-                        tocString += '<li onclick=\'d2reader.goTo(' + JSON.stringify(item) + ')\'>' + item.href + '</li></ul>'
-                    } else {
-                        console.log('middle')
-                        console.log(index)
-                        tocString += '<li onclick=\'d2reader.goTo(' + JSON.stringify(item) + ')\'>' + item.href + '</li>'
-                    }
-                });
-                container.innerHTML = tocString
-            ">show ReadingOrder</button><br>
-            <button onclick="d2reader.previousResource()">previous resource</button><br>
-            <button onclick="d2reader.nextResource()">next resource</button><br>
-            <button onclick="d2reader.previousPage()">previous page</button><br>
-            <button onclick="d2reader.nextPage()">next page</button><br>
-            <button
-                    onclick="d2reader.goTo({href:'OEBPS/Text/front.xhtml', title:'frontpage', locations:{progression:0}})">go
-                to frontpage</button><br>
-            <button
-                    onclick="d2reader.goTo({href:'OEBPS/Text/chapter_01.xhtml', title:'chapter 1', locations:{progression:0}})">go
-                to chapter 1</button><br>
+        <!-- Navigate -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h3>Navigate</h3>
+                <span class="material-icons chevron">expand_more</span>
+            </div>
+            <div class="section-body">
+                <button onclick="apiShowTOC()">Show TOC</button>
+                <button onclick="apiShowReadingOrder()">Show Reading Order</button>
+                <button onclick="d2reader.previousResource()">Previous Resource</button>
+                <button onclick="d2reader.nextResource()">Next Resource</button>
+                <button onclick="d2reader.previousPage()">Previous Page</button>
+                <button onclick="d2reader.nextPage()">Next Page</button>
+                <button onclick="d2reader.goTo({href:'OEBPS/Text/front.xhtml', title:'frontpage', locations:{progression:0}})">Go to Frontpage</button>
+                <button onclick="d2reader.goTo({href:'OEBPS/Text/chapter_01.xhtml', title:'chapter 1', locations:{progression:0}})">Go to Chapter 1</button>
+                <button onclick="d2reader.goToPosition(10)">Go to Position 10</button>
+            </div>
+        </div>
 
-            <button
-              onclick="d2reader.goToPosition(10)">go to position 10</button><br>
+        <!-- Info -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h3>Info</h3>
+                <span class="material-icons chevron">expand_more</span>
+            </div>
+            <div class="section-body">
+                <button onclick="alert(d2reader.totalResources)">Total Resources</button>
+                <button onclick="alert(d2reader.currentResource)">Current Resource</button>
+                <button onclick="alert(d2reader.mostRecentNavigatedTocItem)">Most Recent TOC Item</button>
+                <button onclick="alert(JSON.stringify(d2reader.currentLocator))">Current Locator</button>
+                <button onclick="alert(JSON.stringify(d2reader.positions))">Positions</button>
+                <button onclick="alert(d2reader.atStart)">At Start</button>
+                <button onclick="alert(d2reader.atEnd)">At End</button>
+            </div>
+        </div>
 
-        </ul>
-        <!--Info-->
-        <ul> <div>Info</div>
-            <button onclick="alert(d2reader.totalResources)">totalResources</button><br>
-            <button onclick="alert(d2reader.currentResource)">currentResource</button><br>
-            <button onclick="alert(d2reader.mostRecentNavigatedTocItem)">mostRecentNavigatedTocItem</button><br>
-            <button onclick="alert(JSON.stringify(d2reader.currentLocator))">currentLocator</button><br>
-            <button onClick="alert(JSON.stringify(d2reader.positions))">positions</button><br>
-            <button onclick="alert(d2reader.atStart)">atStart</button><br>
-            <button onclick="alert(d2reader.atEnd)">atEnd</button><br>
-        </ul>
+        <!-- Bookmarks -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h3>Bookmarks</h3>
+                <span class="material-icons chevron">expand_more</span>
+            </div>
+            <div class="section-body">
+                <button onclick="apiAddBookmark()">Add Bookmark</button>
+                <button onclick="apiAddBookmarkPlus()">Add Bookmark Plus (annotation based)</button>
+                <button onclick="d2reader.deleteBookmark({id:'3a2ca517-8a94-4272-8ef9-7e1f7432786f'})">Delete Bookmark</button>
+                <button onclick="apiShowBookmarks()">Show Bookmarks</button>
+            </div>
+        </div>
 
-        <!--Bookmarks-->
-        <ul> <div>Bookmarks</div>
-            <button onclick="d2reader.saveBookmark().then(
-                result => {
-                    console.log(result);
-                    console.log(d2reader.bookmarks.length)
-                }); ">add bookmark</button><br>
-            <button onclick="d2reader.saveBookmarkPlus().then(
-                result => {
-                    console.log(result);
-                    console.log(d2reader.bookmarks.length)
-                }); ">add bookmark plus (annotation based)</button><br>
-            <button onclick="d2reader.deleteBookmark({id:'3a2ca517-8a94-4272-8ef9-7e1f7432786f'})">delete bookmark</button><br>
-            <button onclick="
-                    var result = d2reader.bookmarks;
-                    console.log(result)
-                    console.log(result.length)
-                    var container = document.getElementById('container-bookmarks');
-                    var tocString = ''
-                    result.forEach(function (item, index) {
-                        if (index == 0) {
-                            console.log('first')
-                            console.log(index)
-                            tocString += '<ul><li onclick=\'d2reader.goTo(' + JSON.stringify(item) + ')\'>' + item.title + ' - ' + Math.round(item.locations.progression * 100) + '%</li>'
-                        } else if (index == result.length - 1) {
-                            console.log('last')
-                            console.log(index)
-                            tocString += '<li onclick=\'d2reader.goTo(' + JSON.stringify(item) + ')\'>' + item.title + ' - ' + Math.round(item.locations.progression * 100) + '%</li></ul>'
-                        } else {
-                            console.log('middle')
-                            console.log(index)
-                            tocString += '<li onclick=\'d2reader.goTo(' + JSON.stringify(item) + ')\'>' + item.title + ' - ' +  Math.round(item.locations.progression * 100) + '%</li>'
-                        }
-                    });
-                    container.innerHTML = tocString
-            ">show bookmarks</button><br>
-        </ul>
-        <!--History-->
-        <ul> <div>History</div>
-            <button onclick="alert(d2reader.historyCurrentIndex)">current history index</button><br>
-            <button onclick="
-                var result = d2reader.history;
-                console.log(result)
-                console.log(result.length)
-                var container = document.getElementById('container-history');
-                var tocString = ''
-                result.forEach(function (item, index) {
-                    if (index == 0) {
-                        console.log('first')
-                        console.log(index)
-                        tocString += '<ul><li onclick=\'d2reader.goTo(' + JSON.stringify(item) + ')\'>' + item.title + ' - ' + Math.round(item.locations.progression * 100) + '%</li>'
-                    } else if (index == result.length - 1) {
-                        console.log('last')
-                        console.log(index)
-                        tocString += '<li onclick=\'d2reader.goTo(' + JSON.stringify(item) + ')\'>' + item.title + ' - ' + Math.round(item.locations.progression * 100) + '%</li></ul>'
-                    } else {
-                        console.log('middle')
-                        console.log(index)
-                        tocString += '<li onclick=\'d2reader.goTo(' + JSON.stringify(item) + ')\'>' + item.title + ' - ' + Math.round(item.locations.progression * 100) + '%</li>'
-                    }
-                });
-                container.innerHTML = tocString
-            ">show history</button><br>
-            <button onclick="d2reader.historyBack()">history back</button><br>
-            <button onclick="d2reader.historyForward()">history forward</button><br>
-        </ul>
-        <!--Annotations-->
-        <ul> <div>Annotations</div>
-            <button onclick="
-                var result = d2reader.annotations;
+        <!-- Annotations -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h3>Annotations</h3>
+                <span class="material-icons chevron">expand_more</span>
+            </div>
+            <div class="section-body">
+                <button onclick="apiShowAnnotations()">Show Annotations</button>
+                <button onclick="d2reader.activateMarker('bookmarkIcon', 'center')">Activate Marker</button>
+                <button onclick="d2reader.deactivateMarker()">Deactivate Marker</button>
+                <button onclick="d2reader.showAnnotationLayer()">Show Layer</button>
+                <button onclick="d2reader.hideAnnotationLayer()">Hide Layer</button>
+            </div>
+        </div>
 
-                console.log(result)
-                console.log(result.length)
-                var container = document.getElementById('container-annotations');
-                var tocString = ''
-                result.forEach(function (item, index) {
-                    if (index == 0) {
-                        console.log('first')
-                        console.log(index)
-                        tocString += '<ul><li onclick=\'d2reader.goTo(' + JSON.stringify(item) + ')\'>' + item.title + ' - ' + Math.round(item.locations.progression * 100) + '%</li>'
-                    } else if (index == result.length - 1) {
-                        console.log('last')
-                        console.log(index)
-                        tocString += '<li onclick=\'d2reader.goTo(' + JSON.stringify(item) + ')\'>' + item.title + ' - ' + Math.round(item.locations.progression * 100) + '%</li></ul>'
-                    } else {
-                        console.log('middle')
-                        console.log(index)
-                        tocString += '<li onclick=\'d2reader.goTo(' + JSON.stringify(item) + ')\'>' + item.title + ' - ' + Math.round(item.locations.progression * 100) + '%</li>'
-                    }
-                });
-                container.innerHTML = tocString
-            ">show annotations</button><br>
-            <button onclick="d2reader.activateMarker('bookmarkIcon', 'center')">activate marker</button><br>
-            <button onclick="d2reader.deactivateMarker()">deactivate marker</button><br>
+        <!-- Definitions -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h3>Definitions</h3>
+                <span class="material-icons chevron">expand_more</span>
+            </div>
+            <div class="section-body">
+                <button onclick="apiAddDefinition()">Add Definition</button>
+                <button onclick="d2reader.clearDefinitions()">Clear Definitions</button>
+            </div>
+        </div>
 
-            <button onclick="d2reader.showAnnotationLayer()">show layer</button><br>
-            <button onclick="d2reader.hideAnnotationLayer()">hide layer</button><br>
-        </ul>
-        <!--Definition-->
-        <ul> <div>Definition</div>
-            <button onclick="d2reader.addDefinition({
-                        order: 2,
-                        result: 2,
-                        terms: ['shelley'],
-            definition: 'Giant hyssop was rarely included, despite being hugely attractive to bees.',
-            })">add definition</button><br>
-            <button onclick="d2reader.clearDefinitions()">clear definitions</button><br>
-        </ul>
-        <!--Search-->
-        <ul> <div>Search</div>
-            <button onclick="d2reader.search('shelley', true).then(
-            result => {
-                console.log('search in chapter');
-                console.log(JSON.stringify(result))
-                var container = document.getElementById('searchresult');
-                var tocString = ''
-                result.forEach(function (item, index) {
-                        tocString += '<button onclick=\'d2reader.goToSearchIndex('+JSON.stringify(item.href)+', '+JSON.stringify(index)+', true)\'>go to index '+item.uuid+' in chapter '+index+'</button><br>'
-                });
-                container.innerHTML = tocString
+        <!-- Search -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h3>Search</h3>
+                <span class="material-icons chevron">expand_more</span>
+            </div>
+            <div class="section-body">
+                <button onclick="apiSearchInChapter()">Search in Chapter</button>
+                <button onclick="apiSearchInBook()">Search in Book</button>
+                <button onclick="d2reader.clearSearch()">Clear Search</button>
+            </div>
+        </div>
 
-            })">search in chapter</button><br>
-            <button onclick="d2reader.search('shelley', false).then(
-            result => {
-                console.log('search in book');
-                console.log(JSON.stringify(result))
-                var container = document.getElementById('searchresult');
-                var tocString = ''
-                result.forEach(function (item, index) {
-                        tocString += '<button onclick=\'d2reader.goToSearchID('+JSON.stringify(item.href)+', '+JSON.stringify(item.uuid)+', false)\'>go to uuid '+item.uuid+' in chapter '+item.href+'</button><br>'
-                });
-                container.innerHTML = tocString
+        <!-- Layers -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h3>Layers</h3>
+                <span class="material-icons chevron">expand_more</span>
+            </div>
+            <div class="section-body">
+                <label><input type="checkbox" onchange="this.checked ? d2reader.showLayer('highlights') : d2reader.hideLayer('highlights')"> Highlights</label>
+                <label><input type="checkbox" onchange="this.checked ? d2reader.showLayer('definitions') : d2reader.hideLayer('definitions')"> Definitions</label>
+                <label><input type="checkbox" onchange="this.checked ? d2reader.showLayer('pagebreak') : d2reader.hideLayer('pagebreak')"> Pagebreak</label>
+                <label><input type="checkbox" onchange="this.checked ? d2reader.showLayer('search') : d2reader.hideLayer('search')"> Search</label>
+                <label><input type="checkbox" onchange="this.checked ? d2reader.showLayer('readaloud') : d2reader.hideLayer('readaloud')"> Read Aloud</label>
+            </div>
+        </div>
 
-            })">search in book</button><br>
-            <div id="searchresult"/></div>
-            <button onclick="d2reader.clearSearch()">clear search</button><br>
-        </ul>
+        <!-- TTS -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h3>TTS</h3>
+                <span class="material-icons chevron">expand_more</span>
+            </div>
+            <div class="section-body">
+                <button onclick="d2reader.startReadAloud()">Start Read Aloud</button>
+                <button onclick="d2reader.stopReadAloud()">Stop Read Aloud</button>
+                <button onclick="d2reader.pauseReadAloud()">Pause Read Aloud</button>
+                <button onclick="d2reader.resumeReadAloud()">Resume Read Aloud</button>
+                <div class="sub-label">Pitch</div>
+                <div class="btn-row">
+                    <button onclick="d2reader.decrease('pitch')">-</button>
+                    <button onclick="d2reader.increase('pitch')">+</button>
+                </div>
+                <div class="sub-label">Rate</div>
+                <div class="btn-row">
+                    <button onclick="d2reader.decrease('rate')">-</button>
+                    <button onclick="d2reader.increase('rate')">+</button>
+                </div>
+                <div class="sub-label">Volume</div>
+                <div class="btn-row">
+                    <button onclick="d2reader.decrease('volume')">-</button>
+                    <button onclick="d2reader.increase('volume')">+</button>
+                </div>
+                <button onclick="d2reader.applyTTSSettings({color: 'red'})">Change TTS Color</button>
+                <button onclick="alert(d2reader.publicationLanguage)">Publication Language</button>
+                <button onclick="d2reader.applyTTSSettings({voice: {usePublication: true, name: 'Karen', lang: 'en-AU'}})">Voice: Karen AU</button>
+                <button onclick="d2reader.applyTTSSettings({pitch:1.2, rate:1.5, volume:0.6, color:'purple', voice:{usePublication:false}})">Apply Multiple TTS Settings</button>
+                <button onclick="d2reader.resetTTSSettings()">Reset TTS Settings</button>
+            </div>
+        </div>
 
-        <!--LAYERS-->
-        <ul> <div>LAYERS</div>
-            <input type="checkbox"
-                   onchange="this.checked ? d2reader.showLayer('highlights') : d2reader.hideLayer('highlights')"/> Highlights<br>
-            <input type="checkbox"
-                   onchange="this.checked ? d2reader.showLayer('definitions') : d2reader.hideLayer('definitions')"/> Definitions<br>
-            <input type="checkbox"
-                   onchange="this.checked ? d2reader.showLayer('pagebreak') : d2reader.hideLayer('pagebreak')"/> Pagebreak<br>
-            <input type="checkbox"
-                   onchange="this.checked ? d2reader.showLayer('search') : d2reader.hideLayer('search')"/> Search<br>
-            <input type="checkbox"
-                   onchange="this.checked ? d2reader.showLayer('readaloud') : d2reader.hideLayer('readaloud')"/> Readaloud<br>
-        </ul>
+        <!-- Media Overlays -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h3>Media Overlays</h3>
+                <span class="material-icons chevron">expand_more</span>
+            </div>
+            <div class="section-body">
+                <button onclick="d2reader.startReadAlong()">Start Read Along</button>
+                <button onclick="d2reader.stopReadAlong()">Stop Read Along</button>
+                <button onclick="d2reader.pauseReadAlong()">Pause Read Along</button>
+                <button onclick="d2reader.resumeReadAlong()">Resume Read Along</button>
+                <div class="sub-label">Rate</div>
+                <div class="btn-row">
+                    <button onclick="d2reader.decrease('mo_rate')">-</button>
+                    <button onclick="d2reader.increase('mo_rate')">+</button>
+                </div>
+                <div class="sub-label">Volume</div>
+                <div class="btn-row">
+                    <button onclick="d2reader.decrease('mo_volume')">-</button>
+                    <button onclick="d2reader.increase('mo_volume')">+</button>
+                </div>
+                <button onclick="d2reader.applyMediaOverlaySettings({autoTurn: true})">Auto Turn: Enable</button>
+                <button onclick="d2reader.applyMediaOverlaySettings({autoTurn: false})">Auto Turn: Disable</button>
+                <button onclick="d2reader.resetMediaOverlaySettings()">Reset Media Overlay Settings</button>
+            </div>
+        </div>
 
-            <!--TTS-->
-        <ul> <div>TTS</div>
-            <button onclick="d2reader.startReadAloud()">read aloud from top</button><br>
-            <button onclick="d2reader.stopReadAloud()">stop read aloud from top</button><br>
-            <button onclick="d2reader.pauseReadAloud()">pause read aloud from top</button><br>
-            <button onclick="d2reader.resumeReadAloud()">resume read aloud from top</button><br>
-            <button onclick="d2reader.decrease('pitch')">pitch decrease</button><br>
-            <button onclick="d2reader.increase('pitch')">pitch increase</button><br>
-            <button onclick="d2reader.decrease('rate')">rate decrease</button><br>
-            <button onclick="d2reader.increase('rate')">rate increase</button><br>
-            <button onclick="d2reader.decrease('volume')">volume decrease</button><br>
-            <button onclick="d2reader.increase('volume')">volume increase</button><br>
-            <button onclick="d2reader.applyTTSSettings({color: 'red'})">change tts color</button><br>
-            <button onclick="alert(d2reader.publicationLanguage)">publicationLanguage</button><br>
-            <button
-                    onclick="d2reader.applyTTSSettings({voice: {usePublication: true,  name : 'Karen', lang : 'en-AU' }})">change
-                voice to Karen AU</button><br>
-            <button
-                    onclick="d2reader.applyTTSSettings({ pitch:1.2, rate: 1.5, volume: 0.6, color: 'purple', voice: {usePublication: false}})">apply
-                multiple tts settings</button><br>
-            <button onclick="d2reader.resetTTSSettings()">reset TTS setting</button><br>
-        </ul>
+        <!-- Line Focus -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h3>Line Focus</h3>
+                <span class="material-icons chevron">expand_more</span>
+            </div>
+            <div class="section-body">
+                <button onclick="d2reader.applyLineFocusSettings({debug:true})">Debug</button>
+                <button onclick="d2reader.lineFocus(true)">Enable Line Focus</button>
+                <button onclick="d2reader.lineFocus(false)">Disable Line Focus</button>
+                <button onclick="d2reader.lineUp()">Line Up</button>
+                <button onclick="d2reader.lineDown()">Line Down</button>
+                <div class="sub-label">Lines</div>
+                <div class="btn-row">
+                    <button onclick="d2reader.applyLineFocusSettings({lines:'1'})"><span class="material-icons" style="font-size:16px">looks_one</span></button>
+                    <button onclick="d2reader.applyLineFocusSettings({lines:'3'})"><span class="material-icons" style="font-size:16px">looks_3</span></button>
+                    <button onclick="d2reader.applyLineFocusSettings({lines:'5'})"><span class="material-icons" style="font-size:16px">looks_5</span></button>
+                </div>
+            </div>
+        </div>
 
-        <!--Media Overlays-->
-        <ul> <div>Media Overlays</div>
-            <button onclick="d2reader.startReadAlong()">start read along</button><br>
-            <button onclick="d2reader.stopReadAlong()">stop read along</button><br>
-            <button onclick="d2reader.pauseReadAlong()">pause read along</button><br>
-            <button onclick="d2reader.resumeReadAlong()">resume read along</button><br>
-            <button onclick="d2reader.decrease('mo_rate')">rate decrease</button><br>
-            <button onclick="d2reader.increase('mo_rate')">rate increase</button><br>
-            <button onclick="d2reader.decrease('mo_volume')">volume decrease</button><br>
-            <button onclick="d2reader.increase('mo_volume')">volume increase</button><br>
+        <!-- User Settings -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h3>User Settings</h3>
+                <span class="material-icons chevron">expand_more</span>
+            </div>
+            <div class="section-body">
+                <button onclick="d2reader.resetUserSettings()">Reset User Settings</button>
+                <button onclick="alert(JSON.stringify(d2reader.currentSettings))">Current Settings</button>
+                <button onclick="d2reader.applyUserSettings({appearance:'day', verticalScroll:false, fontSize:100, fontFamily:'opendyslexic', letterSpacing:0.25, textAlignment:'justify'})">Apply Multiple Settings</button>
 
-            <button onclick="d2reader.applyMediaOverlaySettings({ autoTurn: true })">auto turn page enabled</button><br>
-            <button onclick="d2reader.applyMediaOverlaySettings({ autoTurn: false })">auto turn page disable</button><br>
+                <div class="sub-label">Word Spacing</div>
+                <div class="btn-row">
+                    <button onclick="d2reader.decrease('wordSpacing')">-</button>
+                    <button onclick="d2reader.increase('wordSpacing')">+</button>
+                </div>
+                <div class="sub-label">Letter Spacing</div>
+                <div class="btn-row">
+                    <button onclick="d2reader.decrease('letterSpacing')">-</button>
+                    <button onclick="d2reader.increase('letterSpacing')">+</button>
+                </div>
+                <div class="sub-label">Line Height</div>
+                <div class="btn-row">
+                    <button onclick="d2reader.decrease('lineHeight')">-</button>
+                    <button onclick="d2reader.increase('lineHeight')">+</button>
+                </div>
+                <div class="sub-label">Font Size</div>
+                <div class="btn-row">
+                    <button onclick="d2reader.decrease('fontSize')">-</button>
+                    <button onclick="d2reader.increase('fontSize')">+</button>
+                </div>
 
-            <button onclick="d2reader.resetMediaOverlaySettings()">reset Media Overlay setting</button><br>
-        </ul>
+                <div class="sub-label">Appearance</div>
+                <div class="btn-row">
+                    <button onclick="d2reader.applyUserSettings({appearance:'day'})">Day</button>
+                    <button onclick="d2reader.applyUserSettings({appearance:'sepia'})">Sepia</button>
+                    <button onclick="d2reader.applyUserSettings({appearance:'night'})">Night</button>
+                </div>
 
-        <!--Line Focus-->
-        <ul> <div>Line Focus</div>
-            <button onclick="d2reader.applyLineFocusSettings( {debug:true} )">debug</button><br>
-            <button onclick="d2reader.lineFocus( true )">enable line focus</button><br>
-            <button onclick="d2reader.lineFocus( false )">disable line focus</button><br>
-            <button onclick="d2reader.lineUp()">line up</button><br>
-            <button onclick="d2reader.lineDown()">line down</button><br>
-            <button onclick="d2reader.applyLineFocusSettings({lines:'1'});"><span
-              class="material-icons">looks_one</span></button>
-            <button onclick="d2reader.applyLineFocusSettings({lines:'3'});"><span
-              class="material-icons">looks_3</span></button>
-            <button onclick="d2reader.applyLineFocusSettings({lines:'5'});"><span
-              class="material-icons">looks_5</span></button><br>
-        </ul>
+                <div class="sub-label">Font Size Presets</div>
+                <div class="btn-row">
+                    <button onclick="d2reader.applyUserSettings({fontSize:100})">100</button>
+                    <button onclick="d2reader.applyUserSettings({fontSize:150})">150</button>
+                    <button onclick="d2reader.applyUserSettings({fontSize:200})">200</button>
+                </div>
 
-        <!--User Settings-->
-        <ul> <div>User settings</div>
-            <button onclick="d2reader.resetUserSettings()">reset user setting</button><br>
-            <button onclick="alert(JSON.stringify(d2reader.currentSettings))">current usersettings</button><br>
-            <button
-                    onclick="d2reader.applyUserSettings({appearance:'day', verticalScroll:false, fontSize:100, fontFamily:'opendyslexic', letterSpacing:0.25, textAlignment:'justify'})">apply
-                multiple settings</button><br>
-            <button onclick="d2reader.increase('wordSpacing')">word spacing increase</button><br>
-            <button onclick="d2reader.decrease('wordSpacing')">word spacing decrease</button><br>
-            <button onclick="d2reader.increase('letterSpacing')">letter spacing increase</button><br>
-            <button onclick="d2reader.decrease('letterSpacing')">letter spacing decrease</button><br>
-            <button onclick="d2reader.increase('lineHeight')">line height increase</button><br>
-            <button onclick="d2reader.decrease('lineHeight')">line height decrease</button><br>
-            <button onclick="d2reader.increase('fontSize')">font increase</button><br>
-            <button onclick="d2reader.decrease('fontSize')">font decrease</button><br>
-            <button onclick="d2reader.applyUserSettings({appearance:'day'})">day</button><br>
-            <button onclick="d2reader.applyUserSettings({appearance:'sepia'})">sepia</button><br>
-            <button onclick="d2reader.applyUserSettings({appearance:'night'})">night</button><br>
-            <button onclick="d2reader.applyUserSettings({fontSize:100})">font size 100</button><br>
-            <button onclick="d2reader.applyUserSettings({fontSize:150})">font size 150</button><br>
-            <button onclick="d2reader.applyUserSettings({fontSize:200})">font size 200</button><br>
-            <button onclick="d2reader.applyUserSettings({fontFamily:'Courier'})">font family Courier</button><br>
-            <button onclick="d2reader.applyUserSettings({fontFamily:'serif'})">font family serif</button><br>
-            <button onclick="d2reader.applyUserSettings({fontFamily:'opendyslexic'})">font family opendyslexic</button><br>
-            <button onclick="d2reader.applyUserSettings({wordSpacing:0.25})">word spacing 0.25</button><br>
-            <button onclick="d2reader.applyUserSettings({letterSpacing:0.25})">letter spacing 0.25</button><br>
-            <button onclick="d2reader.applyUserSettings({columnCount:'1'})">column 1</button><br>
-            <button onclick="d2reader.applyUserSettings({columnCount:'2'})">column 2</button><br>
-            <button onclick="d2reader.applyUserSettings({columnCount:'auto'})">column auto</button><br>
-            <button onclick="d2reader.applyUserSettings({textAlignment:'auto'})">align auto</button><br>
-            <button onclick="d2reader.applyUserSettings({textAlignment:'justify'})">align justify</button><br>
-            <button onclick="d2reader.applyUserSettings({textAlignment:'start'})">align start</button><br>
-            <button onclick="d2reader.scroll(true)">vertical scroll</button><br>
-            <button onclick="d2reader.scroll(false)">horizontal scroll (paginated)</button><br>
-        </ul>
+                <div class="sub-label">Font Family</div>
+                <button onclick="d2reader.applyUserSettings({fontFamily:'Courier'})">Courier</button>
+                <button onclick="d2reader.applyUserSettings({fontFamily:'serif'})">Serif</button>
+                <button onclick="d2reader.applyUserSettings({fontFamily:'opendyslexic'})">OpenDyslexic</button>
 
-        <!--other-->
-        <ul> <div>other</div>
-            <button onClick="d2reader.applyAttributes({margin:200})">applyAtributes (margin 200 for example)</button><br>
-            <button onclick="d2reader.snapToSelector('body > section > div:nth-child(17) > p')">snapToElement</button><br>
-        </ul>
-    </div>
+                <div class="sub-label">Spacing Presets</div>
+                <button onclick="d2reader.applyUserSettings({wordSpacing:0.25})">Word Spacing 0.25</button>
+                <button onclick="d2reader.applyUserSettings({letterSpacing:0.25})">Letter Spacing 0.25</button>
 
+                <div class="sub-label">Columns</div>
+                <div class="btn-row">
+                    <button onclick="d2reader.applyUserSettings({columnCount:'1'})">1</button>
+                    <button onclick="d2reader.applyUserSettings({columnCount:'2'})">2</button>
+                    <button onclick="d2reader.applyUserSettings({columnCount:'auto'})">Auto</button>
+                </div>
+
+                <div class="sub-label">Text Alignment</div>
+                <div class="btn-row">
+                    <button onclick="d2reader.applyUserSettings({textAlignment:'auto'})">Auto</button>
+                    <button onclick="d2reader.applyUserSettings({textAlignment:'justify'})">Justify</button>
+                    <button onclick="d2reader.applyUserSettings({textAlignment:'start'})">Start</button>
+                </div>
+
+                <div class="sub-label">Scroll</div>
+                <div class="btn-row">
+                    <button onclick="d2reader.scroll(true)">Vertical</button>
+                    <button onclick="d2reader.scroll(false)">Paginated</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- History -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h3>History</h3>
+                <span class="material-icons chevron">expand_more</span>
+            </div>
+            <div class="section-body">
+                <button onclick="alert(d2reader.historyCurrentIndex)">Current History Index</button>
+                <button onclick="apiShowHistory()">Show History</button>
+                <button onclick="d2reader.historyBack()">History Back</button>
+                <button onclick="d2reader.historyForward()">History Forward</button>
+            </div>
+        </div>
+
+        <!-- Other -->
+        <div class="section">
+            <div class="section-header" onclick="toggleSection(this)">
+                <h3>Other</h3>
+                <span class="material-icons chevron">expand_more</span>
+            </div>
+            <div class="section-body">
+                <button onclick="d2reader.applyAttributes({margin:200})">Apply Attributes (margin 200)</button>
+                <button onclick="d2reader.snapToSelector('body > section > div:nth-child(17) > p')">Snap to Element</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Right Panel -->
+    <aside id="right-panel">
+        <div class="result-section">
+            <h3>Table of Contents</h3>
+            <div id="container-toc"></div>
+        </div>
+        <div class="result-section">
+            <h3>Bookmarks</h3>
+            <div id="container-bookmarks"></div>
+        </div>
+        <div class="result-section">
+            <h3>Annotations</h3>
+            <div id="container-annotations"></div>
+        </div>
+        <div class="result-section">
+            <h3>History</h3>
+            <div id="container-history"></div>
+        </div>
+        <div class="result-section">
+            <h3>Search Results</h3>
+            <div id="searchresult"></div>
+        </div>
+    </aside>
+
+    <!-- Reader -->
     <div class="content" id="root">
-        <div id="D2Reader-Container" style="border: solid 5px rebeccapurple;margin-left: 300px;margin-right: 50px">
+        <div id="D2Reader-Container">
             <div id="lineFocusContainer" class="d2-line-focus-container" style="display: none">
-                <div id="lineFocusTopBlinder" class="d2-line-focus-top" ></div>
+                <div id="lineFocusTopBlinder" class="d2-line-focus-top"></div>
                 <div id="lineFocusBottomBlinder" class="d2-line-focus-bottom"></div>
             </div>
-            <main style="height: calc(100vh - 10px)" tabindex=-1 id="iframe-wrapper">
+            <main style="height: calc(100vh - 6px)" tabindex="-1" id="iframe-wrapper">
                 <div id="reader-loading" class="loading"></div>
                 <div id="reader-error" class="error"></div>
                 <div style="height: 0px">
-                <span id="highlight-toolbox" class="highlight-toolbox">
-                    <div id="highlight-toolbox-mode-add">
-                        <button style="background-color: gainsboro;" id="highlightIcon"><span
-                          style="background: yellow;display: inline-block;width: 24px;height: 24px;">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
-                                     preserveAspectRatio="xMidYMid meet" role="img" class="icon open"
-                                     aria-labelledby="text-icon">
-                                    <title id="text-icon">Text</title>
-                                    <path d="M5 4v3h5.5v12h3V7H19V4z"></path>
-                                </svg>
-                            </span></button>
-                        <button style="background-color: gainsboro;" id="underlineIcon"><span
-                          style="display: inline-block;width: 24px;height: 24px;border-bottom: yellow solid 4px;">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
-                                     preserveAspectRatio="xMidYMid meet" role="img" class="icon open"
-                                     aria-labelledby="text-icon">
-                                    <title id="text-icon">Text</title>
-                                    <path d="M5 4v3h5.5v12h3V7H19V4z"></path>
-                                </svg>
-                            </span></button>
-                        <button style="background-color: gainsboro;" id="speakIcon"><span
-                          style="display: inline-block;width: 24px;height: 24px;">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
-                                     preserveAspectRatio="xMidYMid meet" role="img" class="icon open"
-                                     aria-labelledby="speak-icon">
-                                    <title id="speak-icon">Speak</title>
-                                    <circle cx="9" cy="9" r="4"></circle>
-                                    <path
-                                      d="M9 15c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4zm7.76-9.64l-1.68 1.69c.84 1.18.84 2.71 0 3.89l1.68 1.69c2.02-2.02 2.02-5.07 0-7.27zM20.07 2l-1.63 1.63c2.77 3.02 2.77 7.56 0 10.74L20.07 16c3.9-3.89 3.91-9.95 0-14z">
-                                    </path>
-                                    <path d="M0 0h24v24H0z" fill="none"></path>
-                                </svg>
-                            </span></button>
-                        <button style="background-color: gainsboro;" id="anIcon"><span
-                          style="display: inline-block;width: 24px;height: 24px;">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="black" width="24"
-                                     height="24">
-                                    <path d="M0 0h24v24H0z" fill="none" />
-                                    <path
-                                      d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z" />
-                                </svg>
-                            </span></button>
-                    </div>
-                    <div id="highlight-toolbox-mode-edit">
-                        <button style="background-color: gainsboro;display: none" id="deleteIcon"><i class="material-icons" style="color:gray">delete</i></button>
-                    </div>
-                </span>
+                    <span id="highlight-toolbox" class="highlight-toolbox">
+                        <div id="highlight-toolbox-mode-add">
+                            <button style="background-color: gainsboro;" id="highlightIcon"><span
+                              style="background: yellow;display: inline-block;width: 24px;height: 24px;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                                         preserveAspectRatio="xMidYMid meet" role="img" class="icon open"
+                                         aria-labelledby="text-icon">
+                                        <title id="text-icon">Text</title>
+                                        <path d="M5 4v3h5.5v12h3V7H19V4z"></path>
+                                    </svg>
+                                </span></button>
+                            <button style="background-color: gainsboro;" id="underlineIcon"><span
+                              style="display: inline-block;width: 24px;height: 24px;border-bottom: yellow solid 4px;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                                         preserveAspectRatio="xMidYMid meet" role="img" class="icon open"
+                                         aria-labelledby="text-icon">
+                                        <title>Text</title>
+                                        <path d="M5 4v3h5.5v12h3V7H19V4z"></path>
+                                    </svg>
+                                </span></button>
+                            <button style="background-color: gainsboro;" id="speakIcon"><span
+                              style="display: inline-block;width: 24px;height: 24px;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24"
+                                         preserveAspectRatio="xMidYMid meet" role="img" class="icon open"
+                                         aria-labelledby="speak-icon">
+                                        <title id="speak-icon">Speak</title>
+                                        <circle cx="9" cy="9" r="4"></circle>
+                                        <path d="M9 15c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4zm7.76-9.64l-1.68 1.69c.84 1.18.84 2.71 0 3.89l1.68 1.69c2.02-2.02 2.02-5.07 0-7.27zM20.07 2l-1.63 1.63c2.77 3.02 2.77 7.56 0 10.74L20.07 16c3.9-3.89 3.91-9.95 0-14z"></path>
+                                        <path d="M0 0h24v24H0z" fill="none"></path>
+                                    </svg>
+                                </span></button>
+                            <button style="background-color: gainsboro;" id="anIcon"><span
+                              style="display: inline-block;width: 24px;height: 24px;">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="black" width="24" height="24">
+                                        <path d="M0 0h24v24H0z" fill="none" />
+                                        <path d="M11 18h2v-2h-2v2zm1-16C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm0-14c-2.21 0-4 1.79-4 4h2c0-1.1.9-2 2-2s2 .9 2 2c0 2-3 1.75-3 5h2c0-2.25 3-2.5 3-5 0-2.21-1.79-4-4-4z" />
+                                    </svg>
+                                </span></button>
+                        </div>
+                        <div id="highlight-toolbox-mode-edit">
+                            <button style="background-color: gainsboro;display: none" id="deleteIcon"><i class="material-icons" style="color:gray">delete</i></button>
+                        </div>
+                    </span>
                 </div>
             </main>
             <div id="container-view-security" class="security"></div>
             <div id="container-view-timeline" class="timeline" style="left: unset; right: 1.25rem;"></div>
         </div>
     </div>
+
     <script>
-        let getURLQueryParams = function () {
-            let params = {};
-            let query = window.location.search;
+        // --- Sidebar collapse/expand ---
+        function toggleSection(header) {
+            header.classList.toggle('collapsed');
+            var body = header.nextElementSibling;
+            body.classList.toggle('hidden');
+        }
+
+        // --- Render list helper ---
+        function renderList(containerId, items, labelFn) {
+            var container = document.getElementById(containerId);
+            if (!items || !items.length) {
+                container.innerHTML = '<p style="font-size:12px;color:#999;padding:4px">No items.</p>';
+                return;
+            }
+            var html = '<ul>';
+            items.forEach(function (item) {
+                html += '<li onclick=\'d2reader.goTo(' + JSON.stringify(item) + ')\'>' + labelFn(item) + '</li>';
+            });
+            html += '</ul>';
+            container.innerHTML = html;
+        }
+
+        // --- Navigate ---
+        function apiShowTOC() {
+            var result = d2reader.tableOfContents;
+            console.log(result);
+            renderList('container-toc', result, function (item) { return item.title; });
+        }
+
+        function apiShowReadingOrder() {
+            var result = d2reader.readingOrder;
+            console.log(result);
+            renderList('container-toc', result, function (item) { return item.href; });
+        }
+
+        // --- Bookmarks ---
+        function apiAddBookmark() {
+            d2reader.saveBookmark().then(function (result) {
+                console.log(result);
+                console.log(d2reader.bookmarks.length);
+            });
+        }
+
+        function apiAddBookmarkPlus() {
+            d2reader.saveBookmarkPlus().then(function (result) {
+                console.log(result);
+                console.log(d2reader.bookmarks.length);
+            });
+        }
+
+        function apiShowBookmarks() {
+            var result = d2reader.bookmarks;
+            console.log(result);
+            renderList('container-bookmarks', result, function (item) {
+                return item.title + ' - ' + Math.round(item.locations.progression * 100) + '%';
+            });
+        }
+
+        // --- Annotations ---
+        function apiShowAnnotations() {
+            var result = d2reader.annotations;
+            console.log(result);
+            renderList('container-annotations', result, function (item) {
+                return item.title + ' - ' + Math.round(item.locations.progression * 100) + '%';
+            });
+        }
+
+        // --- History ---
+        function apiShowHistory() {
+            var result = d2reader.history;
+            console.log(result);
+            renderList('container-history', result, function (item) {
+                return item.title + ' - ' + Math.round(item.locations.progression * 100) + '%';
+            });
+        }
+
+        // --- Definitions ---
+        function apiAddDefinition() {
+            d2reader.addDefinition({
+                order: 2,
+                result: 2,
+                terms: ['shelley'],
+                definition: 'Giant hyssop was rarely included, despite being hugely attractive to bees.',
+            });
+        }
+
+        // --- Search ---
+        function apiSearchInChapter() {
+            d2reader.search('shelley', true).then(function (result) {
+                console.log('search in chapter');
+                console.log(JSON.stringify(result));
+                var container = document.getElementById('searchresult');
+                var html = '';
+                result.forEach(function (item, index) {
+                    html += '<button onclick=\'d2reader.goToSearchIndex(' + JSON.stringify(item.href) + ', ' + JSON.stringify(index) + ', true)\'>go to index ' + item.uuid + ' in chapter ' + index + '</button>';
+                });
+                container.innerHTML = html;
+            });
+        }
+
+        function apiSearchInBook() {
+            d2reader.search('shelley', false).then(function (result) {
+                console.log('search in book');
+                console.log(JSON.stringify(result));
+                var container = document.getElementById('searchresult');
+                var html = '';
+                result.forEach(function (item) {
+                    html += '<button onclick=\'d2reader.goToSearchID(' + JSON.stringify(item.href) + ', ' + JSON.stringify(item.uuid) + ', false)\'>go to uuid ' + item.uuid + ' in chapter ' + item.href + '</button>';
+                });
+                container.innerHTML = html;
+            });
+        }
+
+        // --- Query params ---
+        function getURLQueryParams() {
+            var params = {};
+            var query = window.location.search;
             if (query && query.length) {
                 query = query.substring(1);
-                let keyParams = query.split('&');
-                for (let x = 0; x < keyParams.length; x++) {
-                    let keyVal = keyParams[x].split('=');
+                var keyParams = query.split('&');
+                for (var x = 0; x < keyParams.length; x++) {
+                    var keyVal = keyParams[x].split('=');
                     if (keyVal.length > 1) {
                         params[keyVal[0]] = decodeURIComponent(keyVal[1]);
                     }
                 }
             }
             return params;
-        };
-        let injectables = [
+        }
+
+        // --- Injectables ---
+        var injectables = [
             { type: 'style', url: '/viewer/readium-css/ReadiumCSS-before.css', r2before: true },
             { type: 'style', url: '/viewer/readium-css/ReadiumCSS-default.css', r2default: true },
             { type: 'style', url: '/viewer/readium-css/ReadiumCSS-after.css', r2after: true },
@@ -456,8 +654,10 @@
             { type: 'script', url: '/viewer/injectables/click/click.js' },
             { type: 'style', url: '/viewer/injectables/style/popup.css' },
             { type: 'style', url: '/viewer/injectables/style/style.css' },
-        ]
-        let selectionMenuItems = [
+        ];
+
+        // --- Selection menu items ---
+        var selectionMenuItems = [
             {
                 id: 'anIcon',
                 callback: function (selection, element) {
@@ -466,35 +666,36 @@
                 }
             },
             {
-                id: `bookmarkIcon`,
+                id: 'bookmarkIcon',
                 marker: 2,
                 icon: {
-                    title: `Bookmark`,
-                    svgPath: `<path d="M0 0h24v24H0V0z" fill="none"/><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/>`,
-                    color: `#000000`,
-                    position: "left",
+                    title: 'Bookmark',
+                    svgPath: '<path d="M0 0h24v24H0V0z" fill="none"/><path d="M17 3H7c-1.1 0-2 .9-2 2v16l7-3 7 3V5c0-1.1-.9-2-2-2z"/>',
+                    color: '#000000',
+                    position: 'left',
                 },
                 highlight: {
-                    color: `#000000`,
+                    color: '#000000',
                     style: {
                         default: [{
-                            property: `border-bottom`,
-                            value: `1px dashed #000000`,
-                            priority: `important`
+                            property: 'border-bottom',
+                            value: '1px dashed #000000',
+                            priority: 'important'
                         }],
                     },
                 }
             },
-        ]
+        ];
 
-        let urlParams = getURLQueryParams();
+        // --- Load reader ---
+        var urlParams = getURLQueryParams();
+        var d2reader = undefined;
 
-        let d2reader = undefined;
         D2Reader.load({
             url: new URL(urlParams['url']),
-            attributes: { // TODO: review these attributes and eventually needs better naming.
-                margin: 15, // subtract this from the iframe height , when setting the iframe minimum height
-                iframePaddingTop: 10, // top padding inside iframe
+            attributes: {
+                margin: 15,
+                iframePaddingTop: 10,
             },
             rights: {
                 enableBookmarks: true,
@@ -504,8 +705,8 @@
                 enableTimeline: true,
                 enableMediaOverlays: true,
                 enableDefinitions: true,
-                enablePageBreaks:true,
-                enableLineFocus:true,
+                enablePageBreaks: true,
+                enableLineFocus: true,
                 enableHistory: true,
                 enableContentProtection: true,
                 autoGeneratePositions: true
@@ -514,42 +715,40 @@
                 enableSplitter: false,
                 api: {
                     started: function () {
-                        console.log("started")
+                        console.log("started");
                         return new Promise(function (resolve, reject) {
-                            resolve
-                        })
+                            resolve();
+                        });
                     },
                     stopped: function () {
-                        console.log("stopped")
+                        console.log("stopped");
                         return new Promise(function (resolve, reject) {
-                            resolve()
-                        })
+                            resolve();
+                        });
                     },
                     paused: function () {
-                        console.log("paused")
+                        console.log("paused");
                         return new Promise(function (resolve, reject) {
-                            resolve()
-                        })
+                            resolve();
+                        });
                     },
                     resumed: function () {
-                        console.log("resumed")
+                        console.log("resumed");
                         return new Promise(function (resolve, reject) {
-                            resolve()
-                        })
+                            resolve();
+                        });
                     },
                     finished: function () {
-                        console.log("finished")
+                        console.log("finished");
                         return new Promise(function (resolve, reject) {
-                            resolve()
-                        })
+                            resolve();
+                        });
                     },
                     updateSettings: function (settings) {
-                        console.log("updateSettings")
+                        console.log("updateSettings");
                         return new Promise(function (resolve, reject) {
-                            resolve(
-                                settings
-                            )
-                        })
+                            resolve(settings);
+                        });
                     }
                 }
             },
@@ -563,48 +762,37 @@
             annotations: {
                 initialAnnotationColor: "var(--RS__highlightColor)",
             },
-            // sample: {
-            //     isSampleRead: true,
-            //     limit: 10, // in percent e.g. 5%
-            //     minimum: 5, // in pages
-            //     popup: "You can borrow the book to continue reading."
-            // },
             protection: {
                 enforceSupportedBrowsers: true,
-                enableEncryption: true, // does nothing right now
+                enableEncryption: true,
                 enableObfuscation: true,
-                disablePrint:true,
-                disableCopy:true,
+                disablePrint: true,
+                disableCopy: true,
                 detectInspect: true,
-                clearOnInspect: false, // make sure detectInspect is true, otherwise this won't work
+                clearOnInspect: false,
                 disableKeys: true,
                 disableContextMenu: true,
                 hideTargetUrl: true,
                 disableDrag: false,
                 api: {
-                    // make sure detectInspect is true, otherwise this won't be called
-                    // this callback will be executed in a loop while inspect is visible
                     inspectDetected: function () {
-                        console.log("inspect detected")
+                        console.log("inspect detected");
                     },
                 }
             },
-            api: {
-            },
+            api: {},
             injectables: injectables,
             injectablesFixed: [],
-            useLocalStorage: true // true = uses local storage, false = uses session storage (default)
-        }).then(instance => {
+            useLocalStorage: true
+        }).then(function (instance) {
             d2reader = instance;
             console.log("D2Reader loaded ", instance);
-            instance.addEventListener("resource.ready", () => {
+            instance.addEventListener("resource.ready", function () {
                 console.log("listener ready");
             });
-
-        }).catch(error => {
+        }).catch(function (error) {
             console.error("error.message ", error.message);
         });
-
     </script>
     <noscript>
         <style>
@@ -615,7 +803,6 @@
                 align-items: center;
                 justify-content: center;
             }
-
             .warning {
                 font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
                 font-size: 1.5rem;
