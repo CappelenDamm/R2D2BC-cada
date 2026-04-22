@@ -2293,66 +2293,6 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     }
   }
 
-  startBufferedReadAlong(startTime?: number) {
-    if (
-      this.rights.enableMediaOverlays &&
-      this.mediaOverlayModule !== undefined &&
-      this.hasMediaOverlays
-    ) {
-      this.mediaOverlayModule?.startBufferedReadAloud(startTime);
-    }
-  }
-
-  stopBufferedReadAlong() {
-    if (
-      this.rights.enableMediaOverlays &&
-      this.mediaOverlayModule !== undefined &&
-      this.hasMediaOverlays
-    ) {
-      this.mediaOverlayModule?.stopBufferedReadAloud();
-    }
-  }
-
-  nextBufferedReadAlong() {
-    if (
-      this.rights.enableMediaOverlays &&
-      this.mediaOverlayModule !== undefined &&
-      this.hasMediaOverlays
-    ) {
-      this.mediaOverlayModule?.skipToNextBufferedReadAloud();
-    }
-  }
-
-  previousBufferedReadAlong() {
-    if (
-      this.rights.enableMediaOverlays &&
-      this.mediaOverlayModule !== undefined &&
-      this.hasMediaOverlays
-    ) {
-      this.mediaOverlayModule?.skipToPreviousBufferedReadAloud();
-    }
-  }
-
-  // Buffered read-along helpers
-  seekBufferedBy(deltaSeconds: number) {
-    if (
-      this.rights.enableMediaOverlays &&
-      this.mediaOverlayModule !== undefined &&
-      this.hasMediaOverlays
-    ) {
-      this.mediaOverlayModule?.seekBufferedBy(deltaSeconds);
-    }
-  }
-  getBufferedState(): { position: number; src: string } | undefined {
-    if (
-      this.rights.enableMediaOverlays &&
-      this.mediaOverlayModule !== undefined &&
-      this.hasMediaOverlays
-    ) {
-      return this.mediaOverlayModule?.getBufferedState();
-    }
-    return undefined;
-  }
   totalResources(): number {
     return this.publication.readingOrder.length;
   }

@@ -64,7 +64,9 @@ import { ConsumptionModule } from "./modules/consumption/ConsumptionModule";
  * Dynamically import PDFNavigator to avoid loading pdfjs-dist in SSR/Node.
  * pdfjs-dist references browser-only APIs (DOMMatrix, canvas) at import time.
  */
-let _PDFNavigatorClass: (typeof import("./navigator/PDFNavigator"))["PDFNavigator"] | undefined;
+let _PDFNavigatorClass:
+  | (typeof import("./navigator/PDFNavigator"))["PDFNavigator"]
+  | undefined;
 async function loadPDFNavigator() {
   if (!_PDFNavigatorClass) {
     const mod = await import("./navigator/PDFNavigator");
@@ -518,43 +520,6 @@ export default class D2Reader {
     if (this.navigator instanceof IFrameNavigator) {
       this.navigator.resumeReadAlong();
     }
-  };
-
-  startBufferedReadAlong = (startTime?: number) => {
-    if (this.navigator instanceof IFrameNavigator) {
-      this.navigator.startBufferedReadAlong(startTime);
-    }
-  };
-
-  stopBufferedReadAlong = () => {
-    if (this.navigator instanceof IFrameNavigator) {
-      this.navigator.stopBufferedReadAlong();
-    }
-  };
-
-  nextBufferedReadAlong = () => {
-    if (this.navigator instanceof IFrameNavigator) {
-      this.navigator.nextBufferedReadAlong();
-    }
-  };
-
-  previousBufferedReadAlong = () => {
-    if (this.navigator instanceof IFrameNavigator) {
-      this.navigator.previousBufferedReadAlong();
-    }
-  };
-
-  // Buffered helpers
-  seekBufferedBy = (deltaSeconds: number) => {
-    if (this.navigator instanceof IFrameNavigator) {
-      this.navigator.seekBufferedBy(deltaSeconds);
-    }
-  };
-  getBufferedState = () => {
-    if (this.navigator instanceof IFrameNavigator) {
-      return this.navigator.getBufferedState();
-    }
-    return undefined;
   };
 
   get hasMediaOverlays() {

@@ -140,11 +140,9 @@ export class MediaOverlayModule implements ReaderModule {
   }
 
   async initializeResource(links: Array<Link | undefined>) {
-    if (!this.bufferedMode) {
-      this.currentLinks = links;
-      this.currentLinkIndex = 0;
-      await this.playLink();
-    }
+    this.currentLinks = links;
+    this.currentLinkIndex = 0;
+    await this.playLink();
   }
 
   private async playLink() {
