@@ -73,9 +73,10 @@ export const DEFAULT_BACKGROUND_COLOR = {
   red: 230,
 };
 export interface TextSelectorAPI {
-  selectionMenuOpen: any;
-  selectionMenuClose: any;
+  selectionMenuOpen?: any;
+  selectionMenuClose?: any;
   selection: any;
+  selectionCollapsed?: () => void;
 }
 
 export const _highlights: IHighlight[] = [];
@@ -954,6 +955,14 @@ export class TextHighlighter {
 
   showTool = debounce(
     (b: boolean) => {
+      if (
+        this.dom(this.navigator.iframes[0].contentDocument?.body).getSelection()
+          ?.isCollapsed
+      ) {
+        this.selectionCollapsed();
+        return;
+      }
+
       if (!this.isAndroid()) {
         this.snapSelectionToWord(b);
       }
@@ -1125,6 +1134,14 @@ export class TextHighlighter {
   selection = debounce((text, selection) => {
     if (this.api?.selection) this.api?.selection(text, selection);
   }, 100);
+
+  selectionCollapsed = debounce(
+    () => {
+      if (this.api?.selectionCollapsed) this.api?.selectionCollapsed();
+    },
+    100,
+    { immediate: true }
+  );
 
   toolboxPlacement() {
     let range = this.dom(
