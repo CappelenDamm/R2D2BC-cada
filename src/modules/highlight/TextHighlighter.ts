@@ -73,9 +73,10 @@ export const DEFAULT_BACKGROUND_COLOR = {
   red: 230,
 };
 export interface TextSelectorAPI {
-  selectionMenuOpen: any;
-  selectionMenuClose: any;
+  selectionMenuOpen?: any;
+  selectionMenuClose?: any;
   selection: any;
+  selectionCollapsed?: () => void;
 }
 
 export const _highlights: IHighlight[] = [];
@@ -644,19 +645,15 @@ export class TextHighlighter {
     el.addEventListener("mouseup", this.toolboxShowDelayed.bind(this));
     el.addEventListener("touchend", this.toolboxShowDelayed.bind(this));
     doc.addEventListener("mouseup", this.toolboxShowDelayed.bind(this));
-    doc.addEventListener("touchend", this.toolboxShowDelayed.bind(this));
+    doc.addEventListener("touchend", this.hideIOSCalloutMenu);
     // doc.addEventListener("selectstart", this.toolboxShowDelayed.bind(this));
 
     if (!hasEventListener) {
       window.addEventListener("resize", this.toolboxPlacement.bind(this));
     }
     doc.addEventListener("selectionchange", this.toolboxPlacement.bind(this));
-    if (!this.isIOS()) {
-      doc.addEventListener(
-        "selectionchange",
-        this.toolboxShowDelayed.bind(this)
-      );
-    }
+
+    doc.addEventListener("selectionchange", this.toolboxShowDelayed.bind(this));
 
     el.addEventListener("mousedown", this.toolboxHide.bind(this));
     el.addEventListener("touchstart", this.toolboxHide.bind(this));
@@ -705,6 +702,8 @@ export class TextHighlighter {
     el.removeEventListener("touchend", this.toolboxShowDelayed.bind(this));
     doc.removeEventListener("mouseup", this.toolboxShowDelayed.bind(this));
     doc.removeEventListener("touchend", this.toolboxShowDelayed.bind(this));
+
+    doc.removeEventListener("touchend", this.hideIOSCalloutMenu);
     // doc.removeEventListener("selectstart", this.toolboxShowDelayed.bind(this));
 
     window.removeEventListener("resize", this.toolboxPlacement.bind(this));
@@ -949,6 +948,14 @@ export class TextHighlighter {
   // Use short timeout to let the selection updated to 'finish', otherwise some
   // browsers can get wrong or incomplete selection data.
   toolboxShowDelayed(event: TouchEvent | MouseEvent) {
+    if (
+      this.dom(this.navigator.iframes[0].contentDocument?.body).getSelection()
+        ?.isCollapsed
+    ) {
+      this.selectionCollapsed();
+      this.toolboxHide();
+      return;
+    }
     this.showTool(event.detail === 1);
   }
 
@@ -1045,6 +1052,43 @@ export class TextHighlighter {
     }
   }
 
+  hideIOSCalloutMenu = () => {
+    if (!this.isIOS()) return;
+
+    setTimeout(() => {
+      const doc = this.navigator.iframes[0].contentDocument;
+      if (!doc) return;
+
+      const selection = doc.getSelection();
+      if (!selection) return;
+
+      const range =
+        selection.rangeCount > 0 ? selection.getRangeAt(0).cloneRange() : null;
+
+      selection.removeAllRanges();
+
+      setTimeout(() => {
+        if (range) selection.addRange(range);
+
+        const getCssSelector = (element: Element): string | undefined => {
+          const options = {
+            className: (str: string) =>
+              _blacklistIdClassForCssSelectors.indexOf(str) < 0,
+            idName: (str: string) =>
+              _blacklistIdClassForCssSelectors.indexOf(str) < 0,
+          };
+          return uniqueCssSelector(element, doc, options);
+        };
+
+        const win = this.navigator.iframes[0].contentWindow;
+        const selectionInfo = getCurrentSelectionInfo(win!, getCssSelector);
+        this.navigator.annotationModule?.annotator?.saveTemporarySelectionInfo(
+          selectionInfo
+        );
+      }, 5);
+    }, 100);
+  };
+
   toolboxShow() {
     if (this.activeAnnotationMarkerId === undefined) {
       let self = this;
@@ -1061,44 +1105,6 @@ export class TextHighlighter {
           self.toolboxHide();
         }
         return;
-      }
-
-      if (this.isIOS()) {
-        setTimeout(function () {
-          let doc = self.navigator.iframes[0].contentDocument;
-          if (doc) {
-            let selection = self.dom(doc.body).getSelection();
-            selection.removeAllRanges();
-            setTimeout(function () {
-              selection.addRange(range);
-              function getCssSelector(element: Element): string | undefined {
-                const options = {
-                  className: (str: string) => {
-                    return _blacklistIdClassForCssSelectors.indexOf(str) < 0;
-                  },
-                  idName: (str: string) => {
-                    return _blacklistIdClassForCssSelectors.indexOf(str) < 0;
-                  },
-                };
-                let doc = self.navigator.iframes[0].contentDocument;
-                if (doc) {
-                  return uniqueCssSelector(element, doc, options);
-                } else {
-                  return undefined;
-                }
-              }
-
-              let win = self.navigator.iframes[0].contentWindow;
-              const selectionInfo = getCurrentSelectionInfo(
-                win!,
-                getCssSelector
-              );
-              self.navigator.annotationModule?.annotator?.saveTemporarySelectionInfo(
-                selectionInfo
-              );
-            }, 5);
-          }
-        }, 100);
       }
 
       this.toolboxPlacement();
@@ -1124,6 +1130,10 @@ export class TextHighlighter {
 
   selection = debounce((text, selection) => {
     if (this.api?.selection) this.api?.selection(text, selection);
+  }, 100);
+
+  selectionCollapsed = debounce(() => {
+    if (this.api?.selectionCollapsed) this.api?.selectionCollapsed();
   }, 100);
 
   toolboxPlacement() {
