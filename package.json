@@ -1,6 +1,6 @@
 {
   "name": "@cappelendamm/r2d2bc",
-  "version": "2.4.10-cada.3",
+  "version": "2.4.10-cada.4",
   "description": "A viewer application for EPUB files.",
   "repository": {
     "type": "git",
