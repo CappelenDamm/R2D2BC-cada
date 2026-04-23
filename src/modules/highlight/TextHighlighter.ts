@@ -953,6 +953,7 @@ export class TextHighlighter {
         ?.isCollapsed
     ) {
       this.selectionCollapsed();
+      this.toolboxHide();
       return;
     }
     this.showTool(event.detail === 1);
