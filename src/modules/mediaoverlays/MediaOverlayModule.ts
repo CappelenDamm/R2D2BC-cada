@@ -307,6 +307,12 @@ export class MediaOverlayModule implements ReaderModule {
     if (moTextAudioPair && moTextAudioPair.Audio) {
       // Clear previous highlight before jumping
       this.mediaOverlayHighlight(undefined);
+      // Pause before jumping so that playMediaOverlaysAudio takes the
+      // "paused" code path and seeks to the correct position instead of
+      // treating the transition as contiguous sequential playback.
+      if (this.audioElement) {
+        this.audioElement.pause();
+      }
       await this.playMediaOverlaysAudio(moTextAudioPair, undefined, undefined);
     }
   }
