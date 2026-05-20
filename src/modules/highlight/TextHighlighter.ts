@@ -1088,9 +1088,11 @@ export class TextHighlighter {
 
         const win = this.navigator.iframes[0].contentWindow;
         const selectionInfo = getCurrentSelectionInfo(win!, getCssSelector);
-        this.navigator.annotationModule?.annotator?.saveTemporarySelectionInfo(
-          selectionInfo,
-        );
+        if (selectionInfo) {
+          this.navigator.annotationModule?.annotator?.saveTemporarySelectionInfo(
+            selectionInfo
+          );
+        }
       }, 5);
     }, 100);
   };
