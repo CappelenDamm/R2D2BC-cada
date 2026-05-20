@@ -17,34 +17,38 @@
  * Licensed to: Bokbasen AS and CAST under one or more contributor license agreements.
  */
 
-import { ReadingPosition } from "../model/Locator";
+import { Annotation, Bookmark, ReadingPosition } from "../model/Locator";
 import { IHighlight } from "../modules/highlight/common/highlight";
+import { ISelectionInfo } from "../modules/highlight/common/selection";
 
 interface Annotator {
-  initLastReadingPosition(position: ReadingPosition);
-  getLastReadingPosition(): any;
-  saveLastReadingPosition(position: any);
+  initLastReadingPosition(position: ReadingPosition): void;
+  getLastReadingPosition(): ReadingPosition | null;
+  saveLastReadingPosition(position: ReadingPosition | string): void;
 
-  initBookmarks(list: any): any;
-  saveBookmark(bookmark: any): any;
-  deleteBookmark(bookmark: any): any;
-  getBookmarks(href?: string): any;
-  locatorExists(locator: any, type: AnnotationType): any;
+  initBookmarks(list: Bookmark[] | string): Bookmark[];
+  saveBookmark(bookmark: Bookmark): Bookmark;
+  deleteBookmark(bookmark: Bookmark): Bookmark;
+  getBookmarks(href?: string): Bookmark[];
+  locatorExists(locator: Bookmark, type: AnnotationType): Bookmark | null;
 
-  initAnnotations(list: any): any;
-  saveAnnotation(annotation: any): any;
-  deleteAnnotation(id: any): any;
-  deleteSelectedAnnotation(annotation: any): any;
-  getAnnotations(): any;
-  getAnnotationsByChapter(chapter: string): any;
-  getAnnotation(annotation: IHighlight): any;
-  getAnnotationByID(id: string): any;
-  getAnnotationPosition(id: any, iframeWin: any): any;
-  getAnnotationElement(id: any, iframeWin: any): any;
+  initAnnotations(list: Annotation[] | string): Annotation[];
+  saveAnnotation(annotation: Annotation): Annotation;
+  deleteAnnotation(id: string): string;
+  deleteSelectedAnnotation(annotation: Annotation): Annotation;
+  getAnnotations(): Annotation[];
+  getAnnotationsByChapter(chapter: string): Annotation[];
+  getAnnotation(annotation: IHighlight): Annotation | null;
+  getAnnotationByID(id: string): Annotation | null;
+  /** Returns the pixel top offset of the annotation highlight element, or null if not found. */
+  getAnnotationPosition(id: string, iframeWin: Window): number | null;
+  /** Returns the highlight DOM element for an annotation, or null if not found. */
+  getAnnotationElement(id: string, iframeWin: Window): HTMLElement | null;
 
-  saveTemporarySelectionInfo(selectionInfo: any);
-  getTemporarySelectionInfo(doc: any): any;
-  deleteTemporarySelectionInfo();
+  saveTemporarySelectionInfo(selectionInfo: ISelectionInfo): void;
+  /** Returns the reconstituted selection info with a live Range, or null. */
+  getTemporarySelectionInfo(doc: Document | null): ISelectionInfo | null;
+  deleteTemporarySelectionInfo(): void;
 }
 
 export enum AnnotationType {

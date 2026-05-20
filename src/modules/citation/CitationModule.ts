@@ -48,8 +48,8 @@ export interface CitationModuleProperties {
   published?: string;
 }
 export interface CitationModuleAPI {
-  citationCreated: any;
-  citationFailed: any;
+  citationCreated: (message: string) => void;
+  citationFailed: (message: string) => void;
 }
 
 export interface CitationModuleConfig extends CitationModuleProperties {
@@ -57,6 +57,23 @@ export interface CitationModuleConfig extends CitationModuleProperties {
   highlighter: TextHighlighter;
   api?: CitationModuleAPI;
 }
+
+/** Extract the display name from a r2-shared-js Contributor (Name may be string or IStringMap). */
+function contributorName(contributor: { Name: string | object }): string {
+  if (typeof contributor.Name === "string") return contributor.Name;
+  if (contributor.Name && typeof contributor.Name === "object") {
+    const vals = Object.values(contributor.Name);
+    return vals.length > 0 ? String(vals[0]) : "";
+  }
+  return "";
+}
+
+/**
+ * Returns a [chicago, mla, apa] tuple or ["","",""] when nothing applies.
+ * Every non-empty entry already includes trailing punctuation.
+ */
+type CitationTuple = [string, string, string];
+const EMPTY: CitationTuple = ["", "", ""];
 
 export default class CitationModule implements ReaderModule {
   private publication: Publication;
@@ -92,45 +109,45 @@ export default class CitationModule implements ReaderModule {
     log.log("Citation module stop");
   }
 
-  copyToClipboard(textToClipboard) {
+  copyToClipboard(textToClipboard: string) {
     if (this.navigator?.contentProtectionModule) {
       this.navigator!.contentProtectionModule.citation = true;
     }
-    let success = true;
-    // @ts-ignore
-    if (window.clipboardData) {
-      // Internet Explorer
-      // @ts-ignore
-      window.clipboardData.setData("text/plain", textToClipboard);
+
+    // Prefer the modern async Clipboard API
+    if (navigator.clipboard) {
+      // Strip HTML tags for plain-text clipboard write
+      const tmp = document.createElement("div");
+      tmp.innerHTML = textToClipboard;
+      const plainText = tmp.textContent ?? tmp.innerText ?? textToClipboard;
+      navigator.clipboard.writeText(plainText).then(
+        () =>
+          this.api?.citationCreated("The text was copied to the clipboard!"),
+        () => this.legacyCopyToClipboard(textToClipboard)
+      );
     } else {
-      // create a temporary element for the execCommand method
-      const forExecElement = this.createElementForExecCommand(textToClipboard);
-
-      /* Select the contents of the element
-          (the execCommand for 'copy' method works on the selection) */
-      this.selectContent(forExecElement);
-
-      // UniversalXPConnect privilege is required for clipboard access in Firefox
-      try {
-        // @ts-ignore
-        if (window.netscape && netscape.security) {
-          // @ts-ignore
-          netscape.security.PrivilegeManager.enablePrivilege(
-            "UniversalXPConnect"
-          );
-        }
-
-        // Copy the selected content to the clipboard
-        // Works in Firefox and in Safari before version 5
-        success = document.execCommand("copy", false);
-      } catch (e) {
-        success = false;
-      }
-
-      // remove the temporary element
-      document.body.removeChild(forExecElement);
+      this.legacyCopyToClipboard(textToClipboard);
     }
+  }
 
+  /** Fallback clipboard copy using deprecated execCommand — used when the
+   *  Clipboard API is unavailable (e.g. non-secure context). */
+  private legacyCopyToClipboard(textToClipboard: string) {
+    const forExecElement = document.createElement("div");
+    forExecElement.style.position = "absolute";
+    forExecElement.style.left = "-10000px";
+    forExecElement.style.top = "-10000px";
+    forExecElement.innerHTML = textToClipboard;
+    forExecElement.contentEditable = "true";
+    document.body.appendChild(forExecElement);
+    this.selectContent(forExecElement);
+    let success = false;
+    try {
+      success = document.execCommand("copy");
+    } catch (_e) {
+      success = false;
+    }
+    document.body.removeChild(forExecElement);
     if (success) {
       this.api?.citationCreated("The text was copied to the clipboard!");
     } else {
@@ -138,29 +155,333 @@ export default class CitationModule implements ReaderModule {
     }
   }
 
-  createElementForExecCommand(textToClipboard) {
-    const forExecElement = document.createElement("div");
-    // place outside the visible area
-    forExecElement.style.position = "absolute";
-    forExecElement.style.left = "-10000px";
-    forExecElement.style.top = "-10000px";
-    // write the necessary text into the element and append to the document
-    forExecElement.innerHTML = textToClipboard;
-    document.body.appendChild(forExecElement);
-    // the contentEditable mode is necessary for the  execCommand method in Firefox
-    // @ts-ignore
-    forExecElement.contentEditable = true;
-    return forExecElement;
-  }
-
-  selectContent(element) {
-    // first create a range
+  selectContent(element: HTMLElement) {
     const rangeToSelect = document.createRange();
     rangeToSelect.selectNodeContents(element);
-    // select the contents
     const selection = window.getSelection();
     selection?.removeAllRanges();
     selection?.addRange(rangeToSelect);
+  }
+
+  // ── Citation formatters ──────────────────────────────────────────────
+  // Each returns [chicago, mla, apa]. Non-empty entries include trailing
+  // punctuation so the assembly can simply concatenate.
+
+  private authorsFormatted(): CitationTuple {
+    let chicago = "";
+    let mla = "";
+    let apa = "";
+
+    if (this.properties.author) {
+      chicago = this.properties.author;
+      mla = this.properties.author;
+      apa = this.properties.author;
+    } else if (this.publication.Metadata.Author?.length > 0) {
+      const authors = this.publication.Metadata.Author;
+      const names = authors
+        .map((a) => contributorName(a))
+        .filter((n) => n.length > 0);
+
+      if (names.length === 1) {
+        chicago = names[0];
+        mla = names[0];
+        apa = names[0];
+      } else if (names.length === 2) {
+        chicago = names[0] + " and " + names[1];
+        mla = names[0] + ", and " + names[1];
+        apa = names[0] + " & " + names[1];
+      } else if (names.length > 2) {
+        // Chicago: list all up to 6, then first 3 + et al.
+        if (names.length <= 6) {
+          chicago =
+            names.slice(0, -1).join(", ") + ", and " + names[names.length - 1];
+        } else {
+          chicago = names.slice(0, 3).join(", ") + ", et al.";
+        }
+        // MLA 9th: first author + et al.
+        mla = names[0] + ", et al.";
+        // APA 7th: list all up to 20, use & before last
+        if (names.length <= 20) {
+          apa =
+            names.slice(0, -1).join(", ") + ", & " + names[names.length - 1];
+        } else {
+          apa =
+            names.slice(0, 19).join(", ") + ", ... " + names[names.length - 1];
+        }
+      }
+    }
+
+    if (chicago) {
+      return [chicago + ". ", mla + ". ", apa + ". "];
+    }
+    return EMPTY;
+  }
+
+  private yearPublishedFormatted(): CitationTuple {
+    let chicago = "";
+    let mla = "";
+    let apa = "";
+
+    // Publisher name for Chicago/MLA (APA puts publisher in publisherFormatted)
+    if (this.properties.publisher) {
+      mla += this.properties.publisher;
+      chicago += this.properties.publisher;
+    } else if (
+      this.publication.Metadata.Publisher?.length > 0 &&
+      contributorName(this.publication.Metadata.Publisher[0])
+    ) {
+      const name = contributorName(this.publication.Metadata.Publisher[0]);
+      mla += name;
+      chicago += name;
+    }
+
+    // Year
+    let year = "";
+    if (this.properties.published) {
+      year = this.properties.published;
+    } else if (this.publication.Metadata.PublicationDate) {
+      const y = this.publication.Metadata.PublicationDate.getFullYear();
+      if (y > 0) year = String(y);
+    }
+
+    if (year) {
+      apa += "(" + year + ")";
+      mla += (mla ? ", " : "") + year;
+      chicago += (chicago ? ", " : "") + year;
+    }
+
+    if (apa || mla || chicago) {
+      return [
+        chicago ? chicago + ". " : "",
+        mla ? mla + ". " : "",
+        apa ? apa + ". " : "",
+      ];
+    }
+    return EMPTY;
+  }
+
+  private bookTitleFormatted(): CitationTuple {
+    const title =
+      this.properties.title || this.publication.Metadata.Title || "";
+    if (title) {
+      const formatted = "<em>" + title + "</em>. ";
+      return [formatted, formatted, formatted];
+    }
+    return EMPTY;
+  }
+
+  private editionFormatted(): CitationTuple {
+    // Edition/volume not exposed in r2-shared-js Metadata.
+    // Could be passed via CitationModuleProperties in the future.
+    return EMPTY;
+  }
+
+  private publisherFormatted(): CitationTuple {
+    // Only APA uses this in the assembly — Chicago/MLA get publisher
+    // via yearPublishedFormatted which combines "Publisher, Year".
+    let name = "";
+
+    if (this.properties.publisher) {
+      name = this.properties.publisher;
+    } else if (
+      this.publication.Metadata.Publisher?.length > 0 &&
+      contributorName(this.publication.Metadata.Publisher[0])
+    ) {
+      name = contributorName(this.publication.Metadata.Publisher[0]);
+    }
+
+    if (name) {
+      return ["", "", name + ". "];
+    }
+    return EMPTY;
+  }
+
+  private contributorsFormatted(): CitationTuple {
+    const parts: string[] = [];
+
+    const editors = this.publication.Metadata.Editor;
+    if (editors?.length > 0) {
+      const names = editors
+        .map((e) => contributorName(e))
+        .filter((n) => n.length > 0);
+      if (names.length > 0) {
+        parts.push(
+          "Edited by " +
+            (names.length <= 2
+              ? names.join(" and ")
+              : names.slice(0, -1).join(", ") +
+                ", and " +
+                names[names.length - 1])
+        );
+      }
+    }
+
+    const translators = this.publication.Metadata.Translator;
+    if (translators?.length > 0) {
+      const names = translators
+        .map((t) => contributorName(t))
+        .filter((n) => n.length > 0);
+      if (names.length > 0) {
+        parts.push(
+          "Translated by " +
+            (names.length <= 2
+              ? names.join(" and ")
+              : names.slice(0, -1).join(", ") +
+                ", and " +
+                names[names.length - 1])
+        );
+      }
+    }
+
+    if (parts.length > 0) {
+      const formatted = parts.join(". ") + ". ";
+      return [formatted, formatted, formatted];
+    }
+    return EMPTY;
+  }
+
+  private eBookVersionFormatted(): CitationTuple {
+    if (this.publication.Metadata.Modified) {
+      const modified = this.publication.Metadata.Modified;
+      const version =
+        modified.getFullYear() +
+        "-" +
+        String(modified.getMonth() + 1).padStart(2, "0") +
+        "-" +
+        String(modified.getDate()).padStart(2, "0");
+      return ["[" + version + "]. ", version + ". ", version + ". "];
+    }
+    return EMPTY;
+  }
+
+  private locationFormatted(): CitationTuple {
+    // r2-shared-js Contributor doesn't expose city/state fields.
+    return EMPTY;
+  }
+
+  private libraryFormatted(): CitationTuple {
+    if (this.properties.library) {
+      const formatted = "Retrieved from " + this.properties.library + ". ";
+      return [formatted, formatted, formatted];
+    }
+    return EMPTY;
+  }
+
+  private appNameFormatted(): CitationTuple {
+    if (this.properties.appName) {
+      const formatted = this.properties.appName + ". ";
+      return [formatted, formatted, formatted];
+    }
+    return EMPTY;
+  }
+
+  private appLinkFormatted(): CitationTuple {
+    if (this.properties.appLink) {
+      const formatted = this.properties.appLink + ". ";
+      return [formatted, formatted, formatted];
+    }
+    return EMPTY;
+  }
+
+  private seriesFormatted(): CitationTuple {
+    const series = this.publication.Metadata.BelongsTo?.Series;
+    if (series && series.length > 0) {
+      const name = contributorName(series[0]);
+      if (name) {
+        return [name + ". ", name + ". ", name + ". "];
+      }
+    }
+    return EMPTY;
+  }
+
+  private selectedText(text: string, length: number): string {
+    return text.length > length ? text.substring(0, length) + "..." : text;
+  }
+
+  // ── Assembly ─────────────────────────────────────────────────────────
+
+  private buildCitation(selection: string): string {
+    const authors = this.authorsFormatted();
+    const year = this.yearPublishedFormatted();
+    const title = this.bookTitleFormatted();
+    const edition = this.editionFormatted();
+    const publisher = this.publisherFormatted();
+    const contributors = this.contributorsFormatted();
+    const version = this.eBookVersionFormatted();
+    const location = this.locationFormatted();
+    const library = this.libraryFormatted();
+    const appName = this.appNameFormatted();
+    const appLink = this.appLinkFormatted();
+    const series = this.seriesFormatted();
+
+    const C = CitationStyle.Chicago;
+    const M = CitationStyle.MLA;
+    const A = CitationStyle.APA;
+
+    const chicago =
+      authors[C] +
+      title[C] +
+      contributors[C] +
+      edition[C] +
+      location[C] +
+      year[C] +
+      version[C] +
+      library[C] +
+      appName[C] +
+      appLink[C];
+
+    const apa =
+      authors[A] +
+      year[A] +
+      title[A] +
+      edition[A] +
+      publisher[A] +
+      contributors[A] +
+      version[A] +
+      location[A] +
+      library[A] +
+      appName[A] +
+      appLink[A];
+
+    const mla =
+      authors[M] +
+      title[M] +
+      contributors[M] +
+      edition[M] +
+      location[M] +
+      year[M] +
+      series[M] +
+      library[M] +
+      appName[M] +
+      appLink[M];
+
+    const maxLen = this.properties.characters ?? 200;
+    const quote = "\u201C" + this.selectedText(selection, maxLen) + "\u201D";
+
+    let citation = "";
+
+    if (
+      this.properties.styles?.includes(CitationStyle[CitationStyle.Chicago])
+    ) {
+      if (this.properties.styles.length > 1) {
+        citation += "Chicago: <br>";
+      }
+      citation += quote + "<br><br>" + chicago + "<br><br>";
+    }
+    if (this.properties.styles?.includes(CitationStyle[CitationStyle.APA])) {
+      if (this.properties.styles.length > 1) {
+        citation += "APA: <br>";
+      }
+      citation += quote + "<br><br>" + apa + "<br><br>";
+    }
+    if (this.properties.styles?.includes(CitationStyle[CitationStyle.MLA])) {
+      if (this.properties.styles.length > 1) {
+        citation += "MLA: <br>";
+      }
+      citation += quote + "<br><br>" + mla + "<br><br>";
+    }
+
+    return citation;
   }
 
   protected async start(): Promise<void> {
@@ -169,319 +490,7 @@ export default class CitationModule implements ReaderModule {
     const citationIconMenu = {
       id: "citationIcon",
       callback: function (selection: string) {
-        let authorsFormatted = function () {
-          let chicagoString = "";
-          let mlaString = "";
-          let apaString = "";
-
-          if (self.properties.author) {
-            apaString = apaString + self.properties.author;
-            mlaString = mlaString + self.properties.author;
-            chicagoString = chicagoString + self.properties.author;
-          } else if (self.publication.Metadata.Author?.length > 0) {
-            // var numAuthors = self.publication.Metadata.Author.length;
-            let authorIndex = 0;
-
-            if (authorIndex === 0) {
-              if (
-                self.publication.Metadata.Author[0].Name &&
-                self.publication.Metadata.Author[0].Name instanceof String
-              ) {
-                if (self.publication.Metadata.Author[0].Name.length > 0) {
-                  apaString =
-                    apaString + self.publication.Metadata.Author[0].Name;
-                  mlaString =
-                    mlaString + self.publication.Metadata.Author[0].Name;
-                  chicagoString =
-                    chicagoString + self.publication.Metadata.Author[0].Name;
-                }
-              }
-            }
-          }
-          // TODO finalize this.
-          if (
-            apaString.length > 0 &&
-            mlaString.length > 0 &&
-            chicagoString.length > 0
-          ) {
-            return [chicagoString + ". ", mlaString + ". ", apaString + ". "];
-          }
-          return ["", "", ""];
-        };
-        let yearPublishedFormatted = function () {
-          let chicagoString = "";
-          let mlaString = "";
-          let apaString = "";
-          if (self.properties.publisher) {
-            mlaString = mlaString + self.properties.publisher;
-            chicagoString = chicagoString + self.properties.publisher;
-          } else if (
-            self.publication.Metadata.Publisher &&
-            self.publication.Metadata.Publisher[0].Name
-          ) {
-            mlaString = mlaString + self.publication.Metadata.Publisher[0].Name;
-            chicagoString =
-              chicagoString + self.publication.Metadata.Publisher[0].Name;
-          }
-
-          if (self.properties.published) {
-            apaString = apaString + "(" + self.properties.published + ")";
-            mlaString = mlaString + ", " + self.properties.published;
-            chicagoString = chicagoString + ", " + self.properties.published;
-          } else if (self.publication.Metadata.PublicationDate) {
-            if (self.publication.Metadata.PublicationDate.getFullYear() > 0) {
-              apaString =
-                apaString +
-                "(" +
-                self.publication.Metadata.PublicationDate.getFullYear() +
-                ")";
-              mlaString =
-                mlaString +
-                ", " +
-                self.publication.Metadata.PublicationDate.getFullYear();
-              chicagoString =
-                chicagoString +
-                ", " +
-                self.publication.Metadata.PublicationDate.getFullYear();
-            }
-          }
-
-          if (
-            apaString.length > 0 &&
-            mlaString.length > 0 &&
-            chicagoString.length > 0
-          ) {
-            return [chicagoString + ". ", mlaString + ". ", apaString + ". "];
-          }
-          return ["", "", ""];
-        };
-        let bookTitleFormatted = function () {
-          if (self.properties.title) {
-            return [
-              "<em>" + self.properties.title + "</em>. ",
-              "<em>" + self.properties.title + "</em>. ",
-              "<em>" + self.properties.title + "</em>. ",
-            ];
-          } else if (self.publication.Metadata.Title) {
-            return [
-              "<em>" + self.publication.Metadata.Title + "</em>. ",
-              "<em>" + self.publication.Metadata.Title + "</em>. ",
-              "<em>" + self.publication.Metadata.Title + "</em>. ",
-            ];
-          } else {
-            return ["", "", ""];
-          }
-        };
-        let editionFormatted = function () {
-          // var apaString:String = String()
-          // var chicagoString:String = String()
-          // var mlaString:String = String()
-          // if let edition = self.edition {
-          //
-          //   if let ed = Int(edition) {
-          //     apaString.append("(")
-          //     apaString.append("\(ed.ordinal) ed.")
-          //     mlaString.append("\(ed.ordinal) ed.")
-          //     chicagoString.append("\(ed.ordinal) ed.")
-          //   }
-          //   if (self.edition != nil && self.volume != nil) {
-          //     apaString.append(" ")
-          //   }
-          //   if let volume = self.volume {
-          //     // comma needs to be moved from here
-          //     apaString.append("Vol. \(volume)")
-          //     mlaString.append("Vol. \(volume). ")
-          //     chicagoString.append("Vol. \(volume). ")
-          //   }
-          //   if (self.volume != nil && self.series != nil) {
-          //     apaString.append(", ")
-          //   }
-          //   apaString.append(seriesFormatted.apa)
-          //   apaString.append(")")
-          //   chicagoString.append(seriesFormatted.chicago)
-          //
-          // }
-          // if !apaString.isEmpty && !mlaString.isEmpty && !chicagoString.isEmpty {
-          //   return ("\(apaString) ", "\(chicagoString) ", "\(mlaString) ")
-          // }
-          return ["", "", ""];
-        };
-        let publisherFormatted = function () {
-          let chicagoString = "";
-          let mlaString = "";
-          let apaString = "";
-
-          if (self.properties.publisher) {
-            mlaString = mlaString + self.properties.publisher + ", ";
-            chicagoString = chicagoString + self.properties.publisher + ", ";
-            apaString = apaString + self.properties.publisher;
-          } else if (
-            self.publication.Metadata.Publisher &&
-            self.publication.Metadata.Publisher[0].Name
-          ) {
-            mlaString =
-              mlaString + self.publication.Metadata.Publisher[0].Name + ", ";
-            chicagoString =
-              chicagoString +
-              self.publication.Metadata.Publisher[0].Name +
-              ", ";
-            apaString = apaString + self.publication.Metadata.Publisher[0].Name;
-          }
-
-          if (
-            apaString.length > 0 &&
-            mlaString.length > 0 &&
-            chicagoString.length > 0
-          ) {
-            return [chicagoString + ". ", mlaString + ". ", apaString + ". "];
-          }
-          return ["", "", ""];
-        };
-        let contributorsFormatted = function () {
-          return ["", "", ""];
-        };
-        let eBookVersionFormatted = function () {
-          // if let eBookVersion = self.eBookVersion {
-          //   return ("[\(eBookVersion)]. ","\(eBookVersion)","\(eBookVersion)")
-          // }
-          // return ("","","")
-          return ["", "", ""];
-        };
-        let locationFormatted = function () {
-          // if let city = self.publisher?.city,
-          //   let state = self.publisher?.state  {
-          //   return ("\(city), State: \(state). ", "\(city), State: \(state), ", "\(city): \(state), ")
-          // }
-          return ["", "", ""];
-        };
-        let libraryFormatted = function () {
-          if (self.properties.library) {
-            return [
-              "Retrieved from " + self.properties.library + ". ",
-              "Retrieved from " + self.properties.library + ". ",
-              "Retrieved from " + self.properties.library + ". ",
-            ];
-          }
-          return ["", "", ""];
-        };
-        let appNameFormatted = function () {
-          if (self.properties.appName) {
-            return [
-              self.properties.appName + ". ",
-              self.properties.appName + ". ",
-              self.properties.appName + ". ",
-            ];
-          }
-          return ["", "", ""];
-        };
-        let appLinkFormatted = function () {
-          if (self.properties.appLink) {
-            return [
-              self.properties.appLink + ". ",
-              self.properties.appLink + ". ",
-              self.properties.appLink + ". ",
-            ];
-          }
-          return ["", "", ""];
-        };
-        let seriesFormatted = function () {
-          // if let series = self.series {
-          //   return ("\(series)","\(series). ","\(series). ")
-          // }
-          return ["", "", ""];
-        };
-
-        let selectedText = function (string, length) {
-          return string.length > length
-            ? string.substring(0, length) + "..."
-            : string;
-        };
-
-        const chicago =
-          authorsFormatted()[CitationStyle.Chicago] +
-          bookTitleFormatted()[CitationStyle.Chicago] +
-          contributorsFormatted()[CitationStyle.Chicago] +
-          editionFormatted()[CitationStyle.Chicago] +
-          locationFormatted()[CitationStyle.Chicago] +
-          yearPublishedFormatted()[CitationStyle.Chicago] +
-          eBookVersionFormatted()[CitationStyle.Chicago] +
-          libraryFormatted()[CitationStyle.Chicago] +
-          appNameFormatted()[CitationStyle.Chicago] +
-          appLinkFormatted()[CitationStyle.Chicago];
-
-        const apa =
-          authorsFormatted()[CitationStyle.APA] +
-          yearPublishedFormatted()[CitationStyle.APA] +
-          bookTitleFormatted()[CitationStyle.APA] +
-          editionFormatted()[CitationStyle.APA] +
-          publisherFormatted()[CitationStyle.APA] +
-          contributorsFormatted()[CitationStyle.APA] +
-          eBookVersionFormatted()[CitationStyle.APA] +
-          locationFormatted()[CitationStyle.APA] +
-          libraryFormatted()[CitationStyle.APA] +
-          appNameFormatted()[CitationStyle.APA] +
-          appLinkFormatted()[CitationStyle.APA];
-
-        const mla =
-          authorsFormatted()[CitationStyle.MLA] +
-          bookTitleFormatted()[CitationStyle.MLA] +
-          contributorsFormatted()[CitationStyle.MLA] +
-          editionFormatted()[CitationStyle.MLA] +
-          locationFormatted()[CitationStyle.MLA] +
-          yearPublishedFormatted()[CitationStyle.MLA] +
-          seriesFormatted()[CitationStyle.MLA] +
-          libraryFormatted()[CitationStyle.MLA] +
-          appNameFormatted()[CitationStyle.MLA] +
-          appLinkFormatted()[CitationStyle.MLA];
-
-        const citationChicago =
-          "“" +
-          selectedText(selection, self.properties.characters) +
-          "“" +
-          "<br><br>" +
-          chicago;
-
-        const citationApa =
-          "“" +
-          selectedText(selection, self.properties.characters) +
-          "“" +
-          "<br><br>" +
-          apa;
-
-        const citationMla =
-          "“" +
-          selectedText(selection, self.properties.characters) +
-          "“" +
-          "<br><br>" +
-          mla;
-
-        let citation = "";
-
-        if (
-          self.properties.styles?.includes(CitationStyle[CitationStyle.Chicago])
-        ) {
-          if (self.properties.styles.length > 1) {
-            citation = citation + "Chicago: <br>";
-          }
-          citation = citation + citationChicago + "<br><br>";
-        }
-        if (
-          self.properties.styles?.includes(CitationStyle[CitationStyle.APA])
-        ) {
-          if (self.properties.styles.length > 1) {
-            citation = citation + "APA: <br>";
-          }
-          citation = citation + citationApa + "<br><br>";
-        }
-        if (
-          self.properties.styles?.includes(CitationStyle[CitationStyle.MLA])
-        ) {
-          if (self.properties.styles.length > 1) {
-            citation = citation + "MLA: <br>";
-          }
-          citation = citation + citationMla + "<br><br>";
-        }
-
+        const citation = self.buildCitation(selection);
         self.copyToClipboard(citation);
       },
     };

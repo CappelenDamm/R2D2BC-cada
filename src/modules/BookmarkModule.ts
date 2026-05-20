@@ -58,7 +58,7 @@ export interface BookmarkModuleConfig extends BookmarkModuleProperties {
   headerMenu?: HTMLElement | null;
   rights: Partial<ReaderRights>;
   publication: Publication;
-  initialAnnotations?: any;
+  initialAnnotations?: import("../navigator/IFrameNavigator").InitialAnnotations;
   properties?: BookmarkModuleProperties;
   api?: BookmarkModuleAPI;
 }
@@ -70,9 +70,8 @@ export class BookmarkModule implements ReaderModule {
   private bookmarksView: HTMLDivElement;
   private sideNavSectionBookmarks: HTMLElement;
   private readonly headerMenu?: HTMLElement | null;
-  private readonly initialAnnotations: any;
+  private readonly initialAnnotations?: import("../navigator/IFrameNavigator").InitialAnnotations;
   navigator: IFrameNavigator;
-  // @ts-ignore
   private readonly properties: BookmarkModuleProperties;
   private readonly api?: BookmarkModuleAPI;
 
@@ -392,7 +391,7 @@ export class BookmarkModule implements ReaderModule {
         selectionInfo =
           this.navigator.annotationModule?.annotator?.getTemporarySelectionInfo(
             doc
-          );
+          ) ?? undefined;
       }
       let doc = self.navigator.iframes[0].contentDocument;
       if (selectionInfo && doc) {

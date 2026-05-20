@@ -46,7 +46,6 @@
 
 @import "reader/timeline";
 
-
 .collection {
   //margin: $element-top-margin 0 $element-bottom-margin 0;
   border-radius: 2px;
@@ -85,7 +84,6 @@
         text-align: center;
       }
 
-
       .title {
         font-size: 16px;
       }
@@ -99,9 +97,7 @@
         top: 16px;
         right: 16px;
       }
-
     }
-
 
     &:last-child {
       border-bottom: none;
@@ -116,9 +112,9 @@
       }
     }
   }
-  a.collection-item{
+  a.collection-item {
     display: block;
-    transition: .25s;
+    transition: 0.25s;
     //color: $collection-link-color;
     &:not(.active) {
       &:hover {
@@ -140,11 +136,9 @@
       padding-left: 72px;
     }
   }
-
 }
 .pagination {
-
-  display:  inline-block;
+  display: inline-block;
 
   li {
     display: inline-block;
@@ -163,7 +157,9 @@
       line-height: 30px;
     }
 
-    &.active a { color: #999; }
+    &.active a {
+      color: #999;
+    }
 
     //&.active { background-color: $primary-color !important; }
 
@@ -176,7 +172,6 @@
       font-size: 2rem;
     }
   }
-
 
   li.pages ul li {
     display: inline-block;
@@ -194,9 +189,9 @@ $medium-and-down: "only screen and (max-width : #{$medium-screen})" !default;
 
 .sidenav {
   &.expanded {
-    width : $medium-screen !important;;
+    width: $medium-screen !important;
     @media #{$medium-and-down} {
-      width : 100% !important; ;
+      width: 100% !important;
     }
   }
 }
@@ -214,7 +209,8 @@ $medium-and-down: "only screen and (max-width : #{$medium-screen})" !default;
 .grab-to-pan-grab {
   cursor: grab !important;
 }
-.grab-to-pan-grab *:not(input):not(textarea):not(button):not(select):not(:link) {
+.grab-to-pan-grab
+  *:not(input):not(textarea):not(button):not(select):not(:link) {
   cursor: inherit !important;
 }
 .grab-to-pan-grab:active,

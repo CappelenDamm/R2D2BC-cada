@@ -16,99 +16,88 @@
  * Developed on behalf of: CAST (http://www.cast.org)
  * Licensed to: Bokbasen AS and CAST under one or more contributor license agreements.
 -->
-
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
-    <title>D2 Reader</title>
+    <title>D2 Reader — Minimal</title>
     <meta charset="utf-8" />
-    <meta name="author" content="Aferdita Muriqi" />
-    <meta name="description" content="A viewer application for EPUB files." />
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
-
-    <!-- R2 Reader CSS -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
     <link rel="stylesheet" href="reader.css" />
     <script src="reader.js"></script>
-
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+        .toolbar { position: fixed; top: 0; left: 0; right: 0; z-index: 1000; display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: #fff; border-bottom: 1px solid #e0e0e0; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+        .badge { font-size: 7pt; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; background: #333; color: #fff; padding: 2px 7px; border-radius: 9px; }
+        .pill { height: 28px; padding: 0 12px; font-size: 8pt; text-transform: uppercase; letter-spacing: .5px; border: 1px solid #d0d0d0; border-radius: 14px; background: #fff; color: #555; cursor: pointer; transition: all .15s; white-space: nowrap; }
+        .pill:hover { background: #f5f5f5; }
+        .pill:active { background: #e8e8e8; color: #000; }
+        .pill.active { background: #e8e8e8; color: #000; }
+        .sep { width: 1px; height: 18px; background: #e0e0e0; flex-shrink: 0; }
+        .info { font-size: 8pt; color: #888; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-left: auto; }
+        #D2Reader-Container { margin-top: 41px; }
+        #iframe-wrapper { height: calc(100vh - 41px); }
+    </style>
 </head>
-
 <body>
-    <div style="position:fixed;top:0;left:0;z-index: 1000;bottom: 0; overflow: scroll;">
-
-        <button onclick="javascript:d2reader.previousResource()">previous resource</button><br>
-        <button onclick="javascript:d2reader.nextResource()">next resource</button><br>
-        <button onclick="javascript:d2reader.previousPage()">previous page</button><br>
-        <button onclick="javascript:d2reader.nextPage()">next page</button><br>
-        <button onclick="javascript:d2reader.scroll(true)">scroll</button><br>
-        <button onclick="javascript:d2reader.scroll(false)">paginated</button><br>
-
+    <div class="toolbar">
+        <span class="badge">Minimal</span>
+        <div class="sep"></div>
+        <button class="pill" onclick="d2reader.previousResource()" title="Previous chapter">&laquo; Ch</button>
+        <button class="pill" onclick="d2reader.previousPage()" title="Previous page">&lsaquo; Prev</button>
+        <button class="pill" onclick="d2reader.nextPage()" title="Next page">Next &rsaquo;</button>
+        <button class="pill" onclick="d2reader.nextResource()" title="Next chapter">Ch &raquo;</button>
+        <div class="sep"></div>
+        <button class="pill" id="btn-scroll" onclick="toggleScroll()" title="Toggle scroll/paginated">Paginated</button>
+        <span class="info" id="page-info"></span>
     </div>
 
-    <div class="content" id="root">
-        <div id="D2Reader-Container" style="border: solid 5px rebeccapurple">
-            <main style="height: calc(100vh - 10px)" tabindex=-1 id="iframe-wrapper">
-                <div id="reader-loading" class="loading"></div>
-                <div id="reader-error" class="error"></div>
-            </main>
-        </div>
+    <div id="D2Reader-Container">
+        <main tabindex="-1" id="iframe-wrapper">
+            <div id="reader-loading" class="loading"></div>
+            <div id="reader-error" class="error"></div>
+        </main>
     </div>
 
     <script>
-        let getURLQueryParams = function () {
-            let params = {};
-            let query = window.location.search;
-            if (query && query.length) {
-                query = query.substring(1);
-                let keyParams = query.split('&');
-                for (let x = 0; x < keyParams.length; x++) {
-                    let keyVal = keyParams[x].split('=');
-                    if (keyVal.length > 1) {
-                        params[keyVal[0]] = decodeURIComponent(keyVal[1]);
-                    }
-                }
-            }
-            return params;
-        };
-
+        let urlParams = Object.fromEntries(new URL(location.href).searchParams);
+        let d2reader, isScroll = false;
 
         let injectables = [
             { type: 'style', url: '/viewer/readium-css/ReadiumCSS-before.css', r2before: true },
             { type: 'style', url: '/viewer/readium-css/ReadiumCSS-default.css', r2default: true },
             { type: 'style', url: '/viewer/readium-css/ReadiumCSS-after.css', r2after: true },
-        ]
+        ];
 
-        let urlParams = getURLQueryParams();
-        let d2reader = undefined;
         D2Reader.load({
             url: new URL(urlParams['url']),
             injectables: injectables,
             injectablesFixed: [],
-        }).then(instance => {
-            d2reader = instance
+            api: {
+                updateCurrentLocation: function (loc) {
+                    let title = loc.title || '';
+                    let pos = loc.locations || {};
+                    let page = pos.position != null ? pos.position : '';
+                    let total = pos.totalRemainingPositions != null ? (pos.position + pos.totalRemainingPositions) : '';
+                    let text = title + (page !== '' && total !== '' ? ' \u2014 ' + page + ' of ' + total : '');
+                    document.getElementById('page-info').textContent = text;
+                }
+            }
+        }).then(function (instance) { d2reader = instance; });
+
+        function toggleScroll() {
+            isScroll = !isScroll;
+            d2reader.scroll(isScroll);
+            let btn = document.getElementById('btn-scroll');
+            btn.textContent = isScroll ? 'Scroll' : 'Paginated';
+            btn.classList.toggle('active', isScroll);
+        }
+
+        document.addEventListener('keydown', function (e) {
+            if (!d2reader) return;
+            if (e.key === 'ArrowLeft') d2reader.previousPage();
+            else if (e.key === 'ArrowRight') d2reader.nextPage();
         });
-
     </script>
-
-    <noscript>
-        <style>
-            noscript {
-                width: 100%;
-                height: 100vh;
-                display: flex;
-                align-items: center;
-                justify-content: center;
-            }
-
-            .warning {
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-                font-size: 1.5rem;
-                font-weight: bold;
-            }
-        </style>
-        <p class="warning">To use this viewer, please enable JavaScript.</p>
-    </noscript>
 </body>
-
 </html>

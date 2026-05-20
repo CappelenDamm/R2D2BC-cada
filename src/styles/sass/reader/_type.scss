@@ -16,8 +16,9 @@
  * Developed on behalf of: Bokbasen AS (https://www.bokbasen.no)
  * Licensed to: Bokbasen AS and CAST under one or more contributor license agreements.
  */
- 
+
 $basefontraw: 16;
 $basefont: $basefontraw * 1px;
 
-$sans-serif-stack: -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;
+$sans-serif-stack:
+  -apple-system, BlinkMacSystemFont, Roboto, Helvetica, Arial, sans-serif;

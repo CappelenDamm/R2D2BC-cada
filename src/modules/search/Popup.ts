@@ -128,7 +128,7 @@ export class Popup {
         d2wrapper.appendChild(d2content);
         if (this.navigator.api?.getContent) {
           await this.navigator.api?.getContent(href).then((content) => {
-            d2content.innerHTML = content;
+            d2content.innerHTML = sanitize(content);
             let doc = this.navigator.iframes[0].contentDocument;
             if (doc) {
               doc.body.appendChild(d2popover);
@@ -138,7 +138,7 @@ export class Popup {
           await fetch(absolute, this.navigator.requestConfig)
             .then((r) => r.text())
             .then(async (data) => {
-              d2content.innerHTML = data;
+              d2content.innerHTML = sanitize(data);
               let doc = this.navigator.iframes[0].contentDocument;
               if (doc) {
                 doc.body.appendChild(d2popover);
@@ -254,7 +254,7 @@ export class Popup {
     d2content.appendChild(p);
 
     if (typeof element === "string") {
-      p.innerHTML = element;
+      p.innerHTML = sanitize(element);
     } else {
       p.innerHTML = sanitize(element.innerHTML, {
         allowedTags: [],

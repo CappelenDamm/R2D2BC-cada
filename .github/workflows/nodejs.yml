@@ -1,5 +1,7 @@
 name: Node CI
 on: [push]
+permissions:
+  contents: read
 jobs:
   build:
     name: Build, lint, and test on latest Node.js LTS

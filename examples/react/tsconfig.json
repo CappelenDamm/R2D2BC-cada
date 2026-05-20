@@ -18,26 +18,14 @@
  */
 
 {
-  "compileOnSave": true,
+  "extends": "../../tsconfig.json",
+  "include": [".", "../../src"],
+  "exclude": [],
   "compilerOptions": {
-    "experimentalDecorators": true,
-    "forceConsistentCasingInFileNames": true,
-    "module": "es6",
-    "noEmitOnError": true,
-    "noFallthroughCasesInSwitch": true,
-    "noImplicitAny": false,
-    "noImplicitReturns": true,
-    "noImplicitThis": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "moduleResolution": "node",
-    "sourceMap": true,
-    "declaration": true,
-    "preserveConstEnums": true,
-    "strictNullChecks": true,
-    "strict": true,
-    "target": "es6",
-    "skipLibCheck": true,
-    "jsx": "react",
-  },
+    "outDir": "../../dist",
+    "declaration": false,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "jsx": "react"
+  }
 }

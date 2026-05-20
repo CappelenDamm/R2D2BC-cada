@@ -97,8 +97,6 @@ import {
   ConsumptionModule,
   ConsumptionModuleConfig,
 } from "../modules/consumption/ConsumptionModule";
-import KeyDownEvent = JQuery.KeyDownEvent;
-
 export type GetContent = (href: string) => Promise<string>;
 export type GetContentBytesLength = (
   href: string,
@@ -110,17 +108,21 @@ export interface RequestConfig extends RequestInit {
 }
 
 export interface NavigatorAPI {
-  updateSettings: any;
+  updateSettings?: (settings: Record<string, unknown>) => Promise<void>;
   getContent: GetContent;
   getContentBytesLength: GetContentBytesLength;
-  resourceReady: any;
-  resourceAtStart: any;
-  resourceAtEnd: any;
-  resourceFitsScreen: any;
-  updateCurrentLocation: any;
-  keydownFallthrough: any;
-  clickThrough: any;
-  direction: any;
+  resourceReady?: () => void;
+  resourceAtStart?: () => void;
+  resourceAtEnd?: () => void;
+  resourceFitsScreen?: () => void;
+  updateCurrentLocation?: (
+    locator: import("../model/Locator").ReadingPosition
+  ) => Promise<void>;
+  positionInfo?: (locator: import("../model/Locator").Locator) => void;
+  chapterInfo?: (title: string | undefined) => void;
+  keydownFallthrough?: (event: KeyboardEvent | undefined) => void;
+  clickThrough?: (event: MouseEvent | TouchEvent) => void;
+  direction?: (dir: string) => void;
   onError?: (e: Error) => void;
 }
 
@@ -130,6 +132,10 @@ export interface IFrameAttributes {
   iframePaddingTop?: number;
   bottomInfoHeight?: number;
   sideNavPosition?: "left" | "right";
+  /** Margin (in px) around fixed-layout content. Defaults to 100. */
+  fixedLayoutMargin?: number;
+  /** Whether to show a drop shadow on fixed-layout spreads. Defaults to true. */
+  fixedLayoutShadow?: boolean;
 }
 export interface IFrameNavigatorConfig {
   mainElement: HTMLElement;
@@ -147,7 +153,7 @@ export interface IFrameNavigatorConfig {
   services?: PublicationServices;
   sample?: SampleRead;
   requestConfig?: RequestConfig;
-  modules: ReaderModule[];
+  modules: Array<ReaderModule | undefined>;
   highlighter: TextHighlighter;
 }
 export interface PublicationServices {
@@ -193,12 +199,25 @@ export interface ReaderRights {
 export interface ReaderUI {
   settings: UserSettingsUIConfig;
 }
+
+/**
+ * Shape of the initial annotations object passed to `D2Reader.load()`.
+ * Both `bookmarks` and `highlights` are optional arrays of their respective types.
+ */
+export interface InitialAnnotations {
+  bookmarks?: import("../model/Locator").Bookmark[];
+  highlights?: import("../model/Locator").Annotation[];
+}
+
 export interface ReaderConfig {
-  publication?: any;
+  /** Pre-parsed publication manifest JSON — if omitted the manifest is fetched from `url`. */
+  publication?: Record<string, unknown>;
   url: URL;
-  userSettings?: any;
-  initialAnnotations?: any;
-  lastReadingPosition?: any;
+  userSettings?: Partial<
+    import("../model/user-settings/UserSettings").InitialUserSettings
+  >;
+  initialAnnotations?: InitialAnnotations;
+  lastReadingPosition?: import("../model/Locator").ReadingPosition;
   rights?: Partial<ReaderRights>;
   api?: Partial<NavigatorAPI>;
   tts?: Partial<TTSModuleConfig>;
@@ -224,6 +243,12 @@ export interface ReaderConfig {
   audioPosition?: {
     saveAudioPosition: (position: number) => Promise<void>;
   };
+  /**
+   * Override the PDF.js worker URL (PDF publications only).
+   * Defaults to the unpkg CDN for the bundled pdfjs-dist version.
+   * Set to a local path when self-hosting the worker, e.g. `"/viewer/pdf.worker.min.mjs"`.
+   */
+  workerSrc?: string;
 }
 
 /** Class that shows webpub resources in an iframe, with navigation controls outside the iframe. */
@@ -369,75 +394,44 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     sample?: SampleRead,
     requestConfig?: RequestConfig,
     highlighter?: TextHighlighter,
-    modules?: ReaderModule[]
+    modules?: Array<ReaderModule | undefined>
   ) {
     super();
     this.highlighter = highlighter;
     if (this.highlighter) {
       this.highlighter.navigator = this;
     }
-    for (const index in modules) {
-      let module = modules[index];
-      if (module) {
-        module.navigator = this;
-      }
-      if (modules[index] instanceof AnnotationModule) {
+    for (const module of modules ?? []) {
+      if (!module) continue;
+      // Allow modules to back-reference the navigator for coordination
+      (module as any).navigator = this;
+      if (module instanceof AnnotationModule) {
         this.annotationModule = module;
-      }
-      if (modules[index] instanceof BookmarkModule) {
+      } else if (module instanceof BookmarkModule) {
         this.bookmarkModule = module;
-      }
-      if (modules[index] instanceof TTSModule2) {
+      } else if (module instanceof TTSModule2) {
         this.ttsModule = module;
-      }
-      if (modules[index] instanceof TTSModule2) {
-        this.ttsModule = module;
-      }
-      if (modules[index] instanceof SearchModule) {
+      } else if (module instanceof SearchModule) {
         this.searchModule = module;
-      }
-      if (modules[index] instanceof DefinitionsModule) {
+      } else if (module instanceof DefinitionsModule) {
         this.definitionsModule = module;
-      }
-      if (modules[index] instanceof TimelineModule) {
+      } else if (module instanceof TimelineModule) {
         this.timelineModule = module;
-      }
-      if (modules[index] instanceof ContentProtectionModule) {
+      } else if (module instanceof ContentProtectionModule) {
         this.contentProtectionModule = module;
-      }
-      if (modules[index] instanceof CitationModule) {
+      } else if (module instanceof CitationModule) {
         this.citationModule = module;
-      }
-      if (modules[index] instanceof MediaOverlayModule) {
+      } else if (module instanceof MediaOverlayModule) {
         this.mediaOverlayModule = module;
-      }
-      if (modules[index] instanceof PageBreakModule) {
+      } else if (module instanceof PageBreakModule) {
         this.pageBreakModule = module;
-      }
-      if (modules[index] instanceof LineFocusModule) {
+      } else if (module instanceof LineFocusModule) {
         this.lineFocusModule = module;
-      }
-      if (modules[index] instanceof HistoryModule) {
+      } else if (module instanceof HistoryModule) {
         this.historyModule = module;
-      }
-      if (modules[index] instanceof ConsumptionModule) {
+      } else if (module instanceof ConsumptionModule) {
         this.consumptionModule = module;
       }
-      // modules: [
-      //   bookmarkModule,
-      //   annotationModule,
-      //   ttsModule,
-      //   searchModule,
-      //   definitionsModule,
-      //   timelineModule,
-      //   contentProtectionModule,
-      //   citationModule,
-      //   mediaOverlayModule,
-      //   pageBreakModule,
-      //   lineFocusModule,
-      //   historyModule,
-      //   consumptionModule,
-      // ],
     }
     this.settings = settings;
     this.annotator = annotator;
@@ -634,16 +628,20 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
             this.iframes.push(iframe2);
 
             secondSpread.appendChild(this.iframes[1]);
-            this.firstSpread.style.clipPath =
-              "polygon(0% -20%, 100% -20%, 100% 120%, -20% 120%)";
-            this.firstSpread.style.boxShadow = "0 0 8px 2px #ccc";
-            secondSpread.style.clipPath =
-              "polygon(0% -20%, 100% -20%, 120% 100%, 0% 120%)";
-            secondSpread.style.boxShadow = "0 0 8px 2px #ccc";
+            if (this.attributes?.fixedLayoutShadow !== false) {
+              this.firstSpread.style.clipPath =
+                "polygon(0% -20%, 100% -20%, 100% 120%, -20% 120%)";
+              this.firstSpread.style.boxShadow = "0 0 8px 2px #ccc";
+              secondSpread.style.clipPath =
+                "polygon(0% -20%, 100% -20%, 120% 100%, 0% 120%)";
+              secondSpread.style.boxShadow = "0 0 8px 2px #ccc";
+            }
           } else {
-            this.firstSpread.style.clipPath =
-              "polygon(0% -20%, 100% -20%, 120% 100%, -20% 120%)";
-            this.firstSpread.style.boxShadow = "0 0 8px 2px #ccc";
+            if (this.attributes?.fixedLayoutShadow !== false) {
+              this.firstSpread.style.clipPath =
+                "polygon(0% -20%, 100% -20%, 120% 100%, -20% 120%)";
+              this.firstSpread.style.boxShadow = "0 0 8px 2px #ccc";
+            }
           }
         } else {
           this.iframes[0].style.paddingTop =
@@ -1484,9 +1482,14 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
         if (this.chapterTitle)
           this.chapterTitle.innerHTML =
             "(" + this.currentChapterLink.title + ")";
+        if (this.api?.chapterInfo)
+          this.api.chapterInfo(this.currentChapterLink.title);
+        this.emit("chapterinfo", this.currentChapterLink.title);
       } else {
         if (this.chapterTitle)
           this.chapterTitle.innerHTML = "(Current Chapter)";
+        if (this.api?.chapterInfo) this.api.chapterInfo(undefined);
+        this.emit("chapterinfo", undefined);
       }
 
       await this.injectInjectablesIntoIframeHead(iframe);
@@ -1845,6 +1848,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                 }
               } else {
                 this.iframes[1].src = "about:blank";
+                this.currentSpreadLinks.right = undefined;
               }
             }
           } else {
@@ -1875,6 +1879,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
               }
             } else {
               this.iframes[0].src = "about:blank";
+              this.currentSpreadLinks.left = undefined;
             }
             if (this.iframes.length === 2 && this.publication.isFixedLayout) {
               this.currentSpreadLinks.right = {
@@ -1981,6 +1986,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                   }
                 } else {
                   this.iframes[1].src = "about:blank";
+                  this.currentSpreadLinks.right = undefined;
                 }
               }
             } else {
@@ -2015,6 +2021,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                   }
                 } else {
                   this.iframes[1].src = "about:blank";
+                  this.currentSpreadLinks.right = undefined;
                 }
               }
             }
@@ -2060,6 +2067,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
               }
             } else {
               this.iframes[0].src = "about:blank";
+              this.currentSpreadLinks.left = undefined;
               if (this.iframes.length === 2) {
                 this.currentSpreadLinks.right = {
                   href: this.currentChapterLink.href,
@@ -2158,13 +2166,14 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
             ? this.iframes[1].parentElement?.parentElement
             : (this.iframes[0].parentElement?.parentElement as HTMLElement);
         if (iframeParent && width) {
+          const fxlMargin = this.attributes?.fixedLayoutMargin ?? 100;
           var widthRatio =
-            (parseInt(getComputedStyle(iframeParent).width) - 100) /
+            (parseInt(getComputedStyle(iframeParent).width) - fxlMargin) /
             (this.iframes.length === 2
-              ? parseInt(width.toString().replace("px", "")) * 2 + 200
+              ? parseInt(width.toString().replace("px", "")) * 2 + fxlMargin * 2
               : parseInt(width.toString().replace("px", "")));
           var heightRatio =
-            (parseInt(getComputedStyle(iframeParent).height) - 100) /
+            (parseInt(getComputedStyle(iframeParent).height) - fxlMargin) /
             parseInt(height.toString().replace("px", ""));
           var scale = Math.min(widthRatio, heightRatio);
           iframeParent.style.transform = "scale(" + scale + ")";
@@ -2284,66 +2293,6 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     }
   }
 
-  startBufferedReadAlong(startTime?: number) {
-    if (
-      this.rights.enableMediaOverlays &&
-      this.mediaOverlayModule !== undefined &&
-      this.hasMediaOverlays
-    ) {
-      this.mediaOverlayModule?.startBufferedReadAloud(startTime);
-    }
-  }
-
-  stopBufferedReadAlong() {
-    if (
-      this.rights.enableMediaOverlays &&
-      this.mediaOverlayModule !== undefined &&
-      this.hasMediaOverlays
-    ) {
-      this.mediaOverlayModule?.stopBufferedReadAloud();
-    }
-  }
-
-  nextBufferedReadAlong() {
-    if (
-      this.rights.enableMediaOverlays &&
-      this.mediaOverlayModule !== undefined &&
-      this.hasMediaOverlays
-    ) {
-      this.mediaOverlayModule?.skipToNextBufferedReadAloud();
-    }
-  }
-
-  previousBufferedReadAlong() {
-    if (
-      this.rights.enableMediaOverlays &&
-      this.mediaOverlayModule !== undefined &&
-      this.hasMediaOverlays
-    ) {
-      this.mediaOverlayModule?.skipToPreviousBufferedReadAloud();
-    }
-  }
-
-  // Buffered read-along helpers
-  seekBufferedBy(deltaSeconds: number) {
-    if (
-      this.rights.enableMediaOverlays &&
-      this.mediaOverlayModule !== undefined &&
-      this.hasMediaOverlays
-    ) {
-      this.mediaOverlayModule?.seekBufferedBy(deltaSeconds);
-    }
-  }
-  getBufferedState(): { position: number; src: string } | undefined {
-    if (
-      this.rights.enableMediaOverlays &&
-      this.mediaOverlayModule !== undefined &&
-      this.hasMediaOverlays
-    ) {
-      return this.mediaOverlayModule?.getBufferedState();
-    }
-    return undefined;
-  }
   totalResources(): number {
     return this.publication.readingOrder.length;
   }
@@ -2473,6 +2422,9 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
       }
     }
     if (position) {
+      if (!position.title && this.currentChapterLink.title) {
+        position.title = this.currentChapterLink.title;
+      }
       position.locations.progression = this.view?.getCurrentPosition();
       position.displayInfo = {
         resourceScreenIndex: Math.round(this.view?.getCurrentPage() ?? 0),
@@ -2482,8 +2434,8 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     return position;
   }
 
-  positions(): any {
-    return this.publication.positions ? this.publication.positions : [];
+  positions(): Locator[] {
+    return this.publication.positions ?? [];
   }
   goToPosition(position: number) {
     if (this.publication.positions) {
@@ -2640,12 +2592,14 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
         this.spreads.appendChild(secondSpread);
         secondSpread.appendChild(this.iframes[1]);
 
-        this.firstSpread.style.clipPath =
-          "polygon(0% -20%, 100% -20%, 100% 120%, -20% 120%)";
-        this.firstSpread.style.boxShadow = "0 0 8px 2px #ccc";
-        secondSpread.style.clipPath =
-          "polygon(0% -20%, 100% -20%, 120% 100%, 0% 120%)";
-        secondSpread.style.boxShadow = "0 0 8px 2px #ccc";
+        if (this.attributes?.fixedLayoutShadow !== false) {
+          this.firstSpread.style.clipPath =
+            "polygon(0% -20%, 100% -20%, 100% 120%, -20% 120%)";
+          this.firstSpread.style.boxShadow = "0 0 8px 2px #ccc";
+          secondSpread.style.clipPath =
+            "polygon(0% -20%, 100% -20%, 120% 100%, 0% 120%)";
+          secondSpread.style.boxShadow = "0 0 8px 2px #ccc";
+        }
       } else {
         if (this.iframes.length === 2) {
           this.iframes.pop();
@@ -2653,9 +2607,11 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
             this.spreads.removeChild(this.spreads.lastChild);
           }
         }
-        this.firstSpread.style.clipPath =
-          "polygon(0% -20%, 100% -20%, 120% 100%, -20% 120%)";
-        this.firstSpread.style.boxShadow = "0 0 8px 2px #ccc";
+        if (this.attributes?.fixedLayoutShadow !== false) {
+          this.firstSpread.style.clipPath =
+            "polygon(0% -20%, 100% -20%, 120% 100%, -20% 120%)";
+          this.firstSpread.style.boxShadow = "0 0 8px 2px #ccc";
+        }
       }
       this.precessContentForIframe();
     }
@@ -2701,13 +2657,18 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
           );
           if (viewport) {
             var dimensionsStr = viewport.content;
-            var obj = dimensionsStr.split(",").reduce((obj, s) => {
-              // @ts-ignore
-              var [key, value] = s.match(/[^\s;=]+/g);
-              obj[key] = isNaN(Number(value)) ? value : +value;
-              return obj;
-            }, {});
-            if (parseInt(obj["height"]) !== 0 || parseInt(obj["width"]) !== 0) {
+            var obj: Record<string, number | string> = {};
+            dimensionsStr.split(",").forEach((s) => {
+              const parts = s.match(/[^\s;=]+/g);
+              if (parts && parts.length >= 2) {
+                const [key, value] = parts;
+                obj[key] = isNaN(Number(value)) ? value : +value;
+              }
+            });
+            if (
+              parseInt(String(obj["height"])) !== 0 ||
+              parseInt(String(obj["width"])) !== 0
+            ) {
               height = obj["height"].toString().endsWith("px")
                 ? obj["height"]
                 : obj["height"] + "px";
@@ -2718,8 +2679,9 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
           }
         }
 
+        const fxlMargin = this.attributes?.fixedLayoutMargin ?? 100;
         var widthRatio =
-          (parseInt(getComputedStyle(iframeParent).width) - 100) /
+          (parseInt(getComputedStyle(iframeParent).width) - fxlMargin) /
           (this.iframes.length === 2
             ? parseInt(
                 width.toString().endsWith("px")
@@ -2727,14 +2689,14 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                   : width
               ) *
                 2 +
-              200
+              fxlMargin * 2
             : parseInt(
                 width.toString().endsWith("px")
                   ? width?.replace("px", "")
                   : width
               ));
         var heightRatio =
-          (parseInt(getComputedStyle(iframeParent).height) - 100) /
+          (parseInt(getComputedStyle(iframeParent).height) - fxlMargin) /
           parseInt(height.toString().replace("px", ""));
         var scale = Math.min(widthRatio, heightRatio);
         iframeParent.style.transform = "scale(" + scale + ")";
@@ -2851,6 +2813,10 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
             this.chapterPosition.innerHTML =
               "Page " + currentPage + " of " + pageCount;
           }
+          if (this.api?.positionInfo) {
+            this.api.positionInfo(locator);
+          }
+          this.emit("positioninfo", locator);
         }
       } else {
         if (this.chapterPosition) this.chapterPosition.innerHTML = "";
@@ -2950,7 +2916,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     }
   }
 
-  private handleKeydownFallthrough(event: KeyDownEvent | undefined): void {
+  private handleKeydownFallthrough(event: KeyboardEvent | undefined): void {
     if (this.api?.keydownFallthrough) this.api?.keydownFallthrough(event);
     this.emit("keydown", event);
   }
@@ -3148,9 +3114,14 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
           if (this.chapterTitle)
             this.chapterTitle.innerHTML =
               "(" + this.currentChapterLink.title + ")";
+          if (this.api?.chapterInfo)
+            this.api.chapterInfo(this.currentChapterLink.title);
+          this.emit("chapterinfo", this.currentChapterLink.title);
         } else {
           if (this.chapterTitle)
             this.chapterTitle.innerHTML = "(Current Chapter)";
+          if (this.api?.chapterInfo) this.api.chapterInfo(undefined);
+          this.emit("chapterinfo", undefined);
         }
         await this.updatePositionInfo();
       } else {
@@ -3341,6 +3312,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
         this.loadingMessage.classList.remove("is-loading");
       }
       if (this.view?.layout !== "fixed") {
+        this.view?.padOddColumns?.();
         if (this.view?.atStart() && this.view?.atEnd()) {
           if (this.api?.resourceFitsScreen) this.api?.resourceFitsScreen();
           this.emit("resource.fits");

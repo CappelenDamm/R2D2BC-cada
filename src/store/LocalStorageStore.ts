@@ -21,10 +21,10 @@ import Store from "./Store";
 import MemoryStore from "./MemoryStore";
 
 export interface LocalStorageStoreConfig {
-  /** String to prepend to keys in localStorage. If the same prefix is shared
-        across LocalStorageStores on the same domain, they will have the same
-        value for each key. */
-  prefix: string;
+  /** String (or URL, which is coerced via .toString()) to prepend to keys in
+   *  localStorage. If the same prefix is shared across LocalStorageStores on
+   *  the same domain, they will have the same value for each key. */
+  prefix: string | URL;
   useLocalStorage: boolean;
   useStorageType: string | undefined;
 }
@@ -38,7 +38,7 @@ export default class LocalStorageStore implements Store {
   private readonly useStorageType: string | undefined;
 
   public constructor(config: LocalStorageStoreConfig) {
-    this.prefix = config.prefix;
+    this.prefix = config.prefix.toString();
     this.useLocalStorage = config.useLocalStorage;
     this.useStorageType = config.useStorageType;
     try {

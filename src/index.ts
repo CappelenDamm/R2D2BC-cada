@@ -24,15 +24,46 @@ export default D2Reader;
 /** for interop with \<script\> based usage */
 export const load = D2Reader.load;
 
+// ─── Models ─────────────────────────────────────────────────────────────────
+
 export { Link } from "./model/Link";
-export {
-  Locator,
-  ReadingPosition,
-  Annotation,
-  AnnotationMarker,
-  Bookmark,
-} from "./model/Locator";
 
 export { ISearchResult as SearchResult } from "./modules/search/searchWithDomSeek";
 export { IColor as Color } from "./modules/highlight/common/highlight";
 export { IUserSettings as UserSettings } from "./model/user-settings/UserSettings";
+
+export {
+  Locator,
+  Locations,
+  LocatorText,
+  ReadingPosition,
+  Bookmark,
+  Annotation,
+  AnnotationMarker,
+} from "./model/Locator";
+
+// ─── Navigator / Config ─────────────────────────────────────────────────────
+
+export type {
+  ReaderConfig,
+  ReaderRights,
+  NavigatorAPI,
+  IFrameAttributes,
+  Injectable,
+  RequestConfig,
+  SampleRead,
+  PublicationServices,
+  InitialAnnotations,
+} from "./navigator/IFrameNavigator";
+
+// ─── User Settings ───────────────────────────────────────────────────────────
+
+export type {
+  IUserSettings,
+  InitialUserSettings,
+} from "./model/user-settings/UserSettings";
+export type { UserSettingsIncrementable } from "./model/user-settings/UserProperties";
+
+// ─── Storage ─────────────────────────────────────────────────────────────────
+
+export type { LocalStorageStoreConfig } from "./store/LocalStorageStore";

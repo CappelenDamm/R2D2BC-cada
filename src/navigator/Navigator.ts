@@ -19,13 +19,15 @@
 
 import { Locator } from "../model/Locator";
 import { IFrameAttributes } from "./IFrameNavigator";
+import { Publication } from "../model/Publication";
+import { Link } from "../model/Link";
 
 interface Navigator {
-  publication: any;
-  rights?: any;
-  hasMediaOverlays?: any;
+  publication: Publication;
+  rights?: Record<string, boolean>;
+  hasMediaOverlays?: boolean;
 
-  addListener?(argument: any, argument2: any): void;
+  addListener?(event: string, handler: (...args: any[]) => void): void;
 
   startReadAloud?(): void;
 
@@ -43,35 +45,36 @@ interface Navigator {
 
   resumeReadAlong?(): void;
 
-  hideLayer?(layer): any;
+  hideLayer?(layer: string): void;
 
-  showLayer?(layer): any;
+  showLayer?(layer: string): void;
 
-  activateMarker?(id: string, position: string): any;
+  activateMarker?(id: string, position: string): void;
 
-  deactivateMarker?(): any;
+  deactivateMarker?(): void;
 
-  tableOfContents(): any;
-  landmarks(): any;
-  pageList(): any;
+  tableOfContents(): Link[];
+  landmarks(): Link[];
+  pageList(): Link[];
 
-  readingOrder(): any;
+  readingOrder(): Link[];
 
-  currentResource(): any;
+  /** Returns the spine index of the current resource, or undefined if not yet loaded. */
+  currentResource(): number | undefined;
 
-  mostRecentNavigatedTocItem?(): any;
+  mostRecentNavigatedTocItem?(): string | undefined;
 
-  totalResources(): any;
+  totalResources(): number;
 
-  currentLocator(): any;
+  currentLocator(): Locator;
 
-  positions(): any;
+  positions(): Locator[];
 
   goTo(locator: Locator): void;
 
-  goToPosition(value: number);
+  goToPosition(value: number): void;
 
-  goToPage(page: number);
+  goToPage(page: number): void;
 
   nextResource(): void;
 
@@ -81,11 +84,11 @@ interface Navigator {
 
   previousPage(): void;
 
-  atStart?(): any;
+  atStart?(): boolean;
 
-  atEnd?(): any;
+  atEnd?(): boolean;
 
-  snapToSelector?(selector): void;
+  snapToSelector?(selector: string): void;
 
   applyAttributes?(value: IFrameAttributes): void;
 
