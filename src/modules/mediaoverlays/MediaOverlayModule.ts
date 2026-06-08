@@ -143,6 +143,9 @@ export class MediaOverlayModule implements ReaderModule {
     this.currentLinks = links;
     this.currentLinkIndex = 0;
     await this.playLink();
+    if (this.settings.playing) {
+      this.bindClickHandler();
+    }
   }
 
   private async playLink() {
@@ -996,6 +999,7 @@ export class MediaOverlayModule implements ReaderModule {
       this.pid = id;
     }
     if (
+      this.settings.autoScroll &&
       current &&
       (this.publication.Metadata.Rendition?.Layout ?? "unknown") !== "fixed"
     ) {

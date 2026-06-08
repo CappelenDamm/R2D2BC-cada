@@ -107,23 +107,23 @@ export class MediaOverlaySettings implements IMediaOverlayUserSettings {
         settings.color = initialSettings.color;
         log.log(settings.color);
       }
-      if (initialSettings?.autoScroll) {
+      if (initialSettings?.autoScroll !== undefined) {
         settings.autoScroll = initialSettings.autoScroll;
         log.log(settings.autoScroll);
       }
-      if (initialSettings?.autoTurn) {
+      if (initialSettings?.autoTurn !== undefined) {
         settings.autoTurn = initialSettings.autoTurn;
-        log.log(settings.autoScroll);
+        log.log(settings.autoTurn);
       }
-      if (initialSettings?.volume) {
+      if (initialSettings?.volume !== undefined) {
         settings.volume = initialSettings.volume;
         log.log(settings.volume);
       }
-      if (initialSettings?.rate) {
+      if (initialSettings?.rate !== undefined) {
         settings.rate = initialSettings.rate;
         log.log(settings.rate);
       }
-      if (initialSettings?.wait) {
+      if (initialSettings?.wait !== undefined) {
         settings.wait = initialSettings.wait;
         log.log(settings.wait);
       }
