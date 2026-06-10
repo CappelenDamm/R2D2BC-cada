@@ -81,6 +81,7 @@ export default class ReflowableBookView implements BookView {
       this.setSize();
       this.setIframeHeight(this.iframe);
     } else {
+      this.unbindContentResizeObserver();
       this.height = BrowserUtilities.getHeight() - 40 - this.attributes.margin;
       this.name = "readium-scroll-off";
       this.label = "Paginated";
@@ -152,11 +153,7 @@ export default class ReflowableBookView implements BookView {
   }
 
   stop(): void {
-    if (this._contentResizeObserver) {
-      this._contentResizeObserver?.disconnect();
-      this._contentResizeObserver = undefined;
-      this._contentResizeBody = undefined;
-    }
+    this.unbindContentResizeObserver();
 
     this.iframe.height = "0";
     this.iframe.width = "0";
@@ -514,6 +511,13 @@ export default class ReflowableBookView implements BookView {
   private _contentResizeObserver: ResizeObserver | undefined;
   private _contentResizeBody: HTMLElement | undefined;
 
+  private unbindContentResizeObserver() {
+    if (!this._contentResizeObserver) return;
+    this._contentResizeObserver.disconnect();
+    this._contentResizeObserver = undefined;
+    this._contentResizeBody = undefined;
+  }
+
   /** Binds a ResizeObserver to the iframe's body to adjust its height dynamically.
    * This is needed to accommodate content that changes size after initial load,
    * such as the <details> element expanding/collapsing.
@@ -527,11 +531,7 @@ export default class ReflowableBookView implements BookView {
       return;
     }
 
-    if (this._contentResizeObserver) {
-      this._contentResizeObserver?.disconnect();
-      this._contentResizeObserver = undefined;
-      this._contentResizeBody = undefined;
-    }
+    this.unbindContentResizeObserver();
 
     // Capture how much taller the <html> element is than the <body> at bind
     // time (e.g. from `html { height: 100%; }` in Readium CSS). This produces
