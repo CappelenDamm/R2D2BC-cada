@@ -527,23 +527,27 @@ export default class ReflowableBookView implements BookView {
       this._contentResizeBody = undefined;
     }
 
-    const minHeight = BrowserUtilities.getHeight() - this.attributes.margin;
+    // Capture how much taller the <html> element is than the <body> at bind
+    // time (e.g. from `html { height: 100%; }` in Readium CSS). This produces
+    // the visual "padding" below the content. We store it as a fixed offset so
+    // the observer can reproduce it without querying html.scrollHeight /
+    // html.offsetHeight — those are inflated by the iframe's own height and
+    // create a circular dependency that prevents the iframe from ever shrinking.
+    const html = iframe.contentWindow?.document?.documentElement;
+    const initialBodyHeight =
+      body.getBoundingClientRect().height + this.attributes.margin;
+    const htmlExtra = Math.max(
+      0,
+      (html?.offsetHeight ?? 0) - initialBodyHeight
+    );
+
     const debouncedResize = debounce((entries: ResizeObserverEntry[]) => {
       for (const entry of entries) {
-        const bodyStyle = iframe.contentWindow?.getComputedStyle(
-          entry.target as HTMLElement
-        );
-        const marginTop = parseFloat(bodyStyle?.marginTop ?? "0") || 0;
-        const marginBottom = parseFloat(bodyStyle?.marginBottom ?? "0") || 0;
-        const paddingTop = parseFloat(bodyStyle?.paddingTop ?? "0") || 0;
-        const paddingBottom = parseFloat(bodyStyle?.paddingBottom ?? "0") || 0;
-        const height =
-          entry.contentRect.height +
-          marginTop +
-          marginBottom +
-          paddingTop +
-          paddingBottom;
+        const height = entry.contentRect.height + htmlExtra;
+
         if (height) {
+          const minHeight =
+            BrowserUtilities.getHeight() - this.attributes.margin;
           iframe.height = Math.max(minHeight, height) + "px";
         }
       }
