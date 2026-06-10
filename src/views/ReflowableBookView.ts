@@ -540,8 +540,7 @@ export default class ReflowableBookView implements BookView {
     // html.offsetHeight — those are inflated by the iframe's own height and
     // create a circular dependency that prevents the iframe from ever shrinking.
     const html = iframe.contentWindow?.document?.documentElement;
-    const initialBodyHeight =
-      body.getBoundingClientRect().height + this.attributes.margin;
+    const initialBodyHeight = body.getBoundingClientRect().height;
     const htmlExtra = Math.max(
       0,
       (html?.offsetHeight ?? 0) - initialBodyHeight
