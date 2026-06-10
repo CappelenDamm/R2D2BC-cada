@@ -526,7 +526,7 @@ export default class ReflowableBookView implements BookView {
     const body = iframe?.contentDocument?.body as HTMLElement | undefined;
     if (!body) return;
 
-    // Rebind when the iframe document/body changes (resource navigation),
+    // Do not re-bind if the same body is already being observed.
     if (this._contentResizeBody === body) {
       return;
     }
