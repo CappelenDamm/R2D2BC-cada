@@ -502,6 +502,55 @@ export default class ReflowableBookView implements BookView {
       }
     }, 200);
     d(iframe);
+    this.bindContentResizeObserver(iframe);
+  }
+
+  private _contentResizeObserver: ResizeObserver | undefined;
+  private _contentResizeBody: HTMLElement | undefined;
+
+  /** Binds a ResizeObserver to the iframe's body to adjust its height dynamically.
+   * This is needed to accommodate content that changes size after initial load,
+   * such as the <details> element expanding/collapsing.
+   */
+  private bindContentResizeObserver(iframe: any) {
+    const body = iframe?.contentDocument?.body as HTMLElement | undefined;
+    if (!body) return;
+
+    // Rebind when the iframe document/body changes (resource navigation),
+    if (this._contentResizeBody === body) {
+      return;
+    }
+
+    if (this._contentResizeObserver) {
+      this._contentResizeObserver?.disconnect();
+      this._contentResizeObserver = undefined;
+      this._contentResizeBody = undefined;
+    }
+
+    const minHeight = BrowserUtilities.getHeight() - this.attributes.margin;
+    const debouncedResize = debounce((entries: ResizeObserverEntry[]) => {
+      for (const entry of entries) {
+        const bodyStyle = iframe.contentWindow?.getComputedStyle(
+          entry.target as HTMLElement
+        );
+        const marginTop = parseFloat(bodyStyle?.marginTop ?? "0") || 0;
+        const marginBottom = parseFloat(bodyStyle?.marginBottom ?? "0") || 0;
+        const paddingTop = parseFloat(bodyStyle?.paddingTop ?? "0") || 0;
+        const paddingBottom = parseFloat(bodyStyle?.paddingBottom ?? "0") || 0;
+        const height =
+          entry.contentRect.height +
+          marginTop +
+          marginBottom +
+          paddingTop +
+          paddingBottom;
+        if (height) {
+          iframe.height = Math.max(minHeight, height) + "px";
+        }
+      }
+    }, 20);
+    this._contentResizeObserver = new ResizeObserver(debouncedResize);
+    this._contentResizeObserver.observe(body);
+    this._contentResizeBody = body;
   }
 
   // paginated functions
