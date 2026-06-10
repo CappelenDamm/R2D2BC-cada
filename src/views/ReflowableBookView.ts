@@ -152,6 +152,12 @@ export default class ReflowableBookView implements BookView {
   }
 
   stop(): void {
+    if (this._contentResizeObserver) {
+      this._contentResizeObserver?.disconnect();
+      this._contentResizeObserver = undefined;
+      this._contentResizeBody = undefined;
+    }
+
     this.iframe.height = "0";
     this.iframe.width = "0";
     let doc = this.iframe.contentDocument;
