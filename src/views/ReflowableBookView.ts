@@ -522,9 +522,9 @@ export default class ReflowableBookView implements BookView {
    * This is needed to accommodate content that changes size after initial load,
    * such as the <details> element expanding/collapsing.
    */
-  private bindContentResizeObserver(iframe: any) {
-    const body = iframe?.contentDocument?.body as HTMLElement | undefined;
-    if (!body) return;
+  private bindContentResizeObserver(iframe: HTMLIFrameElement | undefined) {
+    const body = iframe?.contentDocument?.body;
+    if (!body || !iframe) return;
 
     // Do not re-bind if the same body is already being observed.
     if (this._contentResizeBody === body) {
