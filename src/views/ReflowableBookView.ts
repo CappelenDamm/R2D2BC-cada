@@ -81,6 +81,7 @@ export default class ReflowableBookView implements BookView {
       this.setSize();
       this.setIframeHeight(this.iframe);
     } else {
+      this.unbindContentResizeObserver();
       this.height = BrowserUtilities.getHeight() - 40 - this.attributes.margin;
       this.name = "readium-scroll-off";
       this.label = "Paginated";
@@ -152,6 +153,8 @@ export default class ReflowableBookView implements BookView {
   }
 
   stop(): void {
+    this.unbindContentResizeObserver();
+
     this.iframe.height = "0";
     this.iframe.width = "0";
     let doc = this.iframe.contentDocument;
@@ -502,6 +505,65 @@ export default class ReflowableBookView implements BookView {
       }
     }, 200);
     d(iframe);
+    this.bindContentResizeObserver(iframe);
+  }
+
+  private _contentResizeObserver: ResizeObserver | undefined;
+  private _contentResizeBody: HTMLElement | undefined;
+
+  private unbindContentResizeObserver() {
+    if (!this._contentResizeObserver) return;
+    this._contentResizeObserver.disconnect();
+    this._contentResizeObserver = undefined;
+    this._contentResizeBody = undefined;
+  }
+
+  /** Binds a ResizeObserver to the iframe's body to adjust its height dynamically.
+   * This is needed to accommodate content that changes size after initial load,
+   * such as the <details> element expanding/collapsing.
+   */
+  private bindContentResizeObserver(iframe: HTMLIFrameElement | undefined) {
+    const body = iframe?.contentDocument?.body;
+    if (!body || !iframe) return;
+
+    // Do not re-bind if the same body is already being observed.
+    if (this._contentResizeBody === body) {
+      return;
+    }
+
+    this.unbindContentResizeObserver();
+
+    // Capture how much taller the <html> element is than the <body> at bind
+    // time (e.g. from `html { height: 100%; }` in Readium CSS). This produces
+    // the visual "padding" below the content. We store it as a fixed offset so
+    // the observer can reproduce it without querying html.scrollHeight /
+    // html.offsetHeight — those are inflated by the iframe's own height and
+    // create a circular dependency that prevents the iframe from ever shrinking.
+    const html = iframe.contentWindow?.document?.documentElement;
+    const initialBodyHeight = body.getBoundingClientRect().height;
+    const htmlExtra = Math.max(
+      0,
+      (html?.offsetHeight ?? 0) - initialBodyHeight
+    );
+
+    let _resizeObserver: ResizeObserver | undefined;
+    const debouncedResize = debounce((entries: ResizeObserverEntry[]) => {
+      // Ignore any pending debounced callbacks after the observer has been unbound/replaced.
+      if (this._contentResizeObserver !== _resizeObserver) return;
+      for (const entry of entries) {
+        const height = entry.contentRect.height + htmlExtra;
+
+        if (height) {
+          const minHeight =
+            BrowserUtilities.getHeight() - this.attributes.margin;
+          iframe.height = Math.max(minHeight, height) + "px";
+        }
+      }
+    }, 20);
+    _resizeObserver = new ResizeObserver(debouncedResize);
+    this._contentResizeObserver = _resizeObserver;
+    _resizeObserver.observe(body);
+    this._contentResizeBody = body;
   }
 
   // paginated functions
