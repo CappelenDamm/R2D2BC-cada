@@ -546,7 +546,10 @@ export default class ReflowableBookView implements BookView {
       (html?.offsetHeight ?? 0) - initialBodyHeight
     );
 
+    let _resizeObserver: ResizeObserver | undefined;
     const debouncedResize = debounce((entries: ResizeObserverEntry[]) => {
+      // Ignore any pending debounced callbacks after the observer has been unbound/replaced.
+      if (this._contentResizeObserver !== _resizeObserver) return;
       for (const entry of entries) {
         const height = entry.contentRect.height + htmlExtra;
 
@@ -557,8 +560,9 @@ export default class ReflowableBookView implements BookView {
         }
       }
     }, 20);
-    this._contentResizeObserver = new ResizeObserver(debouncedResize);
-    this._contentResizeObserver.observe(body);
+    _resizeObserver = new ResizeObserver(debouncedResize);
+    this._contentResizeObserver = _resizeObserver;
+    _resizeObserver.observe(body);
     this._contentResizeBody = body;
   }
 
