@@ -1007,6 +1007,8 @@ export class MediaOverlayModule implements ReaderModule {
     }
   }
   private throttledScrollIntoView = throttle((element: HTMLElement) => {
+    //Prevent scrolling if autoScroll is disabled within the throttle delay
+    if (!this.settings.autoScroll) return;
     element.scrollIntoView({
       block: "center",
       behavior: "smooth",
