@@ -2263,6 +2263,17 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     }
   }
 
+  async startReadAlongFromId(id: string): Promise<boolean> {
+    if (
+      this.rights.enableMediaOverlays &&
+      this.mediaOverlayModule !== undefined &&
+      this.hasMediaOverlays
+    ) {
+      return (await this.mediaOverlayModule?.startReadAlongFromId(id)) ?? false;
+    }
+    return false;
+  }
+
   stopReadAlong() {
     if (
       this.rights.enableMediaOverlays &&

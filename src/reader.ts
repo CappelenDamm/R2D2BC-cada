@@ -503,6 +503,16 @@ export default class D2Reader {
       }
     }
   };
+  /**
+   * Start Media Overlay Read Along from a given SMIL fragment id (e.g. "mo-518").
+   * Resolves to `true` if the id was found and playback started, otherwise `false`.
+   */
+  startReadAlongFromId = (id: string): Promise<boolean> => {
+    if (this.navigator instanceof IFrameNavigator) {
+      return this.navigator.startReadAlongFromId(id);
+    }
+    return Promise.resolve(false);
+  };
   /** Stop Media Overlay Read Along */
   stopReadAlong = () => {
     if (this.navigator instanceof IFrameNavigator) {
