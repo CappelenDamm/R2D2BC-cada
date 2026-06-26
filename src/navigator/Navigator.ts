@@ -39,6 +39,8 @@ interface Navigator {
 
   startReadAlong?(position?: number): void;
 
+  startReadAlongFromId?(id: string): Promise<boolean>;
+
   stopReadAlong?(): void;
 
   pauseReadAlong?(): void;

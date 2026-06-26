@@ -262,43 +262,15 @@ export class MediaOverlayModule implements ReaderModule {
 
     // If clicking on a different page, load its MO first
     if (clickedLinkIndex !== this.currentLinkIndex || !this.mediaOverlayRoot) {
-      if (!link.MediaOverlays?.initialized) {
-        // MO not loaded for this page yet — load it
-        if (link.Properties?.MediaOverlay) {
-          const moUrl = link.Properties.MediaOverlay;
-          const moUrlObjFull = new URL(moUrl, this.publication.manifestUrl);
-          try {
-            const response = await fetch(
-              moUrlObjFull.toString(),
-              this.navigator.requestConfig
-            );
-            if (response.ok) {
-              const moJson = await response.json();
-              if (moJson) {
-                link.MediaOverlays = TaJsonDeserialize<MediaOverlayNode>(
-                  moJson,
-                  MediaOverlayNode
-                );
-                link.MediaOverlays.initialized = true;
-              }
-            }
-          } catch (e) {
-            log.log(
-              "handleContentClick() - failed to load MO for clicked page"
-            );
-            return;
-          }
-        } else {
-          return; // No MO for this page
-        }
-      }
+      const loaded = await this.ensureLinkMediaOverlaysLoaded(link);
+      if (!loaded) return;
       this.currentLinkIndex = clickedLinkIndex;
       this.mediaOverlayRoot = link.MediaOverlays!;
     }
 
     const href = link.HrefDecoded || link.Href;
     const hrefUrlObj = new URL("https://dita.digital/" + href);
-    const textHref = hrefUrlObj.pathname.substr(1);
+    const textHref = hrefUrlObj.pathname.substring(1);
 
     // Find the matching text/audio pair
     const moTextAudioPair = this.findDepthFirstTextAudioPair(
@@ -318,6 +290,65 @@ export class MediaOverlayModule implements ReaderModule {
       }
       await this.playMediaOverlaysAudio(moTextAudioPair, undefined, undefined);
     }
+  }
+
+  /**
+   * Ensures a link's MediaOverlays tree is fetched and deserialized.
+   * Returns true if the link has an initialized MediaOverlays tree.
+   */
+  private async ensureLinkMediaOverlaysLoaded(link: Link): Promise<boolean> {
+    if (link.MediaOverlays?.initialized) {
+      return true;
+    }
+    if (!link.Properties?.MediaOverlay) {
+      return false;
+    }
+    const moUrl = link.Properties.MediaOverlay;
+    const moUrlObjFull = new URL(moUrl, this.publication.manifestUrl);
+    try {
+      const response = await fetch(
+        moUrlObjFull.toString(),
+        this.navigator.requestConfig
+      );
+      if (response.ok) {
+        const moJson = await response.json();
+        if (moJson) {
+          link.MediaOverlays = TaJsonDeserialize<MediaOverlayNode>(
+            moJson,
+            MediaOverlayNode
+          );
+          link.MediaOverlays.initialized = true;
+        }
+      }
+    } catch (e) {
+      log.log("ensureLinkMediaOverlaysLoaded() - failed to load MO");
+      return false;
+    }
+    return !!link.MediaOverlays?.initialized;
+  }
+
+  /**
+   * Returns the first leaf text/audio node whose Text fragment id equals the
+   * given id (e.g. "mo-518"), or undefined if none is found.
+   */
+  private findLeafByFragmentId(
+    mo: MediaOverlayNode,
+    fragmentId: string
+  ): MediaOverlayNode | undefined {
+    if (!mo.Children || !mo.Children.length) {
+      if (mo.Text) {
+        const hash = new URL("https://dita.digital/" + mo.Text).hash.substring(
+          1
+        );
+        if (hash === fragmentId) return mo;
+      }
+      return undefined;
+    }
+    for (const child of mo.Children) {
+      const match = this.findLeafByFragmentId(child, fragmentId);
+      if (match) return match;
+    }
+    return undefined;
   }
 
   async startReadAloud(startTime?: number) {
@@ -359,6 +390,55 @@ export class MediaOverlayModule implements ReaderModule {
       if (this.pause) this.pause.style.removeProperty("display");
       this.bindClickHandler();
     }
+  }
+
+  /**
+   * Starts Media Overlay read-along playback from a given SMIL fragment id
+   * (e.g. "mo-518"), searching the currently displayed resource(s). Starts
+   * playback even if read-along is currently stopped.
+   *
+   * Resolves to `true` if a matching node was found and playback started,
+   * or `false` if the id could not be found in the current resource(s).
+   */
+  async startReadAlongFromId(id: string): Promise<boolean> {
+    if (!this.navigator.rights.enableMediaOverlays || !this.currentLinks) {
+      return false;
+    }
+
+    for (let i = 0; i < this.currentLinks.length; i++) {
+      const link = this.currentLinks[i];
+      if (!link) continue;
+
+      const loaded = await this.ensureLinkMediaOverlaysLoaded(link);
+      if (!loaded || !link.MediaOverlays) continue;
+
+      const moTextAudioPair = this.findLeafByFragmentId(link.MediaOverlays, id);
+
+      if (!moTextAudioPair || !moTextAudioPair.Audio) {
+        continue;
+      }
+
+      this.currentLinkIndex = i;
+      this.mediaOverlayRoot = link.MediaOverlays;
+      this.mediaOverlayGenerator = this.textAudioPairGenerator(
+        link.MediaOverlays
+      );
+      this.settings.playing = true;
+
+      // Pause before jumping so that playMediaOverlaysAudio takes the
+      // "paused" code path and seeks to the correct position instead of
+      // treating the transition as contiguous sequential playback.
+      if (this.audioElement) {
+        this.audioElement.pause();
+      }
+      await this.playMediaOverlaysAudio(moTextAudioPair, undefined, undefined);
+
+      this.bindClickHandler();
+      return true;
+    }
+
+    log.warn("startReadAlongFromId() - id not found: " + id);
+    return false;
   }
 
   async stopReadAloud() {
