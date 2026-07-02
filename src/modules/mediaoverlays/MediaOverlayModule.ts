@@ -1070,10 +1070,13 @@ export class MediaOverlayModule implements ReaderModule {
     if (!current) return;
 
     current.classList.add(classActive);
-    this.findAndOpenDetailsElements(current);
     this.pid = id;
 
-    if (this.settings.autoScroll && this.publication.isReflowable) {
+    if (!this.publication.isReflowable) return;
+
+    this.findAndOpenDetailsElements(current);
+
+    if (this.settings.autoScroll) {
       this.throttledScrollIntoView(current);
     }
   }
