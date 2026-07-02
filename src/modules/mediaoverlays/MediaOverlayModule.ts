@@ -1045,9 +1045,7 @@ export class MediaOverlayModule implements ReaderModule {
       ? styleAttr.indexOf("readium-sepia-on") > 0
       : false;
 
-    if (
-      (this.publication.Metadata.Rendition?.Layout ?? "unknown") !== "fixed"
-    ) {
+    if (this.publication.isReflowable) {
       classActive =
         isNight || isSepia
           ? R2_MO_CLASS_ACTIVE
@@ -1066,26 +1064,29 @@ export class MediaOverlayModule implements ReaderModule {
       }
     }
 
-    let current;
-    if (id) {
-      if (this.currentLinkIndex === 0) {
-        current = this.navigator.iframes[0].contentDocument?.getElementById(id);
-      } else {
-        current = this.navigator.iframes[1].contentDocument?.getElementById(id);
-      }
-      if (current) {
-        current.classList.add(classActive);
-      }
-      this.pid = id;
-    }
-    if (
-      this.settings.autoScroll &&
-      current &&
-      (this.publication.Metadata.Rendition?.Layout ?? "unknown") !== "fixed"
-    ) {
-      this.throttledScrollIntoView(current as HTMLElement);
+    const iframe = this.navigator.iframes[this.currentLinkIndex];
+    const current = id ? iframe?.contentDocument?.getElementById(id) : null;
+
+    if (!current) return;
+
+    current.classList.add(classActive);
+    this.findAndOpenDetailsElements(current);
+    this.pid = id;
+
+    if (this.settings.autoScroll && this.publication.isReflowable) {
+      this.throttledScrollIntoView(current);
     }
   }
+
+  private findAndOpenDetailsElements(element: HTMLElement) {
+    const details = element.closest<HTMLDetailsElement>("details:not([open])");
+    if (!details) return;
+    details.open = true;
+    if (details.parentElement) {
+      this.findAndOpenDetailsElements(details.parentElement);
+    }
+  }
+
   private throttledScrollIntoView = throttle((element: HTMLElement) => {
     //Prevent scrolling if autoScroll is disabled within the throttle delay
     if (!this.settings.autoScroll) return;
