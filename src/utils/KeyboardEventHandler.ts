@@ -90,6 +90,11 @@ export default class KeyboardEventHandler {
           return;
         }
 
+        // Only handle keydown events when the reader iframe has focus
+        if (!(document.activeElement instanceof HTMLIFrameElement)) {
+          return;
+        }
+
         const key = event.key;
         switch (key) {
           case "ArrowRight":
