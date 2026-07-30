@@ -77,7 +77,7 @@ export default class KeyboardEventHandler {
       (this.handlers["onKeyDown"] = function (event: KeyboardEvent) {
         // Ignore input elements
         const eventTarget = event.target as HTMLElement;
-        if (/input|select|option|textarea/i.test(eventTarget.tagName)) {
+        if (/input|select|option|textarea|button/i.test(eventTarget.tagName)) {
           return;
         }
 
@@ -90,8 +90,12 @@ export default class KeyboardEventHandler {
           return;
         }
 
-        // Only handle keydown events when the reader iframe has focus
-        if (!(document.activeElement instanceof HTMLIFrameElement)) {
+        // Only handle keydown events when a reader iframe has focus
+        const activeElement = document.activeElement;
+        if (
+          !(activeElement instanceof HTMLIFrameElement) ||
+          !self.navigator.iframes.includes(activeElement)
+        ) {
           return;
         }
 
