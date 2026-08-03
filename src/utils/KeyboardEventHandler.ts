@@ -80,6 +80,11 @@ export default class KeyboardEventHandler {
         if (/input|select|option|textarea|button/i.test(eventTarget.tagName)) {
           return;
         }
+        if (/summary/i.test(eventTarget.tagName)) {
+          // Prevent event from reaching the outer document, which would scroll the page
+          event.stopPropagation();
+          return;
+        }
 
         // Ignore when active text selection
         const ownerDocument = (eventTarget.ownerDocument ||
@@ -90,14 +95,15 @@ export default class KeyboardEventHandler {
           return;
         }
 
-        // Only handle keydown events when a reader iframe has focus
+        // Only handle keydown events when the reader has focus
         const activeElement = document.activeElement;
-        if (
-          !(activeElement instanceof HTMLIFrameElement) ||
-          !self.navigator.iframes.includes(activeElement)
-        ) {
-          return;
-        }
+        const iframeHasFocus =
+          activeElement instanceof HTMLIFrameElement &&
+          self.navigator.iframes.includes(activeElement);
+        const wrapperHasFocus =
+          activeElement === document.querySelector("main#iframe-wrapper");
+
+        if (!iframeHasFocus && !wrapperHasFocus) return;
 
         const key = event.key;
         switch (key) {
