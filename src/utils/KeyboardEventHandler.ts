@@ -100,7 +100,7 @@ export default class KeyboardEventHandler {
         const iframeHasFocus =
           activeElement instanceof HTMLIFrameElement &&
           self.navigator.iframes.includes(activeElement);
-        const wrapperHasFocus = eventTarget.closest("main#iframe-wrapper");
+        const wrapperHasFocus = !!eventTarget.closest("main#iframe-wrapper");
 
         if (!iframeHasFocus && !wrapperHasFocus) return;
 
