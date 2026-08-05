@@ -39,12 +39,12 @@ log.setLevel("trace", true);
 // Read Aloud
 
 export interface MediaOverlayModuleAPI {
-  started: any;
-  stopped: any;
-  paused: any;
-  resumed: any;
-  finished: any;
-  updateSettings: any;
+  started?: any;
+  stopped?: any;
+  paused?: any;
+  resumed?: any;
+  finished?: any;
+  updateSettings?: any;
 }
 export interface MediaOverlayModuleProperties {
   color?: string;
@@ -73,6 +73,7 @@ export class MediaOverlayModule implements ReaderModule {
 
   settings: MediaOverlaySettings;
   private properties: MediaOverlayModuleProperties;
+  private api: MediaOverlayModuleAPI | undefined;
   private play: HTMLLinkElement = HTMLUtilities.findElement(
     document,
     "#menu-button-play"
@@ -97,12 +98,12 @@ export class MediaOverlayModule implements ReaderModule {
   private pid: string | undefined = undefined;
   private __ontimeupdate = false;
   private clickHandler: ((event: MouseEvent) => void) | undefined;
-
   public static create(config: MediaOverlayModuleConfig) {
     const mediaOverlay = new this(
       config.publication,
       config.settings,
-      config as MediaOverlayModuleProperties
+      config as MediaOverlayModuleProperties,
+      config.api
     );
     mediaOverlay.start();
     return mediaOverlay;
@@ -111,11 +112,13 @@ export class MediaOverlayModule implements ReaderModule {
   private constructor(
     publication: Publication,
     settings: MediaOverlaySettings,
-    properties: MediaOverlayModuleProperties
+    properties: MediaOverlayModuleProperties,
+    api?: MediaOverlayModuleAPI
   ) {
     this.publication = publication;
     this.settings = settings;
     this.properties = properties;
+    this.api = api;
   }
 
   stop() {
@@ -152,38 +155,42 @@ export class MediaOverlayModule implements ReaderModule {
     let link = this.currentLinks[this.currentLinkIndex];
     if (link?.Properties?.MediaOverlay) {
       this.ensureOnTimeUpdate(false, false);
-      const moUrl = link.Properties?.MediaOverlay;
 
-      const moUrlObjFull = new URL(moUrl, this.publication.manifestUrl);
-      const moUrlFull = moUrlObjFull.toString();
+      if (!link.MediaOverlays?.initialized) {
+        const moUrl = link.Properties.MediaOverlay;
+        const moUrlFull = new URL(
+          moUrl,
+          this.publication.manifestUrl
+        ).toString();
 
-      let response: Response;
-      try {
-        response = await fetch(moUrlFull, this.navigator.requestConfig);
-      } catch (e) {
-        console.error(e, moUrlFull);
-        return;
-      }
-      if (!response.ok) {
-        log.log("BAD RESPONSE?!");
-      }
+        let response: Response;
+        try {
+          response = await fetch(moUrlFull, this.navigator.requestConfig);
+        } catch (e) {
+          console.error(e, moUrlFull);
+          return;
+        }
+        if (!response.ok) {
+          log.log("BAD RESPONSE?!");
+        }
 
-      let moJson: any | undefined;
-      try {
-        moJson = await response.json();
-      } catch (e) {
-        console.error(e);
-      }
-      if (!moJson) {
-        log.log("## moJson" + moJson);
-        return;
-      }
+        let moJson: any | undefined;
+        try {
+          moJson = await response.json();
+        } catch (e) {
+          console.error(e);
+        }
+        if (!moJson) {
+          log.log("## moJson" + moJson);
+          return;
+        }
 
-      link.MediaOverlays = TaJsonDeserialize<MediaOverlayNode>(
-        moJson,
-        MediaOverlayNode
-      );
-      link.MediaOverlays.initialized = true;
+        link.MediaOverlays = TaJsonDeserialize<MediaOverlayNode>(
+          moJson,
+          MediaOverlayNode
+        );
+        link.MediaOverlays.initialized = true;
+      }
 
       const href = link.HrefDecoded || link.Href;
       const hrefUrlObj = new URL("https://dita.digital/" + href);
@@ -356,6 +363,7 @@ export class MediaOverlayModule implements ReaderModule {
       this.settings.playing = true;
       if (
         this.audioElement &&
+        this.mediaOverlayRoot &&
         this.currentLinks[this.currentLinkIndex]?.Properties?.MediaOverlay
       ) {
         log.log("startReadAloud(): audioElement finnes");
@@ -374,17 +382,7 @@ export class MediaOverlayModule implements ReaderModule {
         this.audioElement.playbackRate = this.settings.rate;
       } else {
         log.log("startReadAloud(): audioElement finnes ikke");
-        if (this.currentLinks.length > 1 && this.currentLinkIndex === 0) {
-          this.currentLinkIndex++;
-          log.log("startReadAloud(): kaller playLink()");
-          await this.playLink();
-        } else {
-          if (this.settings.autoTurn && this.settings.playing) {
-            this.navigator.nextResource();
-          } else {
-            await this.stopReadAloud();
-          }
-        }
+        await this.playLink();
       }
       if (this.play) this.play.style.display = "none";
       if (this.pause) this.pause.style.removeProperty("display");
@@ -446,8 +444,17 @@ export class MediaOverlayModule implements ReaderModule {
       this.settings.playing = false;
       this.unbindClickHandler();
 
-      if (this.audioElement) this.audioElement.pause();
+      this.mediaOverlayHighlight(undefined);
+      if (this.audioElement) {
+        this.audioElement.pause();
+      }
       this.ensureOnTimeUpdate(true, false);
+      // Keep audioElement and currentAudioUrl so the element is reused on next play
+      this.mediaOverlayRoot = undefined;
+      this.mediaOverlayGenerator = undefined;
+      this.mediaOverlayTextAudioPair = undefined;
+      this.currentAudioBegin = undefined;
+      this.currentAudioEnd = undefined;
 
       if (this.play) this.play.style.removeProperty("display");
       if (this.pause) this.pause.style.display = "none";
@@ -457,6 +464,7 @@ export class MediaOverlayModule implements ReaderModule {
     if (this.navigator.rights.enableMediaOverlays) {
       this.settings.playing = false;
       if (this.audioElement) this.audioElement.pause();
+      cancelAnimationFrame(this.myReq);
       if (this.play) this.play.style.removeProperty("display");
       if (this.pause) this.pause.style.display = "none";
     }
@@ -465,6 +473,7 @@ export class MediaOverlayModule implements ReaderModule {
     if (this.navigator.rights.enableMediaOverlays) {
       this.settings.playing = true;
       await this.audioElement.play();
+      this.myReq = requestAnimationFrame(this.trackCurrentTime.bind(this));
       if (this.play) this.play.style.display = "none";
       if (this.pause) this.pause.style.removeProperty("display");
     }
@@ -625,7 +634,9 @@ export class MediaOverlayModule implements ReaderModule {
 
         this.mediaOverlayHighlight(match_id);
 
-        this.myReq = requestAnimationFrame(this.trackCurrentTime.bind(this));
+        if (this.settings.playing) {
+          this.myReq = requestAnimationFrame(this.trackCurrentTime.bind(this));
+        }
       } catch (e) {}
     }
   }
@@ -661,6 +672,7 @@ export class MediaOverlayModule implements ReaderModule {
             this.navigator.nextResource();
           } else {
             this.stopReadAloud();
+            if (this.api?.finished) this.api.finished();
           }
         }
       } else {
@@ -709,6 +721,7 @@ export class MediaOverlayModule implements ReaderModule {
           this.navigator.nextResource();
         } else {
           this.stopReadAloud();
+          if (this.api?.finished) this.api.finished();
         }
       }
     }
@@ -933,7 +946,8 @@ export class MediaOverlayModule implements ReaderModule {
             this.audioElement.pause();
             this.navigator.nextResource();
           } else {
-            this.stopReadAloud();
+            await this.stopReadAloud();
+            if (this.api?.finished) this.api.finished();
           }
         }
       };
