@@ -77,7 +77,12 @@ export default class KeyboardEventHandler {
       (this.handlers["onKeyDown"] = function (event: KeyboardEvent) {
         // Ignore input elements
         const eventTarget = event.target as HTMLElement;
-        if (/input|select|option|textarea/i.test(eventTarget.tagName)) {
+        if (/input|select|option|textarea|button/i.test(eventTarget.tagName)) {
+          return;
+        }
+        if (/summary/i.test(eventTarget.tagName)) {
+          // Prevent event from reaching the outer document, which would scroll the page
+          event.stopPropagation();
           return;
         }
 
@@ -89,6 +94,15 @@ export default class KeyboardEventHandler {
         if (!selection.isCollapsed) {
           return;
         }
+
+        // Only handle keydown events when the reader has focus
+        const activeElement = document.activeElement;
+        const iframeHasFocus =
+          activeElement instanceof HTMLIFrameElement &&
+          self.navigator.iframes.includes(activeElement);
+        const wrapperHasFocus = !!eventTarget.closest("main#iframe-wrapper");
+
+        if (!iframeHasFocus && !wrapperHasFocus) return;
 
         const key = event.key;
         switch (key) {
