@@ -630,21 +630,23 @@ export class MediaOverlayModule implements ReaderModule {
       }
       if (!nextTextAudioPair) {
         log.log("mediaOverlaysNext() - navLeftOrRight()");
-        this.mediaOverlaysStop();
 
         if (this.currentLinks.length > 1 && this.currentLinkIndex === 0) {
+          this.mediaOverlaysStop();
           this.currentLinkIndex++;
           this.playLink();
+        } else if (this.settings.autoTurn && this.settings.playing) {
+          this.mediaOverlaysStop();
+          this.navigator.nextResource();
         } else {
-          this.audioElement.pause();
-          if (this.settings.autoTurn && this.settings.playing) {
-            this.audioElement.pause();
-            this.navigator.nextResource();
-          } else {
-            this.stopReadAloud().then(() => {
-              if (this.api?.finished) this.api.finished();
-            });
-          }
+          // Chapter end (autoTurn off): the last clip's declared SMIL end can
+          // fall slightly before the word's audio actually finishes, so pausing
+          // here would clip it. Let the clip play to the audio's natural end;
+          // onended fires finished().
+          this.currentAudioEnd = undefined;
+          this.mediaOverlayTextAudioPair = undefined;
+          this.mediaOverlayGenerator = undefined;
+          cancelAnimationFrame(this.myReq);
         }
       } else {
         let switchDoc = false;
