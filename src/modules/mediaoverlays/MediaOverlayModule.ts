@@ -39,12 +39,12 @@ log.setLevel("trace", true);
 // Read Aloud
 
 export interface MediaOverlayModuleAPI {
-  started?: any;
-  stopped?: any;
-  paused?: any;
-  resumed?: any;
-  finished?: any;
-  updateSettings?: any;
+  started?: () => void;
+  stopped?: () => void;
+  paused?: () => void;
+  resumed?: () => void;
+  finished?: () => void;
+  updateSettings?: (settings: any) => Promise<any>;
 }
 export interface MediaOverlayModuleProperties {
   color?: string;
@@ -156,40 +156,9 @@ export class MediaOverlayModule implements ReaderModule {
     if (link?.Properties?.MediaOverlay) {
       this.ensureOnTimeUpdate(false, false);
 
-      if (!link.MediaOverlays?.initialized) {
-        const moUrl = link.Properties.MediaOverlay;
-        const moUrlFull = new URL(
-          moUrl,
-          this.publication.manifestUrl
-        ).toString();
-
-        let response: Response;
-        try {
-          response = await fetch(moUrlFull, this.navigator.requestConfig);
-        } catch (e) {
-          console.error(e, moUrlFull);
-          return;
-        }
-        if (!response.ok) {
-          log.log("BAD RESPONSE?!");
-        }
-
-        let moJson: any | undefined;
-        try {
-          moJson = await response.json();
-        } catch (e) {
-          console.error(e);
-        }
-        if (!moJson) {
-          log.log("## moJson" + moJson);
-          return;
-        }
-
-        link.MediaOverlays = TaJsonDeserialize<MediaOverlayNode>(
-          moJson,
-          MediaOverlayNode
-        );
-        link.MediaOverlays.initialized = true;
+      const loaded = await this.ensureLinkMediaOverlaysLoaded(link);
+      if (!loaded || !link.MediaOverlays) {
+        return;
       }
 
       const href = link.HrefDecoded || link.Href;
@@ -449,6 +418,7 @@ export class MediaOverlayModule implements ReaderModule {
         this.audioElement.pause();
       }
       this.ensureOnTimeUpdate(true, false);
+      cancelAnimationFrame(this.myReq);
       // Keep audioElement and currentAudioUrl so the element is reused on next play
       this.mediaOverlayRoot = undefined;
       this.mediaOverlayGenerator = undefined;
@@ -671,8 +641,9 @@ export class MediaOverlayModule implements ReaderModule {
             this.audioElement.pause();
             this.navigator.nextResource();
           } else {
-            this.stopReadAloud();
-            if (this.api?.finished) this.api.finished();
+            this.stopReadAloud().then(() => {
+              if (this.api?.finished) this.api.finished();
+            });
           }
         }
       } else {
@@ -720,8 +691,9 @@ export class MediaOverlayModule implements ReaderModule {
           this.audioElement.pause();
           this.navigator.nextResource();
         } else {
-          this.stopReadAloud();
-          if (this.api?.finished) this.api.finished();
+          this.stopReadAloud().then(() => {
+            if (this.api?.finished) this.api.finished();
+          });
         }
       }
     }
