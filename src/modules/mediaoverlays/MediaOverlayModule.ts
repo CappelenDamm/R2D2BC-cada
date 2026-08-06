@@ -444,6 +444,8 @@ export class MediaOverlayModule implements ReaderModule {
       this.settings.playing = true;
       await this.audioElement.play();
       this.myReq = requestAnimationFrame(this.trackCurrentTime.bind(this));
+      // Rebind in case the resource changed while paused (e.g. navigated chapters)
+      this.bindClickHandler();
       if (this.play) this.play.style.display = "none";
       if (this.pause) this.pause.style.removeProperty("display");
     }
