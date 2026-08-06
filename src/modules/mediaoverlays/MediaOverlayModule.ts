@@ -648,7 +648,8 @@ export class MediaOverlayModule implements ReaderModule {
           this.currentAudioEnd = undefined;
           this.mediaOverlayTextAudioPair = undefined;
           this.mediaOverlayGenerator = undefined;
-          cancelAnimationFrame(this.myReq);
+          // Detach timeupdate + cancel rAF so we don't spin while the tail plays
+          this.ensureOnTimeUpdate(true, false);
         }
       } else {
         let switchDoc = false;
