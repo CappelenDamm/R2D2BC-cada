@@ -401,11 +401,11 @@ const fetchContentBytesLength = async (
     ? { ...requestConfig, method: "HEAD" }
     : { method: "HEAD" };
   const r = await fetch(href, headConfig);
-  const contentLength = r.headers.get("Content-Length");
-  if (contentLength !== null) {
-    return parseInt(contentLength, 10);
+  const parsed = parseInt(r.headers.get("Content-Length") ?? "", 10);
+  if (r.ok && Number.isFinite(parsed)) {
+    return parsed;
   }
-  // Fall back to downloading the body if Content-Length is not provided
+  // Fall back to downloading the body if Content-Length is missing or invalid
   const full = await fetch(href, requestConfig);
   const b = await full.blob();
   return b.size;
