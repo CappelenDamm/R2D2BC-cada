@@ -387,7 +387,16 @@ const fetchContentBytesLength = async (
   href: string,
   requestConfig?: RequestConfig
 ): Promise<number> => {
-  const r = await fetch(href, requestConfig);
-  const b = await r.blob();
+const headConfig = requestConfig
+    ? { ...requestConfig, method: "HEAD" }
+    : { method: "HEAD" };
+  const r = await fetch(href, headConfig);
+  const contentLength = r.headers.get("Content-Length");
+  if (contentLength !== null) {
+    return parseInt(contentLength, 10);
+  }
+  // Fall back to downloading the body if Content-Length is not provided
+  const full = await fetch(href, requestConfig);
+  const b = await full.blob();
   return b.size;
 };
