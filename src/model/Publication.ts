@@ -328,11 +328,21 @@ export class Publication extends R2Publication {
       }
     }
 
+    // Group positions by href once to avoid O(n²) filtering inside the loop
+    const positionsByHrefMap = new Map<string, Locator[]>();
+    for (const p of positions) {
+      const key = decodeURI(p.href);
+      const group = positionsByHrefMap.get(key);
+      if (group) {
+        group.push(p);
+      } else {
+        positionsByHrefMap.set(key, [p]);
+      }
+    }
+
     // Once you have all the positions, you can update all the progressions and total progressions and remaining.
     for (const locator of positions) {
-      const resource = positions.filter(
-        (el: Locator) => el.href === decodeURI(locator.href)
-      );
+      const resource = positionsByHrefMap.get(decodeURI(locator.href)) ?? [];
       const positionIndex = Math.ceil(
         (locator.locations.progression ? locator.locations.progression : 0) *
           (resource.length - 1)
@@ -387,7 +397,16 @@ const fetchContentBytesLength = async (
   href: string,
   requestConfig?: RequestConfig
 ): Promise<number> => {
-  const r = await fetch(href, requestConfig);
-  const b = await r.blob();
+  const headConfig = requestConfig
+    ? { ...requestConfig, method: "HEAD" }
+    : { method: "HEAD" };
+  const r = await fetch(href, headConfig);
+  const parsed = parseInt(r.headers.get("Content-Length") ?? "", 10);
+  if (r.ok && Number.isFinite(parsed)) {
+    return parsed;
+  }
+  // Fall back to downloading the body if Content-Length is missing or invalid
+  const full = await fetch(href, requestConfig);
+  const b = await full.blob();
   return b.size;
 };
