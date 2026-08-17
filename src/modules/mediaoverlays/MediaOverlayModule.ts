@@ -154,11 +154,15 @@ export class MediaOverlayModule implements ReaderModule {
       return this.initializeResourcePromise;
     }
     this.initializeResourceHref = href;
-    this.initializeResourcePromise = this.doInitializeResource(links).finally(
-      () => {
+
+    const promise = this.doInitializeResource(links).finally(() => {
+      // Only clear if we're still the most recent in-flight call for this href;
+      // a newer call may have already replaced these before this one settled.
+      if (this.initializeResourcePromise === promise) {
         this.initializeResourcePromise = undefined;
       }
-    );
+    });
+    this.initializeResourcePromise = promise;
     return this.initializeResourcePromise;
   }
 
