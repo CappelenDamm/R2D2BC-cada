@@ -98,6 +98,8 @@ export class MediaOverlayModule implements ReaderModule {
   private pid: string | undefined = undefined;
   private __ontimeupdate = false;
   private clickHandler: ((event: MouseEvent) => void) | undefined;
+  private initializeResourceHref: string | undefined;
+  private initializeResourcePromise: Promise<void> | undefined;
   public static create(config: MediaOverlayModuleConfig) {
     const mediaOverlay = new this(
       config.publication,
@@ -143,6 +145,28 @@ export class MediaOverlayModule implements ReaderModule {
   }
 
   async initializeResource(links: Array<Link | undefined>) {
+    // Coalesce overlapping calls (e.g. from both navigate() and the iframe's load event) targeting the same resource
+    const href = links.map((l) => l?.Href ?? "").join("|");
+    if (
+      this.initializeResourcePromise &&
+      this.initializeResourceHref === href
+    ) {
+      return this.initializeResourcePromise;
+    }
+    this.initializeResourceHref = href;
+
+    const promise = this.doInitializeResource(links).finally(() => {
+      // Only clear if we're still the most recent in-flight call for this href;
+      // a newer call may have already replaced these before this one settled.
+      if (this.initializeResourcePromise === promise) {
+        this.initializeResourcePromise = undefined;
+      }
+    });
+    this.initializeResourcePromise = promise;
+    return this.initializeResourcePromise;
+  }
+
+  private async doInitializeResource(links: Array<Link | undefined>) {
     this.currentLinks = links;
     this.currentLinkIndex = 0;
     await this.playLink();
