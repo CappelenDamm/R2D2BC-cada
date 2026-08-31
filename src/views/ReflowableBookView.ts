@@ -550,15 +550,21 @@ export default class ReflowableBookView implements BookView {
     const debouncedResize = debounce((entries: ResizeObserverEntry[]) => {
       // Ignore any pending debounced callbacks after the observer has been unbound/replaced.
       if (this._contentResizeObserver !== _resizeObserver) return;
-      for (const entry of entries) {
-        const height = entry.contentRect.height + htmlExtra;
+      // Defer the DOM write to the next frame so mutating iframe.height here
+      // doesn't re-trigger this same observation cycle (avoids the browser's
+      // "ResizeObserver loop completed with undelivered notifications" warning).
+      requestAnimationFrame(() => {
+        if (this._contentResizeObserver !== _resizeObserver) return;
+        for (const entry of entries) {
+          const height = entry.contentRect.height + htmlExtra;
 
-        if (height) {
-          const minHeight =
-            BrowserUtilities.getHeight() - this.attributes.margin;
-          iframe.height = Math.max(minHeight, height) + "px";
+          if (height) {
+            const minHeight =
+              BrowserUtilities.getHeight() - this.attributes.margin;
+            iframe.height = Math.max(minHeight, height) + "px";
+          }
         }
-      }
+      });
     }, 20);
     _resizeObserver = new ResizeObserver(debouncedResize);
     this._contentResizeObserver = _resizeObserver;
