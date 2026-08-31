@@ -1579,7 +1579,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
           if (startContainer) {
             this.view?.goToCssSelector(startContainer);
           }
-        } else if (bookViewPosition && bookViewPosition >= 0) {
+        } else if (bookViewPosition !== undefined && bookViewPosition >= 0) {
           this.view?.goToProgression(bookViewPosition);
         }
 
@@ -2777,7 +2777,9 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
       }
     }, 100);
     setTimeout(async () => {
-      if (oldPosition) {
+      // Skip restoring the pre-resize scroll fraction when a navigation is in flight,
+      // otherwise it reapplies the previous chapter's stale scroll position.
+      if (oldPosition && !this.newPosition) {
         this.view?.goToProgression(oldPosition);
       }
       this.updatePositionInfo(false);
