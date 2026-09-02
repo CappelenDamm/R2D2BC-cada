@@ -1585,20 +1585,11 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
 
         this.newPosition = undefined;
 
-        // Highlights were drawn against the pre-restoration scroll offset;
-        // redraw now that the reading position has been restored.
-        if (this.rights.enableAnnotations && this.annotationModule) {
-          await this.annotationModule.handleResize();
-        }
-
         if (this.rights?.enableContentProtection) {
           if (this.contentProtectionModule !== undefined) {
             await this.contentProtectionModule.recalculate(10);
           }
         }
-
-        this.hideLoadingMessage();
-        this.showIframeContents(iframe);
 
         if (
           this.rights.enableMediaOverlays &&
@@ -1610,6 +1601,15 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
         }
         await this.updatePositionInfo();
         await this.view?.setSize();
+
+        // The final size can change the iframe width in scroll mode, which
+        // reflows ranges and must happen before their rectangles are drawn.
+        if (this.rights.enableAnnotations && this.annotationModule) {
+          await this.annotationModule.handleResize();
+        }
+
+        this.hideLoadingMessage();
+        this.showIframeContents(iframe);
         setTimeout(() => {
           if (this.mediaOverlayModule) {
             this.mediaOverlayModule.settings.resourceReady = true;
