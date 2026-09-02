@@ -1585,6 +1585,12 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
 
         this.newPosition = undefined;
 
+        // Highlights were drawn against the pre-restoration scroll offset;
+        // redraw now that the reading position has been restored.
+        if (this.rights.enableAnnotations && this.annotationModule) {
+          await this.annotationModule.handleResize();
+        }
+
         if (this.rights?.enableContentProtection) {
           if (this.contentProtectionModule !== undefined) {
             await this.contentProtectionModule.recalculate(10);
