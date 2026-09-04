@@ -148,12 +148,12 @@ export class SearchModule implements ReaderModule {
 
   private async handleSearch(event: any): Promise<void> {
     if (event.key === "Enter" || event.type === "click") {
-      await this.handleSearchChapter();
+      await this.handleSearchChapter(undefined, false);
       await this.handleSearchBook();
     }
   }
 
-  async handleSearchChapter(index?: number) {
+  async handleSearchChapter(index?: number, jumpToMark = true) {
     var self = this;
     var searchVal = this.searchInput.value;
     let currentLocation = this.navigator.currentChapterLink.href;
@@ -168,13 +168,18 @@ export class SearchModule implements ReaderModule {
     self.currentChapterSearchResult = [];
     self.currentSearchHighlights = [];
     var localSearchResultChapter: any = [];
-    await this.searchAndPaintChapter(searchVal, index, async (result) => {
-      localSearchResultChapter = result;
-      goToResultPage(1);
-      if (this.navigator.rights.enableContentProtection) {
-        this.navigator.contentProtectionModule?.recalculate(200);
-      }
-    });
+    await this.searchAndPaintChapter(
+      searchVal,
+      index,
+      async (result) => {
+        localSearchResultChapter = result;
+        goToResultPage(1);
+        if (this.navigator.rights.enableContentProtection) {
+          this.navigator.contentProtectionModule?.recalculate(200);
+        }
+      },
+      jumpToMark
+    );
 
     async function goToResultPage(page: number) {
       searchResultDiv.innerHTML = "";
@@ -294,7 +299,8 @@ export class SearchModule implements ReaderModule {
   async searchAndPaintChapter(
     term: string,
     index: number = 0,
-    callback: (result: any) => any
+    callback: (result: any) => any,
+    jumpToMark = true
   ) {
     if (this.navigator.rights.enableContentProtection) {
       this.navigator.contentProtectionModule?.deactivate();
@@ -332,7 +338,9 @@ export class SearchModule implements ReaderModule {
                       selectionInfo,
                       this.properties?.current!!
                     );
-                    this.jumpToMark(index);
+                    if (jumpToMark) {
+                      this.jumpToMark(index);
+                    }
                   } else {
                     highlight = this.createSearchHighlight(
                       selectionInfo,
@@ -381,13 +389,15 @@ export class SearchModule implements ReaderModule {
         this.navigator.iframes[0].contentWindow as any,
         highlight
       );
-      highlight.position = parseInt(
-        (
-          (highlightDom?.hasChildNodes()
-            ? highlightDom.childNodes[0]
-            : highlightDom) as HTMLDivElement
-        ).style.top.replace("px", "")
-      );
+      if (highlightDom) {
+        highlight.position = parseInt(
+          (
+            (highlightDom.hasChildNodes()
+              ? highlightDom.childNodes[0]
+              : highlightDom) as HTMLDivElement
+          ).style.top.replace("px", "")
+        );
+      }
       return highlight;
     } catch (e) {
       throw "Can't create highlight: " + e;
@@ -406,11 +416,16 @@ export class SearchModule implements ReaderModule {
     this.bookSearchResult = [];
 
     reset();
-    await this.searchAndPaintChapter(term, 0, async () => {
-      if (this.navigator.rights.enableContentProtection) {
-        this.navigator.contentProtectionModule?.recalculate(200);
-      }
-    });
+    await this.searchAndPaintChapter(
+      term,
+      0,
+      async () => {
+        if (this.navigator.rights.enableContentProtection) {
+          this.navigator.contentProtectionModule?.recalculate(200);
+        }
+      },
+      false
+    );
 
     if (current) {
       await this.searchBook(term);
