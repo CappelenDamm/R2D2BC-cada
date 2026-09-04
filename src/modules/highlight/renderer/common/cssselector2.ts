@@ -120,7 +120,7 @@ function bottomUpSearch(
     if (limit === Limit.All) {
       if (nth) {
         level = level.concat(
-          level.filter(dispensableNth).map((node) => nthChild(node, nth))
+          level.filter(dispensableNth).map((node) => nthOfType(node, nth))
         );
       }
     } else if (limit === Limit.Two) {
@@ -128,14 +128,14 @@ function bottomUpSearch(
 
       if (nth) {
         level = level.concat(
-          level.filter(dispensableNth).map((node) => nthChild(node, nth))
+          level.filter(dispensableNth).map((node) => nthOfType(node, nth))
         );
       }
     } else if (limit === Limit.One) {
       const [node] = (level = level.slice(0, 1));
 
       if (nth && dispensableNth(node)) {
-        level = [nthChild(node, nth)];
+        level = [nthOfType(node, nth)];
       }
     }
 
@@ -269,7 +269,10 @@ function index(input: Element): number | null {
 
   let i = 0;
   while (child) {
-    if (child.nodeType === Node.ELEMENT_NODE) {
+    if (
+      child.nodeType === Node.ELEMENT_NODE &&
+      (child as Element).tagName === input.tagName
+    ) {
       i++;
     }
 
@@ -283,9 +286,9 @@ function index(input: Element): number | null {
   return i;
 }
 
-function nthChild(node: CSSNode, i: number): CSSNode {
+function nthOfType(node: CSSNode, i: number): CSSNode {
   return {
-    name: node.name + `:nth-child(${i})`,
+    name: node.name + `:nth-of-type(${i})`,
     penalty: node.penalty + 1,
   };
 }

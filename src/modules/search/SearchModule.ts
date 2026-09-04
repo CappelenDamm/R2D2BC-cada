@@ -332,7 +332,8 @@ export class SearchModule implements ReaderModule {
                       selectionInfo,
                       this.properties?.current!!
                     );
-                    this.jumpToMark(index);
+                    //Commenting this out to prevent automatic scrolling to mark when search results are highlighted
+                    //this.jumpToMark(index);
                   } else {
                     highlight = this.createSearchHighlight(
                       selectionInfo,
@@ -381,13 +382,15 @@ export class SearchModule implements ReaderModule {
         this.navigator.iframes[0].contentWindow as any,
         highlight
       );
-      highlight.position = parseInt(
-        (
-          (highlightDom?.hasChildNodes()
-            ? highlightDom.childNodes[0]
-            : highlightDom) as HTMLDivElement
-        ).style.top.replace("px", "")
-      );
+      if (highlightDom) {
+        highlight.position = parseInt(
+          (
+            (highlightDom.hasChildNodes()
+              ? highlightDom.childNodes[0]
+              : highlightDom) as HTMLDivElement
+          ).style.top.replace("px", "")
+        );
+      }
       return highlight;
     } catch (e) {
       throw "Can't create highlight: " + e;
