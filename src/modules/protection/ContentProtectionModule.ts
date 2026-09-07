@@ -50,6 +50,7 @@ export interface ContentProtectionModuleProperties {
   disableDrag: boolean;
   supportedBrowsers: string[];
   excludeNodes: string[];
+  api?: ContentProtectionModuleAPI;
 }
 
 export interface ContentProtectionModuleConfig extends Partial<ContentProtectionModuleProperties> {
@@ -57,7 +58,8 @@ export interface ContentProtectionModuleConfig extends Partial<ContentProtection
 }
 
 export interface ContentProtectionModuleAPI {
-  inspectDetected: () => void;
+  inspectDetected?: () => void;
+  copyBlocked?: () => void;
 }
 
 interface ContentProtectionRect {
@@ -101,6 +103,8 @@ export class ContentProtectionModule implements ReaderModule {
 
   public constructor(properties?: ContentProtectionModuleProperties) {
     this.properties = properties;
+    this.preventCopy = this.preventCopy.bind(this);
+    this.preventCopyKey = this.preventCopyKey.bind(this);
   }
 
   private static async startInspectorProtection(
@@ -897,36 +901,38 @@ export class ContentProtectionModule implements ReaderModule {
   }
 
   public async initialize(iframe: HTMLIFrameElement) {
-    if (this.properties?.enableObfuscation) {
-      return new Promise<void>(async (resolve) => {
-        await (document as any).fonts.ready;
-        if (iframe.contentDocument) {
-          const body = HTMLUtilities.findRequiredIframeElement(
-            iframe.contentDocument,
-            "body"
-          ) as HTMLBodyElement;
-          this.observe();
-
-          setTimeout(() => {
-            this.rects = this.findRects(body);
-            this.rects.forEach((rect) =>
-              this.toggleRect(rect, this.securityContainer, this.isHacked)
-            );
-
-            this.setupEvents();
-            if (!this.hasEventListener) {
-              this.hasEventListener = true;
-              addEventListenerOptional(
-                this.wrapper,
-                "scroll",
-                this.handleScroll.bind(this)
-              );
-            }
-            resolve();
-          }, 10);
-        }
-      });
+    if (!this.properties?.enableObfuscation) {
+      return Promise.resolve(this.setupEvents());
     }
+
+    return new Promise<void>(async (resolve) => {
+      await (document as any).fonts.ready;
+      if (iframe.contentDocument) {
+        const body = HTMLUtilities.findRequiredIframeElement(
+          iframe.contentDocument,
+          "body"
+        ) as HTMLBodyElement;
+        this.observe();
+
+        setTimeout(() => {
+          this.rects = this.findRects(body);
+          this.rects.forEach((rect) =>
+            this.toggleRect(rect, this.securityContainer, this.isHacked)
+          );
+
+          this.setupEvents();
+          if (!this.hasEventListener) {
+            this.hasEventListener = true;
+            addEventListenerOptional(
+              this.wrapper,
+              "scroll",
+              this.handleScroll.bind(this)
+            );
+          }
+          resolve();
+        }, 10);
+      }
+    });
   }
 
   handleScroll() {
@@ -988,6 +994,7 @@ export class ContentProtectionModule implements ReaderModule {
     event.clipboardData.setData("text/plain", "copy not allowed");
     event.stopPropagation();
     event.preventDefault();
+    this.notifyCopyBlocked();
     return false;
   }
   preventCopyKey(event: {
@@ -1000,14 +1007,20 @@ export class ContentProtectionModule implements ReaderModule {
   }) {
     if (
       navigator.platform === "MacIntel" || navigator.platform.match("Mac")
-        ? event.metaKey
+        ? event.metaKey && (event.key === "c" || event.keyCode === 67)
         : event.ctrlKey && (event.key === "c" || event.keyCode === 67)
     ) {
       event.preventDefault();
       event.stopPropagation();
+      this.notifyCopyBlocked();
       return false;
     }
     return true;
+  }
+
+  private notifyCopyBlocked() {
+    this.properties?.api?.copyBlocked?.();
+    this.navigator?.emit("protection.copy.blocked");
   }
 
   restrictCopy(event: {
@@ -1068,7 +1081,7 @@ export class ContentProtectionModule implements ReaderModule {
   restrictCopyKey(event) {
     if (
       navigator.platform === "MacIntel" || navigator.platform.match("Mac")
-        ? event.metaKey
+        ? event.metaKey && (event.key === "c" || event.keyCode === 67)
         : event.ctrlKey && (event.key === "c" || event.keyCode === 67)
     ) {
       let win = this.navigator.iframes[0].contentWindow;
