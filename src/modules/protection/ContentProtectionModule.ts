@@ -83,6 +83,7 @@ export class ContentProtectionModule implements ReaderModule {
   private mutationObserver: MutationObserver;
   private wrapper: HTMLDivElement;
   citation: boolean;
+  private persistentListenersAttached = false;
   public static async setupPreloadProtection(
     config: Partial<ContentProtectionModuleConfig>
   ): Promise<void> {
@@ -105,6 +106,13 @@ export class ContentProtectionModule implements ReaderModule {
     this.properties = properties;
     this.preventCopy = this.preventCopy.bind(this);
     this.preventCopyKey = this.preventCopyKey.bind(this);
+    this.restrictCopy = this.restrictCopy.bind(this);
+    this.restrictCopyKey = this.restrictCopyKey.bind(this);
+    this.disableSave = this.disableSave.bind(this);
+    this.beforePrint = this.beforePrint.bind(this);
+    this.afterPrint = this.afterPrint.bind(this);
+    this.disableContext = this.disableContext.bind(this);
+    this.handleScroll = this.handleScroll.bind(this);
   }
 
   private static async startInspectorProtection(
@@ -359,12 +367,12 @@ export class ContentProtectionModule implements ReaderModule {
       removeEventListenerOptional(
         this.navigator.mainElement,
         "beforeprint",
-        this.beforePrint.bind(this)
+        this.beforePrint
       );
       removeEventListenerOptional(
         this.navigator.headerMenu,
         "beforeprint",
-        this.beforePrint.bind(this)
+        this.beforePrint
       );
       for (const iframe of this.navigator.iframes) {
         removeEventListenerOptional(
@@ -383,35 +391,27 @@ export class ContentProtectionModule implements ReaderModule {
       removeEventListenerOptional(
         this.navigator.mainElement,
         "afterprint",
-        this.afterPrint.bind(this)
+        this.afterPrint
       );
       removeEventListenerOptional(
         this.navigator.headerMenu,
         "afterprint",
-        this.afterPrint.bind(this)
+        this.afterPrint
       );
       for (const iframe of this.navigator.iframes) {
         removeEventListenerOptional(
           iframe.contentDocument,
           "afterprint",
-          this.afterPrint.bind(this)
+          this.afterPrint
         );
         removeEventListenerOptional(
           iframe.contentWindow,
           "afterprint",
-          this.afterPrint.bind(this)
+          this.afterPrint
         );
       }
-      removeEventListenerOptional(
-        window,
-        "afterprint",
-        this.afterPrint.bind(this)
-      );
-      removeEventListenerOptional(
-        document,
-        "afterprint",
-        this.afterPrint.bind(this)
-      );
+      removeEventListenerOptional(window, "afterprint", this.afterPrint);
+      removeEventListenerOptional(document, "afterprint", this.afterPrint);
     }
     if (this.properties?.disableContextMenu) {
       removeEventListenerOptional(
@@ -446,11 +446,9 @@ export class ContentProtectionModule implements ReaderModule {
       this.preventDrag(false);
     }
 
-    removeEventListenerOptional(
-      this.wrapper,
-      "scroll",
-      this.handleScroll.bind(this)
-    );
+    removeEventListenerOptional(this.wrapper, "scroll", this.handleScroll);
+
+    this.persistentListenersAttached = false;
   }
 
   observe(): any {
@@ -497,18 +495,25 @@ export class ContentProtectionModule implements ReaderModule {
     }
   }
   private setupEvents(): void {
+    const attachPersistent = !this.persistentListenersAttached;
+    const iframes = this.navigator.iframes;
+
     if (this.properties?.disableKeys) {
-      addEventListenerOptional(
-        this.navigator.mainElement,
-        "keydown",
-        this.disableSave
-      );
-      addEventListenerOptional(
-        this.navigator.headerMenu,
-        "keydown",
-        this.disableSave
-      );
-      for (const iframe of this.navigator.iframes) {
+      if (attachPersistent) {
+        addEventListenerOptional(
+          this.navigator.mainElement,
+          "keydown",
+          this.disableSave
+        );
+        addEventListenerOptional(
+          this.navigator.headerMenu,
+          "keydown",
+          this.disableSave
+        );
+        addEventListenerOptional(window, "keydown", this.disableSave);
+        addEventListenerOptional(document, "keydown", this.disableSave);
+      }
+      for (const iframe of iframes) {
         addEventListenerOptional(iframe, "keydown", this.disableSave);
         addEventListenerOptional(
           iframe.ownerDocument,
@@ -531,21 +536,48 @@ export class ContentProtectionModule implements ReaderModule {
           this.disableSave
         );
       }
-      addEventListenerOptional(window, "keydown", this.disableSave);
-      addEventListenerOptional(document, "keydown", this.disableSave);
     }
     if (this.properties?.disableCopy) {
-      addEventListenerOptional(
-        this.navigator.mainElement,
-        "copy",
-        this.preventCopy
-      );
-      addEventListenerOptional(
-        this.navigator.headerMenu,
-        "copy",
-        this.preventCopy
-      );
-      for (const iframe of this.navigator.iframes) {
+      if (attachPersistent) {
+        addEventListenerOptional(
+          this.navigator.mainElement,
+          "copy",
+          this.preventCopy
+        );
+        addEventListenerOptional(
+          this.navigator.headerMenu,
+          "copy",
+          this.preventCopy
+        );
+        addEventListenerOptional(window, "copy", this.preventCopy);
+        addEventListenerOptional(document, "copy", this.preventCopy);
+
+        addEventListenerOptional(
+          this.navigator.mainElement,
+          "cut",
+          this.preventCopy
+        );
+        addEventListenerOptional(
+          this.navigator.headerMenu,
+          "cut",
+          this.preventCopy
+        );
+        addEventListenerOptional(window, "cut", this.preventCopy);
+        addEventListenerOptional(document, "cut", this.preventCopy);
+        addEventListenerOptional(
+          this.navigator.mainElement,
+          "keydown",
+          this.preventCopyKey
+        );
+        addEventListenerOptional(
+          this.navigator.headerMenu,
+          "keydown",
+          this.preventCopyKey
+        );
+        addEventListenerOptional(window, "keydown", this.preventCopyKey);
+        addEventListenerOptional(document, "keydown", this.preventCopyKey);
+      }
+      for (const iframe of iframes) {
         addEventListenerOptional(iframe, "copy", this.preventCopy);
         addEventListenerOptional(
           iframe.ownerDocument,
@@ -567,21 +599,6 @@ export class ContentProtectionModule implements ReaderModule {
           "copy",
           this.preventCopy
         );
-      }
-      addEventListenerOptional(window, "copy", this.preventCopy);
-      addEventListenerOptional(document, "copy", this.preventCopy);
-
-      addEventListenerOptional(
-        this.navigator.mainElement,
-        "cut",
-        this.preventCopy
-      );
-      addEventListenerOptional(
-        this.navigator.headerMenu,
-        "cut",
-        this.preventCopy
-      );
-      for (const iframe of this.navigator.iframes) {
         addEventListenerOptional(iframe, "cut", this.preventCopy);
         addEventListenerOptional(iframe.ownerDocument, "cut", this.preventCopy);
         addEventListenerOptional(
@@ -595,21 +612,6 @@ export class ContentProtectionModule implements ReaderModule {
           "cut",
           this.preventCopy
         );
-      }
-
-      addEventListenerOptional(window, "cut", this.preventCopy);
-      addEventListenerOptional(document, "cut", this.preventCopy);
-      addEventListenerOptional(
-        this.navigator.mainElement,
-        "keydown",
-        this.preventCopyKey
-      );
-      addEventListenerOptional(
-        this.navigator.headerMenu,
-        "keydown",
-        this.preventCopyKey
-      );
-      for (const iframe of this.navigator.iframes) {
         addEventListenerOptional(iframe, "keydown", this.preventCopyKey);
         addEventListenerOptional(
           iframe.ownerDocument,
@@ -632,238 +634,201 @@ export class ContentProtectionModule implements ReaderModule {
           this.preventCopyKey
         );
       }
-      addEventListenerOptional(window, "keydown", this.preventCopyKey);
-      addEventListenerOptional(document, "keydown", this.preventCopyKey);
     } else if (this.properties?.canCopy) {
-      addEventListenerOptional(
-        this.navigator.mainElement,
-        "copy",
-        this.restrictCopy.bind(this)
-      );
-      addEventListenerOptional(
-        this.navigator.headerMenu,
-        "copy",
-        this.restrictCopy.bind(this)
-      );
-      for (const iframe of this.navigator.iframes) {
+      if (attachPersistent) {
+        addEventListenerOptional(
+          this.navigator.mainElement,
+          "copy",
+          this.restrictCopy
+        );
+        addEventListenerOptional(
+          this.navigator.headerMenu,
+          "copy",
+          this.restrictCopy
+        );
+        addEventListenerOptional(window, "copy", this.restrictCopy);
+        addEventListenerOptional(document, "copy", this.restrictCopy);
+
+        addEventListenerOptional(
+          this.navigator.mainElement,
+          "cut",
+          this.restrictCopy
+        );
+        addEventListenerOptional(
+          this.navigator.headerMenu,
+          "cut",
+          this.restrictCopy
+        );
+        addEventListenerOptional(window, "cut", this.restrictCopy);
+        addEventListenerOptional(document, "cut", this.restrictCopy);
+        addEventListenerOptional(
+          this.navigator.mainElement,
+          "keydown",
+          this.restrictCopyKey
+        );
+        addEventListenerOptional(
+          this.navigator.headerMenu,
+          "keydown",
+          this.restrictCopyKey
+        );
+        addEventListenerOptional(window, "keydown", this.restrictCopyKey);
+        addEventListenerOptional(document, "keydown", this.restrictCopyKey);
+      }
+      for (const iframe of iframes) {
         addEventListenerOptional(iframe, "copy", this.restrictCopy);
         addEventListenerOptional(
           iframe.ownerDocument,
           "copy",
-          this.restrictCopy.bind(this)
+          this.restrictCopy
         );
         addEventListenerOptional(
           iframe.contentDocument,
           "copy",
-          this.restrictCopy.bind(this)
+          this.restrictCopy
         );
         addEventListenerOptional(
           iframe.contentWindow,
           "copy",
-          this.restrictCopy.bind(this)
+          this.restrictCopy
         );
         addEventListenerOptional(
           iframe.contentWindow?.document,
           "copy",
-          this.restrictCopy.bind(this)
+          this.restrictCopy
         );
-      }
-      addEventListenerOptional(window, "copy", this.restrictCopy.bind(this));
-      addEventListenerOptional(document, "copy", this.restrictCopy.bind(this));
-
-      addEventListenerOptional(
-        this.navigator.mainElement,
-        "cut",
-        this.restrictCopy.bind(this)
-      );
-      addEventListenerOptional(
-        this.navigator.headerMenu,
-        "cut",
-        this.restrictCopy.bind(this)
-      );
-      for (const iframe of this.navigator.iframes) {
-        addEventListenerOptional(iframe, "cut", this.restrictCopy.bind(this));
+        addEventListenerOptional(iframe, "cut", this.restrictCopy);
         addEventListenerOptional(
           iframe.ownerDocument,
           "cut",
-          this.restrictCopy.bind(this)
+          this.restrictCopy
         );
         addEventListenerOptional(
           iframe.contentDocument,
           "cut",
-          this.restrictCopy.bind(this)
+          this.restrictCopy
         );
         addEventListenerOptional(
           iframe.contentWindow,
           "cut",
-          this.restrictCopy.bind(this)
+          this.restrictCopy
         );
         addEventListenerOptional(
           iframe.contentWindow?.document,
           "cut",
-          this.restrictCopy.bind(this)
+          this.restrictCopy
         );
-      }
-
-      addEventListenerOptional(window, "cut", this.restrictCopy.bind(this));
-      addEventListenerOptional(document, "cut", this.restrictCopy.bind(this));
-      addEventListenerOptional(
-        this.navigator.mainElement,
-        "keydown",
-        this.restrictCopyKey.bind(this)
-      );
-      addEventListenerOptional(
-        this.navigator.headerMenu,
-        "keydown",
-        this.restrictCopyKey.bind(this)
-      );
-      for (const iframe of this.navigator.iframes) {
-        addEventListenerOptional(
-          iframe,
-          "keydown",
-          this.restrictCopyKey.bind(this)
-        );
+        addEventListenerOptional(iframe, "keydown", this.restrictCopyKey);
         addEventListenerOptional(
           iframe.ownerDocument,
           "keydown",
-          this.restrictCopyKey.bind(this)
+          this.restrictCopyKey
         );
         addEventListenerOptional(
           iframe.contentDocument,
           "keydown",
-          this.restrictCopyKey.bind(this)
+          this.restrictCopyKey
         );
         addEventListenerOptional(
           iframe.contentWindow,
           "keydown",
-          this.restrictCopyKey.bind(this)
+          this.restrictCopyKey
         );
         addEventListenerOptional(
           iframe.contentWindow?.document,
           "keydown",
-          this.restrictCopyKey.bind(this)
+          this.restrictCopyKey
         );
       }
-      addEventListenerOptional(
-        window,
-        "keydown",
-        this.restrictCopyKey.bind(this)
-      );
-      addEventListenerOptional(
-        document,
-        "keydown",
-        this.restrictCopyKey.bind(this)
-      );
     }
     if (this.properties?.disablePrint) {
-      addEventListenerOptional(
-        this.navigator.mainElement,
-        "beforeprint",
-        this.beforePrint
-      );
-      addEventListenerOptional(
-        this.navigator.headerMenu,
-        "beforeprint",
-        this.beforePrint
-      );
-      for (const iframe of this.navigator.iframes) {
+      if (attachPersistent) {
         addEventListenerOptional(
-          iframe,
+          this.navigator.mainElement,
           "beforeprint",
-          this.beforePrint.bind(this)
+          this.beforePrint
         );
         addEventListenerOptional(
-          iframe.ownerDocument,
+          this.navigator.headerMenu,
           "beforeprint",
-          this.beforePrint.bind(this)
+          this.beforePrint
         );
-        addEventListenerOptional(
-          iframe.contentDocument,
-          "beforeprint",
-          this.beforePrint.bind(this)
-        );
-        addEventListenerOptional(
-          iframe.contentWindow,
-          "beforeprint",
-          this.beforePrint.bind(this)
-        );
-        addEventListenerOptional(
-          iframe.contentWindow?.document,
-          "beforeprint",
-          this.beforePrint.bind(this)
-        );
-      }
-      addEventListenerOptional(
-        window,
-        "beforeprint",
-        this.beforePrint.bind(this)
-      );
-      addEventListenerOptional(
-        document,
-        "beforeprint",
-        this.beforePrint.bind(this)
-      );
+        addEventListenerOptional(window, "beforeprint", this.beforePrint);
+        addEventListenerOptional(document, "beforeprint", this.beforePrint);
 
-      addEventListenerOptional(
-        this.navigator.mainElement,
-        "afterprint",
-        this.afterPrint
-      );
-      addEventListenerOptional(
-        this.navigator.headerMenu,
-        "afterprint",
-        this.afterPrint
-      );
-      for (const iframe of this.navigator.iframes) {
         addEventListenerOptional(
-          iframe,
+          this.navigator.mainElement,
           "afterprint",
-          this.afterPrint.bind(this)
+          this.afterPrint
         );
+        addEventListenerOptional(
+          this.navigator.headerMenu,
+          "afterprint",
+          this.afterPrint
+        );
+        addEventListenerOptional(window, "afterprint", this.afterPrint);
+        addEventListenerOptional(document, "afterprint", this.afterPrint);
+      }
+      for (const iframe of iframes) {
+        addEventListenerOptional(iframe, "beforeprint", this.beforePrint);
+        addEventListenerOptional(
+          iframe.ownerDocument,
+          "beforeprint",
+          this.beforePrint
+        );
+        addEventListenerOptional(
+          iframe.contentDocument,
+          "beforeprint",
+          this.beforePrint
+        );
+        addEventListenerOptional(
+          iframe.contentWindow,
+          "beforeprint",
+          this.beforePrint
+        );
+        addEventListenerOptional(
+          iframe.contentWindow?.document,
+          "beforeprint",
+          this.beforePrint
+        );
+        addEventListenerOptional(iframe, "afterprint", this.afterPrint);
         addEventListenerOptional(
           iframe.ownerDocument,
           "afterprint",
-          this.afterPrint.bind(this)
+          this.afterPrint
         );
         addEventListenerOptional(
           iframe.contentDocument,
           "afterprint",
-          this.afterPrint.bind(this)
+          this.afterPrint
         );
         addEventListenerOptional(
           iframe.contentWindow,
           "afterprint",
-          this.afterPrint.bind(this)
+          this.afterPrint
         );
         addEventListenerOptional(
           iframe.contentWindow?.document,
           "afterprint",
-          this.afterPrint.bind(this)
+          this.afterPrint
         );
       }
-      addEventListenerOptional(
-        window,
-        "afterprint",
-        this.afterPrint.bind(this)
-      );
-      addEventListenerOptional(
-        document,
-        "afterprint",
-        this.afterPrint.bind(this)
-      );
     }
     if (this.properties?.disableContextMenu) {
-      addEventListenerOptional(
-        this.navigator.mainElement,
-        "contextmenu",
-        this.disableContext
-      );
-      addEventListenerOptional(
-        this.navigator.headerMenu,
-        "contextmenu",
-        this.disableContext
-      );
-      for (const iframe of this.navigator.iframes) {
+      if (attachPersistent) {
+        addEventListenerOptional(
+          this.navigator.mainElement,
+          "contextmenu",
+          this.disableContext
+        );
+        addEventListenerOptional(
+          this.navigator.headerMenu,
+          "contextmenu",
+          this.disableContext
+        );
+        addEventListenerOptional(window, "contextmenu", this.disableContext);
+        addEventListenerOptional(document, "contextmenu", this.disableContext);
+      }
+      for (const iframe of iframes) {
         addEventListenerOptional(iframe, "contextmenu", this.disableContext);
         addEventListenerOptional(
           iframe.ownerDocument,
@@ -886,9 +851,9 @@ export class ContentProtectionModule implements ReaderModule {
           this.disableContext
         );
       }
-      addEventListenerOptional(window, "contextmenu", this.disableContext);
-      addEventListenerOptional(document, "contextmenu", this.disableContext);
     }
+
+    this.persistentListenersAttached = true;
   }
 
   initializeResource() {
@@ -923,11 +888,7 @@ export class ContentProtectionModule implements ReaderModule {
           this.setupEvents();
           if (!this.hasEventListener) {
             this.hasEventListener = true;
-            addEventListenerOptional(
-              this.wrapper,
-              "scroll",
-              this.handleScroll.bind(this)
-            );
+            addEventListenerOptional(this.wrapper, "scroll", this.handleScroll);
           }
           resolve();
         }, 10);
