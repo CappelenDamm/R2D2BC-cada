@@ -44,6 +44,7 @@ export interface MediaOverlayModuleAPI {
   paused?: () => void;
   resumed?: () => void;
   finished?: () => void;
+  clickedToAdvance?: () => void;
   updateSettings?: (settings: any) => Promise<any>;
 }
 export interface MediaOverlayModuleProperties {
@@ -289,6 +290,7 @@ export class MediaOverlayModule implements ReaderModule {
         this.audioElement.pause();
       }
       await this.playMediaOverlaysAudio(moTextAudioPair, undefined, undefined);
+      if (this.api?.clickedToAdvance) this.api.clickedToAdvance();
     }
   }
 
