@@ -477,7 +477,7 @@ export class SearchModule implements ReaderModule {
           position.locations.position = hrefPositions[0].locations.position;
         }
 
-        this.navigator.navigate(position);
+        this.navigator.navigate(this.withMatchLocation(position, item));
         // Navigate to new chapter and search only in new current chapter,
         // this should refresh thesearch result of current chapter and highlight the selected index
         setTimeout(() => {
@@ -488,11 +488,22 @@ export class SearchModule implements ReaderModule {
               if (this.navigator.rights.enableContentProtection) {
                 this.navigator.contentProtectionModule?.recalculate(200);
               }
-            }
+            },
+            false
           );
         }, 300);
       }
     }
+  }
+
+  /** Lets the navigator scroll to the match while the iframe is still hidden. */
+  private withMatchLocation(position: Locator, item: any): Locator {
+    if (item?.rangeInfo) {
+      (position as any).highlight = {
+        selectionInfo: { rangeInfo: item.rangeInfo },
+      };
+    }
+    return position;
   }
 
   async goToSearchIndex(href: string, index: number, current: boolean) {
@@ -530,7 +541,7 @@ export class SearchModule implements ReaderModule {
           position.locations.position = hrefPositions[0].locations.position;
         }
 
-        this.navigator.navigate(position);
+        this.navigator.navigate(this.withMatchLocation(position, item));
         // Navigate to new chapter and search only in new current chapter,
         // this should refresh thesearch result of current chapter and highlight the selected index
         setTimeout(() => {
@@ -541,7 +552,8 @@ export class SearchModule implements ReaderModule {
               if (this.navigator.rights.enableContentProtection) {
                 this.navigator.contentProtectionModule?.recalculate(200);
               }
-            }
+            },
+            false
           );
         }, 300);
       }
@@ -647,11 +659,13 @@ export class SearchModule implements ReaderModule {
                       hrefPositions[0].locations.position;
                   }
 
-                  self.navigator.navigate(position);
+                  self.navigator.navigate(
+                    self.withMatchLocation(position, searchItem)
+                  );
                   // Navigate to new chapter and search only in new current chapter,
                   // this should refresh thesearch result of current chapter and highlight the selected index
                   setTimeout(() => {
-                    self.handleSearchChapter(filteredIndex);
+                    self.handleSearchChapter(filteredIndex, false);
                   }, 300);
                 }
               }

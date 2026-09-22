@@ -1579,6 +1579,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
       }
 
       setTimeout(async () => {
+        this.view?.setSize();
         if (this.newElementId) {
           const element = (iframe.contentDocument as any).getElementById(
             this.newElementId
@@ -1620,7 +1621,6 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
           await this.mediaOverlayModule?.initializeResource(link);
         }
         await this.updatePositionInfo();
-        await this.view?.setSize();
 
         // The final size can change the iframe width in scroll mode, which
         // reflows ranges and must happen before their rectangles are drawn.
