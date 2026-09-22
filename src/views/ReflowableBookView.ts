@@ -308,7 +308,7 @@ export default class ReflowableBookView implements BookView {
     element: HTMLElement,
     scrollPosition?: ScrollLogicalPosition
   ): void {
-    element.scrollIntoView({ block: scrollPosition ?? "center" });
+    element.scrollIntoView({ block: scrollPosition ?? "start" });
 
     if (element.tabIndex < 0) {
       element.tabIndex = -1;
