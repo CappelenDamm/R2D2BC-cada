@@ -936,7 +936,6 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
       log.log(lastReadingPosition.href);
       log.log(linkHref);
       lastReadingPosition.href = linkHref;
-      console.info("lastReadingPosition", lastReadingPosition);
       await this.navigate(lastReadingPosition);
     }
   };
@@ -1584,7 +1583,6 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
           const element = (iframe.contentDocument as any).getElementById(
             this.newElementId
           );
-          console.info("Navigating to element with newElementId:", element);
           this.view?.goToElement?.(
             element,
             undefined,
@@ -2407,9 +2405,8 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
 
   goTo(
     locator: Locator,
-    options?: { scrollPosition: ScrollLogicalPosition }
+    options?: { scrollPosition?: ScrollLogicalPosition }
   ): any {
-    console.info(options);
     let locations: Locations = locator.locations ?? { progression: 0 };
     if (locator.href.indexOf("#") !== -1) {
       const elementId = locator.href.slice(locator.href.indexOf("#") + 1);
@@ -2995,7 +2992,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
   async navigate(
     locator: Locator,
     history: boolean = true,
-    options?: { scrollPosition: ScrollLogicalPosition }
+    options?: { scrollPosition?: ScrollLogicalPosition }
   ): Promise<void> {
     if (this.rights.enableConsumption && this.consumptionModule) {
       if (history) {
@@ -3037,7 +3034,6 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
           return;
         }
       }
-      console.info("Navigating to locator:", locator);
 
       // isCurrentLoaded represents if the navigation goes to a different chapter
       // Going to a chapter also triggers handleIFrameLoad
@@ -3070,10 +3066,6 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
           }
           this.newElementId = undefined;
         } else {
-          console.info(
-            "No newElementId, navigating based on locator:",
-            locator
-          );
           if ((locator as Annotation).highlight) {
             let startContainer = (locator as Annotation).highlight
               ?.selectionInfo.rangeInfo.startContainerElementCssSelector;
@@ -3198,7 +3190,6 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
         }
         this.newElementScrollPosition = options?.scrollPosition;
 
-        console.info("Preparing to load content for locator:", locator);
         this.hideIframeContents();
         this.showLoadingMessageAfterDelay();
         if (locator.locations === undefined) {
@@ -3263,7 +3254,6 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
         if (this.rights.enableConsumption && this.consumptionModule) {
           this.consumptionModule.continueReadingSession(locator);
         }
-        console.info("Updating chapter anchor elements based on current view.");
 
         if (this.view?.layout === "fixed") {
           if (this.nextChapterBottomAnchorElement)
@@ -3301,7 +3291,6 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
         }
       }
     } else {
-      console.info("No last reading position found, navigating to start link.");
       const startLink = this.publication.getStartLink();
       let startUrl: string | undefined = undefined;
       if (startLink && startLink.Href) {
