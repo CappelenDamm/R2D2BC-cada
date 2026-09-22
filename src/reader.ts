@@ -408,6 +408,7 @@ export default class D2Reader {
         settings,
         annotator: annotator,
         initialLastReadingPosition: initialConfig.lastReadingPosition,
+        initialScrollPosition: initialConfig.initialScrollPosition,
         api: initialConfig.api,
         rights: rights,
         tts: initialConfig.tts,
@@ -900,8 +901,13 @@ export default class D2Reader {
   get positions() {
     return this.navigator.positions();
   }
-  goTo = async (locator: Locator) => {
-    this.navigator.goTo(locator);
+  goTo = async (locator: Locator, scrollPosition?: ScrollLogicalPosition) => {
+    this.navigator.goTo(
+      locator,
+      scrollPosition && this.navigator.publication.isReflowable
+        ? { scrollPosition }
+        : undefined
+    );
   };
   goToPosition = async (value: number) => {
     return this.navigator.goToPosition(value);

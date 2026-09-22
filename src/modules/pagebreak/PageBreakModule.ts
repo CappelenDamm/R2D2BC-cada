@@ -122,7 +122,7 @@ export class PageBreakModule implements ReaderModule {
         title: firstPage.Title,
       };
 
-      this.navigator.goTo(position);
+      this.navigator.goTo(position, { scrollPosition: "start" });
     }
   }
 

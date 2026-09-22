@@ -145,6 +145,7 @@ export interface IFrameNavigatorConfig {
   settings: UserSettings;
   annotator?: Annotator;
   initialLastReadingPosition?: ReadingPosition;
+  initialScrollPosition?: ScrollLogicalPosition;
   rights: Partial<ReaderRights>;
   api?: Partial<NavigatorAPI>;
   tts?: Partial<TTSModuleConfig>;
@@ -218,6 +219,8 @@ export interface ReaderConfig {
   >;
   initialAnnotations?: InitialAnnotations;
   lastReadingPosition?: import("../model/Locator").ReadingPosition;
+  /** Scroll alignment used when restoring `lastReadingPosition` on load. */
+  initialScrollPosition?: ScrollLogicalPosition;
   rights?: Partial<ReaderRights>;
   api?: Partial<NavigatorAPI>;
   tts?: Partial<TTSModuleConfig>;
@@ -323,9 +326,11 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
   private remainingPositions: HTMLSpanElement;
   private newPosition: Locator | undefined;
   private newElementId: string | undefined;
+  private newElementScrollPosition: ScrollLogicalPosition | undefined;
   private isBeingStyled: boolean;
   private isLoading: boolean;
   private readonly initialLastReadingPosition?: ReadingPosition;
+  private readonly initialScrollPosition?: ScrollLogicalPosition;
   api?: Partial<NavigatorAPI>;
   rights: Partial<ReaderRights> = {
     autoGeneratePositions: false,
@@ -369,7 +374,8 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
       config.sample,
       config.requestConfig,
       config.highlighter,
-      config.modules
+      config.modules,
+      config.initialScrollPosition
     );
 
     await navigator.start(
@@ -394,7 +400,8 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     sample?: SampleRead,
     requestConfig?: RequestConfig,
     highlighter?: TextHighlighter,
-    modules?: Array<ReaderModule | undefined>
+    modules?: Array<ReaderModule | undefined>,
+    initialScrollPosition?: ScrollLogicalPosition
   ) {
     super();
     this.highlighter = highlighter;
@@ -442,6 +449,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     this.touchEventHandler = new TouchEventHandler(this);
     this.keyboardEventHandler = new KeyboardEventHandler(this);
     this.initialLastReadingPosition = initialLastReadingPosition;
+    this.initialScrollPosition = initialScrollPosition;
     this.publication = publication;
     this.api = api;
     this.rights = rights ?? {
@@ -806,6 +814,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
 
       this.newPosition = undefined;
       this.newElementId = undefined;
+      this.newElementScrollPosition = undefined;
       this.isBeingStyled = true;
       this.isLoading = true;
 
@@ -927,6 +936,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
       log.log(lastReadingPosition.href);
       log.log(linkHref);
       lastReadingPosition.href = linkHref;
+      console.info("lastReadingPosition", lastReadingPosition);
       await this.navigate(lastReadingPosition);
     }
   };
@@ -1357,7 +1367,13 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
         log.log(lastReadingPosition.href);
         log.log(linkHref);
         lastReadingPosition.href = linkHref;
-        await this.navigate(lastReadingPosition);
+        await this.navigate(
+          lastReadingPosition,
+          false,
+          this.initialScrollPosition
+            ? { scrollPosition: this.initialScrollPosition }
+            : undefined
+        );
       } else if (startUrl) {
         const position: ReadingPosition = {
           href: startUrl,
@@ -1568,8 +1584,14 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
           const element = (iframe.contentDocument as any).getElementById(
             this.newElementId
           );
-          this.view?.goToElement?.(element);
+          console.info("Navigating to element with newElementId:", element);
+          this.view?.goToElement?.(
+            element,
+            undefined,
+            this.newElementScrollPosition
+          );
           this.newElementId = undefined;
+          this.newElementScrollPosition = undefined;
         } else if (
           this.newPosition &&
           (this.newPosition as Annotation).highlight
@@ -2383,7 +2405,11 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     });
   }
 
-  goTo(locator: Locator): any {
+  goTo(
+    locator: Locator,
+    options?: { scrollPosition: ScrollLogicalPosition }
+  ): any {
+    console.info(options);
     let locations: Locations = locator.locations ?? { progression: 0 };
     if (locator.href.indexOf("#") !== -1) {
       const elementId = locator.href.slice(locator.href.indexOf("#") + 1);
@@ -2402,7 +2428,8 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     log.log(linkHref);
     position.href = linkHref;
     this.stopReadAloud();
-    this.navigate(position);
+
+    this.navigate(position, true, options);
   }
   currentLocator(): Locator {
     let position;
@@ -2965,7 +2992,11 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     }
   }
 
-  async navigate(locator: Locator, history: boolean = true): Promise<void> {
+  async navigate(
+    locator: Locator,
+    history: boolean = true,
+    options?: { scrollPosition: ScrollLogicalPosition }
+  ): Promise<void> {
     if (this.rights.enableConsumption && this.consumptionModule) {
       if (history) {
         this.consumptionModule.startReadingSession(locator);
@@ -3006,6 +3037,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
           return;
         }
       }
+      console.info("Navigating to locator:", locator);
 
       // isCurrentLoaded represents if the navigation goes to a different chapter
       // Going to a chapter also triggers handleIFrameLoad
@@ -3025,16 +3057,23 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
           this.currentTocUrl =
             this.currentChapterLink.href + "#" + this.newElementId;
         }
-
         if (this.newElementId) {
           for (const iframe of this.iframes) {
             const element = (iframe.contentDocument as any).getElementById(
               this.newElementId
             );
-            this.view?.goToElement?.(element);
+            this.view?.goToElement?.(
+              element,
+              undefined,
+              options?.scrollPosition
+            );
           }
           this.newElementId = undefined;
         } else {
+          console.info(
+            "No newElementId, navigating based on locator:",
+            locator
+          );
           if ((locator as Annotation).highlight) {
             let startContainer = (locator as Annotation).highlight
               ?.selectionInfo.rangeInfo.startContainerElementCssSelector;
@@ -3157,7 +3196,9 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
           this.currentTocUrl =
             this.currentChapterLink.href + "#" + this.newElementId;
         }
+        this.newElementScrollPosition = options?.scrollPosition;
 
+        console.info("Preparing to load content for locator:", locator);
         this.hideIframeContents();
         this.showLoadingMessageAfterDelay();
         if (locator.locations === undefined) {
@@ -3222,6 +3263,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
         if (this.rights.enableConsumption && this.consumptionModule) {
           this.consumptionModule.continueReadingSession(locator);
         }
+        console.info("Updating chapter anchor elements based on current view.");
 
         if (this.view?.layout === "fixed") {
           if (this.nextChapterBottomAnchorElement)
@@ -3259,6 +3301,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
         }
       }
     } else {
+      console.info("No last reading position found, navigating to start link.");
       const startLink = this.publication.getStartLink();
       let startUrl: string | undefined = undefined;
       if (startLink && startLink.Href) {

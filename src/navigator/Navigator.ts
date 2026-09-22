@@ -72,7 +72,10 @@ interface Navigator {
 
   positions(): Locator[];
 
-  goTo(locator: Locator): void;
+  goTo(
+    locator: Locator,
+    options?: { scrollPosition?: ScrollLogicalPosition }
+  ): void;
 
   goToPosition(value: number): void;
 

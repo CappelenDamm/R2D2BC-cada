@@ -36,7 +36,11 @@ interface BookView {
   setMode?(scroll: boolean);
   isScrollMode();
   isPaginated();
-  goToElement?(element: HTMLElement | null, relative?: boolean): void;
+  goToElement?(
+    element: HTMLElement | null,
+    relative?: boolean,
+    scrollPosition?: ScrollLogicalPosition
+  ): void;
   setSize(): void;
   setIframeHeight?(iframe: any);
   setSize(): void;
