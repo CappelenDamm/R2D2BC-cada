@@ -264,41 +264,57 @@ export default class ReflowableBookView implements BookView {
     }
   }
 
-  goToElement(element: HTMLElement | null, relative?: boolean): void {
+  goToElement(
+    element: HTMLElement | null,
+    relative?: boolean,
+    scrollPosition?: ScrollLogicalPosition
+  ): void {
+    if (!element) return;
+
     if (this.scrollMode) {
-      if (element) {
-        element.scrollIntoView({ block: "center" });
-      }
-    } else {
-      if (element) {
-        // Get the element's position in the iframe, and
-        // round that to figure out the column it's in.
-
-        // There is a bug in Safari when using getBoundingClientRect
-        // on an element that spans multiple columns. Temporarily
-        // set the element's height to fit it on one column, so we
-        // can determine the first column position.
-        const originalHeight = element.style.height;
-        element.style.height = "0";
-
-        const left = element.getBoundingClientRect().left;
-        const width = this.getColumnWidth();
-        const diff = this.scrollingElement.scrollLeft - width;
-        // let roundedLeftWidth = Math.ceil(left / width) * width;
-        let roundedLeftWidth = Math.ceil(left / width) * width + diff;
-        if (relative) {
-          const origin = this.getLeftColumnsWidth();
-          roundedLeftWidth = Math.ceil(left / width) * width + origin;
-        }
-
-        // Restore element's original height.
-        element.style.height = originalHeight;
-        this.setLeftColumnsWidth(roundedLeftWidth);
-        if (this.navigator.rights.enableContentProtection) {
-          this.navigator.contentProtectionModule?.recalculate(200);
-        }
-      }
+      this.focusElement(element, scrollPosition);
+      return;
     }
+
+    // Get the element's position in the iframe, and
+    // round that to figure out the column it's in.
+
+    // There is a bug in Safari when using getBoundingClientRect
+    // on an element that spans multiple columns. Temporarily
+    // set the element's height to fit it on one column, so we
+    // can determine the first column position.
+    const originalHeight = element.style.height;
+    element.style.height = "0";
+
+    const left = element.getBoundingClientRect().left;
+    const width = this.getColumnWidth();
+    const diff = this.scrollingElement.scrollLeft - width;
+    // let roundedLeftWidth = Math.ceil(left / width) * width;
+    let roundedLeftWidth = Math.ceil(left / width) * width + diff;
+    if (relative) {
+      const origin = this.getLeftColumnsWidth();
+      roundedLeftWidth = Math.ceil(left / width) * width + origin;
+    }
+
+    // Restore element's original height.
+    element.style.height = originalHeight;
+    this.setLeftColumnsWidth(roundedLeftWidth);
+    if (this.navigator.rights.enableContentProtection) {
+      this.navigator.contentProtectionModule?.recalculate(200);
+    }
+  }
+
+  private focusElement(
+    element: HTMLElement,
+    scrollPosition?: ScrollLogicalPosition
+  ): void {
+    element.scrollIntoView({ block: scrollPosition ?? "start" });
+
+    if (element.tabIndex < 0) {
+      element.tabIndex = -1;
+    }
+
+    element.focus({ preventScroll: true });
   }
 
   // at top in scroll mode
