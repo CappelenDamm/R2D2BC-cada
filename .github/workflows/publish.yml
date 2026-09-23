@@ -4,6 +4,16 @@ on:
   push:
     branches:
       - master
+    paths:
+      - src/**
+      - injectables/**
+      - build.ts
+      - polyfills.js
+      - tsconfig.json
+      - package.json
+      - package-lock.json
+      - README.md
+      - LICENSE
   workflow_dispatch:
 
 jobs:
