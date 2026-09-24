@@ -452,6 +452,7 @@ export class MediaOverlayModule implements ReaderModule {
       !Number.isFinite(time) ||
       (this.currentAudioBegin !== undefined &&
         time < this.currentAudioBegin - 0.05) ||
+      (this.currentAudioEnd !== undefined && time >= this.currentAudioEnd) ||
       this.audioElement?.src !== this.getUrlNoQuery(pair)
     )
       return undefined;
@@ -493,7 +494,7 @@ export class MediaOverlayModule implements ReaderModule {
         const { begin, end } = this.getBeginEndFromNode(pair);
         if (
           position.time < (begin ?? 0) ||
-          (end !== undefined && position.time > end)
+          (end !== undefined && position.time >= end)
         )
           continue;
 

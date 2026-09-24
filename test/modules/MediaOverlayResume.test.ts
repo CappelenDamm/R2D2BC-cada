@@ -187,4 +187,92 @@ describe("media overlay resume", () => {
     }) as MediaOverlayModule;
     expect(module.getPlaybackPosition()).toBeUndefined();
   });
+
+  it("does not report the previous span at or beyond its clip end", () => {
+    const pair = { Text: "chapter.xhtml#mo-1", Audio: "audio.mp3#t=0,8" };
+    const audioElement = {
+      src: "https://example.org/audio.mp3",
+      currentTime: 7.9,
+    };
+    const module = Object.assign(Object.create(MediaOverlayModule.prototype), {
+      currentLinks: [{ Href: "chapter.xhtml" }],
+      currentLinkIndex: 0,
+      mediaOverlayTextAudioPair: pair,
+      currentAudioEnd: 8,
+      audioElement,
+      publication: {
+        manifestUrl: new URL("https://example.org/manifest.json"),
+      },
+    }) as MediaOverlayModule;
+
+    expect(module.getPlaybackPosition()?.spanId).toBe("mo-1");
+    audioElement.currentTime = 8;
+    expect(module.getPlaybackPosition()).toBeUndefined();
+    audioElement.currentTime = 8.1;
+    expect(module.getPlaybackPosition()).toBeUndefined();
+  });
+
+  it("does not notify the previous span while its next clip is queued", () => {
+    const positionChanged = vi.fn();
+    const mediaOverlaysNext = vi.fn();
+    const module = Object.assign(Object.create(MediaOverlayModule.prototype), {
+      currentLinks: [{ Href: "chapter.xhtml" }],
+      currentLinkIndex: 0,
+      mediaOverlayTextAudioPair: {
+        Text: "chapter.xhtml#mo-1",
+        Audio: "audio.mp3#t=0,8",
+      },
+      currentAudioEnd: 8,
+      audioElement: { src: "https://example.org/audio.mp3", currentTime: 8 },
+      publication: {
+        manifestUrl: new URL("https://example.org/manifest.json"),
+      },
+      navigator: { iframes: [] },
+      settings: { playing: true },
+      api: { positionChanged },
+      mediaOverlaysNext,
+      mediaOverlayHighlight: vi.fn(),
+    }) as MediaOverlayModule;
+    vi.stubGlobal("cancelAnimationFrame", vi.fn());
+    vi.stubGlobal(
+      "requestAnimationFrame",
+      vi.fn(() => 1)
+    );
+    try {
+      module.trackCurrentTime();
+      expect(mediaOverlaysNext).toHaveBeenCalledWith(8);
+      expect(positionChanged).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it("resumes the next clip at a shared clip boundary", async () => {
+    const first = { Text: "chapter.xhtml#mo-1", Audio: "audio.mp3#t=0,8" };
+    const second = { Text: "chapter.xhtml#mo-2", Audio: "audio.mp3#t=8,20" };
+    const playMediaOverlaysAudio = vi.fn();
+    const module = Object.assign(Object.create(MediaOverlayModule.prototype), {
+      navigator: { rights: { enableMediaOverlays: true } },
+      currentLinks: [
+        {
+          Href: "chapter.xhtml",
+          MediaOverlays: { initialized: true, Children: [first, second] },
+        },
+      ],
+      publication: {
+        manifestUrl: new URL("https://example.org/manifest.json"),
+      },
+      settings: { playing: false },
+      playMediaOverlaysAudio,
+      bindClickHandler: vi.fn(),
+    }) as MediaOverlayModule;
+
+    expect(
+      await module.startReadAlongFromPosition({
+        href: "chapter.xhtml",
+        time: 8,
+      })
+    ).toBe(true);
+    expect(playMediaOverlaysAudio).toHaveBeenCalledWith(second, 8, 20);
+  });
 });
