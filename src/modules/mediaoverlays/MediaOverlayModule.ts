@@ -44,8 +44,14 @@ export interface MediaOverlayModuleAPI {
   paused?: () => void;
   resumed?: () => void;
   finished?: () => void;
+  positionChanged?: (position: MediaOverlayPlaybackPosition) => void;
   clickedToAdvance?: () => void;
   updateSettings?: (settings: any) => Promise<any>;
+}
+export interface MediaOverlayPlaybackPosition {
+  href: string;
+  time: number;
+  spanId?: string;
 }
 export interface MediaOverlayModuleProperties {
   color?: string;
@@ -97,6 +103,8 @@ export class MediaOverlayModule implements ReaderModule {
     | undefined;
   private mediaOverlayTextAudioPair: MediaOverlayNode | undefined;
   private pid: string | undefined = undefined;
+  private lastNotifiedPosition: MediaOverlayPlaybackPosition | undefined;
+  private lastNotifiedAudioUrl: string | undefined;
   private __ontimeupdate = false;
   private clickHandler: ((event: MouseEvent) => void) | undefined;
   private initializeResourceHref: string | undefined;
@@ -434,6 +442,74 @@ export class MediaOverlayModule implements ReaderModule {
     return false;
   }
 
+  getPlaybackPosition(): MediaOverlayPlaybackPosition | undefined {
+    const link = this.currentLinks?.[this.currentLinkIndex];
+    const pair = this.mediaOverlayTextAudioPair;
+    const time = this.audioElement?.currentTime;
+    if (
+      !link ||
+      !pair?.Audio ||
+      !Number.isFinite(time) ||
+      (this.currentAudioBegin !== undefined &&
+        time < this.currentAudioBegin - 0.05) ||
+      this.audioElement?.src !== this.getUrlNoQuery(pair)
+    )
+      return undefined;
+    return {
+      href: link.HrefDecoded || link.Href,
+      time,
+      spanId: pair.Text
+        ? new URL("https://dita.digital/" + pair.Text).hash.substring(1) ||
+          undefined
+        : undefined,
+    };
+  }
+
+  async startReadAlongFromPosition(
+    position: MediaOverlayPlaybackPosition
+  ): Promise<boolean> {
+    if (
+      !this.navigator.rights.enableMediaOverlays ||
+      !this.currentLinks ||
+      !Number.isFinite(position.time) ||
+      position.time < 0
+    )
+      return false;
+
+    for (let index = 0; index < this.currentLinks.length; index++) {
+      const link = this.currentLinks[index];
+      if (
+        !link ||
+        (link.HrefDecoded || link.Href) !== position.href ||
+        !(await this.ensureLinkMediaOverlaysLoaded(link)) ||
+        !link.MediaOverlays
+      )
+        continue;
+
+      const generator = this.textAudioPairGenerator(link.MediaOverlays);
+      for (let step = generator.next(); !step.done; step = generator.next()) {
+        const pair = step.value;
+        if (!pair?.Audio) continue;
+        const { begin, end } = this.getBeginEndFromNode(pair);
+        if (
+          position.time < (begin ?? 0) ||
+          (end !== undefined && position.time > end)
+        )
+          continue;
+
+        this.currentLinkIndex = index;
+        this.mediaOverlayRoot = link.MediaOverlays;
+        this.mediaOverlayGenerator = generator;
+        this.settings.playing = true;
+        this.audioElement?.pause();
+        await this.playMediaOverlaysAudio(pair, position.time, end);
+        this.bindClickHandler();
+        return true;
+      }
+    }
+    return false;
+  }
+
   async stopReadAloud() {
     if (this.navigator.rights.enableMediaOverlays) {
       this.settings.playing = false;
@@ -449,6 +525,7 @@ export class MediaOverlayModule implements ReaderModule {
       this.mediaOverlayRoot = undefined;
       this.mediaOverlayGenerator = undefined;
       this.mediaOverlayTextAudioPair = undefined;
+      this.lastNotifiedPosition = undefined;
       this.currentAudioBegin = undefined;
       this.currentAudioEnd = undefined;
 
@@ -631,6 +708,20 @@ export class MediaOverlayModule implements ReaderModule {
         );
 
         this.mediaOverlayHighlight(match_id);
+
+        const position = this.getPlaybackPosition();
+        if (
+          position &&
+          this.settings.playing &&
+          (position.href !== this.lastNotifiedPosition?.href ||
+            this.audioElement.src !== this.lastNotifiedAudioUrl ||
+            Math.abs(position.time - (this.lastNotifiedPosition?.time ?? 0)) >=
+              1)
+        ) {
+          this.lastNotifiedPosition = position;
+          this.lastNotifiedAudioUrl = this.audioElement.src;
+          this.api?.positionChanged?.(position);
+        }
 
         if (this.settings.playing) {
           this.myReq = requestAnimationFrame(this.trackCurrentTime.bind(this));
