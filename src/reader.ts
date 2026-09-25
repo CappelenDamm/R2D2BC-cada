@@ -24,6 +24,7 @@ import { AnnotationModule } from "./modules/AnnotationModule";
 import { BookmarkModule } from "./modules/BookmarkModule";
 import { TextHighlighter } from "./modules/highlight/TextHighlighter";
 import { MediaOverlayModule } from "./modules/mediaoverlays/MediaOverlayModule";
+import type { MediaOverlayPlaybackPosition } from "./modules/mediaoverlays/MediaOverlayModule";
 import {
   MediaOverlaySettings,
   IMediaOverlayUserSettings,
@@ -514,6 +515,17 @@ export default class D2Reader {
     }
     return Promise.resolve(false);
   };
+  startReadAlongFromPosition = (
+    position: MediaOverlayPlaybackPosition
+  ): Promise<boolean> => {
+    if (this.navigator instanceof IFrameNavigator) {
+      return this.navigator.startReadAlongFromPosition(position);
+    }
+    return Promise.resolve(false);
+  };
+  get currentReadAlongPosition(): MediaOverlayPlaybackPosition | undefined {
+    return this.mediaOverlayModule?.getPlaybackPosition();
+  }
   /** Stop Media Overlay Read Along */
   stopReadAlong = () => {
     if (this.navigator instanceof IFrameNavigator) {

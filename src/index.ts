@@ -63,6 +63,7 @@ export type {
   InitialUserSettings,
 } from "./model/user-settings/UserSettings";
 export type { UserSettingsIncrementable } from "./model/user-settings/UserProperties";
+export type { MediaOverlayPlaybackPosition } from "./modules/mediaoverlays/MediaOverlayModule";
 
 // ─── Storage ─────────────────────────────────────────────────────────────────
 

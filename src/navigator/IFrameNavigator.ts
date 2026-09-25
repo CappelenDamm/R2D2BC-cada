@@ -67,6 +67,7 @@ import BookView from "../views/BookView";
 import {
   MediaOverlayModule,
   MediaOverlayModuleConfig,
+  type MediaOverlayPlaybackPosition,
 } from "../modules/mediaoverlays/MediaOverlayModule";
 import { D2Link, Link } from "../model/Link";
 import SampleReadEventHandler from "../modules/sampleread/SampleReadEventHandler";
@@ -2295,9 +2296,20 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
       this.mediaOverlayModule !== undefined &&
       this.hasMediaOverlays
     ) {
-      return (await this.mediaOverlayModule?.startReadAlongFromId(id)) ?? false;
+      return (await this.mediaOverlayModule.startReadAlongFromId(id)) ?? false;
     }
     return false;
+  }
+
+  async startReadAlongFromPosition(
+    position: MediaOverlayPlaybackPosition
+  ): Promise<boolean> {
+    if (!this.rights.enableMediaOverlays || !this.hasMediaOverlays)
+      return false;
+    return (
+      (await this.mediaOverlayModule?.startReadAlongFromPosition(position)) ??
+      false
+    );
   }
 
   stopReadAlong() {
