@@ -1449,6 +1449,13 @@ D2Reader.load({
 - Set an explicit `height` on `#iframe-wrapper` (e.g., `height: 100vh`).
 - Verify the manifest URL is accessible and returns valid JSON.
 
+### Scrolled content is clipped
+
+- Constrain `#iframe-wrapper` to the available reader height and let the reader size the iframe to its content; do not apply a fixed CSS height or max-height to the iframe.
+- The content resize observer measures rendered body and child margin boxes, including child margins that collapse through the body, after styles load. It avoids root viewport heights so the iframe can also shrink when content collapses.
+- In scroll mode, the reader overrides `height`, `min-height`, and `max-height` on the chapter's `html` and `body` elements with intrinsic sizing (`auto`, `0`, and `none`, using inline `!important`). This prevents publication rules such as `min-height: 100vh` plus body margins from feeding the iframe height back into itself. Original inline values and priorities are restored when leaving scroll mode, stopping the view, or binding a new chapter body.
+- Chapters written from cross-origin fetches or `api.getContent` are given an HTML5 doctype to preserve standards mode, including both fixed-layout spread frames. Without it, `document.write` would parse the serialized XHTML in quirks mode, where `body.scrollHeight` can include the iframe viewport and prevent shrinking.
+
 ### Content styles look wrong
 
 - Ensure all three Readium CSS files are provided as injectables in the correct order: `r2before`, `r2default`, `r2after`.
