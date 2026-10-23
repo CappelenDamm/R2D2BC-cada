@@ -657,7 +657,7 @@ Manages saving, deleting, and listing bookmarks. Bookmarks are `Locator` objects
 
 Manages text highlights and annotations. Supports multiple highlight types (highlight, underline, bookmark marker, comment, custom) and colors. Works with the `TextHighlighter` to render highlights in the content iframe.
 
-Annotation overlays inside the collapsed content of a closed `<details>` element are hidden and restored when it opens. Annotations in the visible `<summary>` remain visible unless an outer closed `<details>` hides them. Overlays are repositioned on details toggles and again when CSS transitions or animations within details finish or are cancelled, so animated layout changes do not leave highlights offset from their text.
+Annotation overlays inside the collapsed content of a closed `<details>` element are hidden and restored when it opens. Annotations spanning visible and collapsed content render only their visible fragments, including the first `<summary>`, without changing the saved selection. Nested closed details are respected. Comment gutters omit hidden annotations and ranges without renderable highlight areas, and restore them on reopening. Bookmarks are unchanged. Overlays are repositioned on details toggles and again when CSS transitions or animations within details finish or are cancelled, so animated layout changes do not leave highlights offset from their text. Annotation redraws preserve definition overlays and their interactions.
 
 Configuration:
 

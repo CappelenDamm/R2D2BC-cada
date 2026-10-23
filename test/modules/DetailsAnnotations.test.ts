@@ -1,11 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AnnotationMarker } from "../../src/model/Locator";
 import { Publication } from "../../src/model/Publication";
+import { Link } from "../../src/model/Link";
 import { AnnotationModule } from "../../src/modules/AnnotationModule";
 import {
   TextHighlighter,
   _highlights,
+  HighlightContainer,
 } from "../../src/modules/highlight/TextHighlighter";
+import { getClientRectsNoOverlap } from "../../src/modules/highlight/common/rect-utils";
 import {
   HighlightType,
   IHighlight,
@@ -19,7 +22,7 @@ vi.mock("../../src/modules/highlight/renderer/iframe/selection", () => ({
   convertRangeInfo: vi.fn(),
 }));
 vi.mock("../../src/modules/highlight/common/rect-utils", () => ({
-  getClientRectsNoOverlap: () => [],
+  getClientRectsNoOverlap: vi.fn(() => []),
 }));
 
 interface ContentNode {
@@ -65,6 +68,8 @@ function overlay() {
   const children: { style: { top: string } }[] = [];
   return {
     childNodes: children,
+    dataset: {},
+    innerHTML: "",
     hasChildNodes: () => children.length > 0,
     style: {
       display: "",
@@ -77,6 +82,8 @@ function overlay() {
     setAttribute: vi.fn(),
     addEventListener: vi.fn(),
     append: (child: { style: { top: string } }) => children.push(child),
+    appendChild: (child: { style: { top: string } }) => children.push(child),
+    querySelectorAll: () => [],
   };
 }
 
@@ -88,6 +95,8 @@ function documentFixture() {
       getBoundingClientRect: () => ({ top: 0, left: 0 }),
     },
     querySelector: () => null,
+    querySelectorAll: (): ContentElement[] => [],
+    createRange: vi.fn(),
     createElement: overlay,
     getElementById: () => overlay(),
     addEventListener: vi.fn(),
@@ -123,8 +132,8 @@ describe("annotations in details", () => {
     vi.stubGlobal("document", doc);
     highlighter = Object.assign(Object.create(TextHighlighter.prototype), {
       navigator: {
-        view: { isPaginated: () => false },
-        iframes: [{ contentDocument: doc }],
+        view: { isPaginated: () => false, isScrollMode: () => true },
+        iframes: [{ contentDocument: doc, contentWindow: { document: doc } }],
       },
       getScrollingElement: () => ({ scrollLeft: 0, scrollTop: 0 }),
     });
@@ -135,6 +144,7 @@ describe("annotations in details", () => {
     vi.clearAllTimers();
     vi.useRealTimers();
     vi.restoreAllMocks();
+    vi.mocked(getClientRectsNoOverlap).mockReset().mockReturnValue([]);
     vi.unstubAllGlobals();
   });
 
@@ -243,6 +253,79 @@ describe("annotations in details", () => {
     expect(_highlights).toContain(created);
   });
 
+  it("clips a mixed summary/body range without changing the saved range", () => {
+    const details = element("details");
+    const summary = element("summary", details);
+    const content = element("p", details);
+    doc.querySelectorAll = () => (details.open ? [] : [details]);
+    const clipped = {
+      startContainer: summary,
+      startOffset: 2,
+      endContainer: content,
+      endOffset: 4,
+      setEnd(node: ContentElement, offset: number) {
+        this.endContainer = node;
+        this.endOffset = offset;
+      },
+    };
+    const range = {
+      commonAncestorContainer: details,
+      startContainer: summary,
+      startOffset: 2,
+      endContainer: content,
+      endOffset: 4,
+      intersectsNode: () => true,
+      cloneRange: () => clipped,
+      getBoundingClientRect: () => ({
+        top: 10,
+        left: 5,
+        width: 200,
+        height: 100,
+      }),
+    };
+    doc.createRange.mockReturnValue({
+      startContainer: details,
+      startOffset: 1,
+      endContainer: details,
+      endOffset: 2,
+      selectNodeContents: vi.fn(),
+      cloneRange: () => ({
+        collapsed: true,
+        setEndBefore: vi.fn(),
+      }),
+      setStartAfter: vi.fn(),
+      comparePoint: (node: ContentElement) => (node === summary ? -1 : 0),
+    });
+    vi.mocked(convertRangeInfo).mockReturnValue(
+      Object.assign(Object.create(null), range)
+    );
+    vi.mocked(getClientRectsNoOverlap).mockReturnValue([
+      { top: 10, left: 5, width: 30, height: 20, bottom: 30, right: 35 },
+    ]);
+    Object.assign(doc, {
+      documentElement: { style: { getPropertyValue: () => "0" } },
+    });
+    Object.assign(highlighter.navigator, { settings: { fontSize: 100 } });
+    vi.stubGlobal("getComputedStyle", () => ({
+      width: "600px",
+      getPropertyValue: () => "0",
+    }));
+
+    const closed = highlighter.createHighlightDom({ document: doc }, highlight);
+    expect(closed?.style.display).toBe("");
+    expect(getClientRectsNoOverlap).toHaveBeenLastCalledWith(clipped, true);
+    expect(clipped.endContainer).toBe(details);
+    expect(clipped.endOffset).toBe(1);
+    expect(range.endContainer).toBe(content);
+    const bounding = closed?.childNodes[1] as HTMLElement;
+    expect(bounding.style.width).toBe("30px");
+    expect(bounding.style.height).toBe("20px");
+
+    details.open = true;
+    highlighter.createHighlightDom({ document: doc }, highlight);
+    expect(getClientRectsNoOverlap).toHaveBeenLastCalledWith(range, true);
+  });
+
   function annotationModule(enableAnnotations = true) {
     return new AnnotationModule(
       new LocalAnnotator({ store: new MemoryStore() }),
@@ -279,6 +362,147 @@ describe("annotations in details", () => {
     layoutEvent();
     expect(draw).toHaveBeenCalledTimes(1);
   });
+
+  it("keeps definitions clickable after an actual details annotation redraw", async () => {
+    Object.assign(doc, { readyState: "complete" });
+    const definition = {
+      ...highlight,
+      id: "definition",
+      type: HighlightType.Definition,
+      pointerInteraction: true,
+    };
+    const click = vi.fn();
+    const emit = vi.fn();
+    const result = { order: 1, term: "Term" };
+    Object.assign(highlighter.navigator, {
+      currentLocator: () => ({ href: "chapter.xhtml" }),
+      currentChapterLink: { href: "chapter.xhtml" },
+      rights: {},
+      definitionsModule: {
+        properties: { definitions: [result] },
+        api: { click },
+      },
+      emit,
+    });
+    const module = annotationModule();
+    module.navigator = highlighter.navigator;
+    vi.spyOn(module.annotator!, "getAnnotationsByChapter").mockReturnValue([
+      {
+        href: "chapter.xhtml",
+        locations: {},
+        created: new Date(),
+        highlight,
+      },
+    ]);
+    vi.spyOn(Publication.prototype, "getTOCItem").mockReturnValue(
+      Object.assign(new Link(), { Href: "chapter.xhtml" })
+    );
+    vi.spyOn(highlighter, "createHighlightDom").mockReturnValue(undefined);
+    const draw = vi.spyOn(module, "drawHighlights");
+    _highlights.push(highlight, definition);
+    await module.initialize(
+      Object.assign(Object.create(null), { contentDocument: doc })
+    );
+    layoutEvent();
+    await draw.mock.results[0].value;
+    expect(_highlights).toEqual([definition, highlight]);
+
+    const target = Object.assign(new EventTarget(), {
+      parentElement: {
+        id: definition.id,
+        style: { display: "" },
+        dataset: { order: "1" },
+      },
+      getAttribute: (name: string) => (name === "data-click" ? "1" : null),
+    });
+    const interactions: Promise<void>[] = [];
+    target.addEventListener("click", (event) => {
+      interactions.push(highlighter.processMouseEvent(event as MouseEvent));
+    });
+    target.dispatchEvent(new Event("click"));
+    await Promise.all(interactions);
+    expect(click).toHaveBeenCalledWith(result, definition);
+    expect(emit).toHaveBeenCalledWith("definition.click", result, definition);
+  });
+
+  it.each(["hidden", "empty", "missing", "zero-height", "zero-width"])(
+    "omits %s gutter comments and restores them when renderable",
+    (state) => {
+      const area = {
+        style: {
+          top: "50px",
+          width: "40px",
+          height: "20px",
+          display: "",
+        },
+      };
+      if (state === "zero-height") area.style.height = "0px";
+      if (state === "zero-width") area.style.width = "0px";
+      const areas = state === "empty" ? [] : [area];
+      const hidden = {
+        style: { display: state === "hidden" ? "none" : "" },
+        querySelectorAll: () => areas,
+        getElementsByClassName: () => areas,
+      };
+      const visibleArea = {
+        style: { top: "10px", width: "40px", height: "20px", display: "" },
+      };
+      const visible = {
+        style: { display: "" },
+        querySelectorAll: () => [visibleArea],
+        getElementsByClassName: () => [visibleArea],
+      };
+      const overlays = new Map([["visible", visible]]);
+      if (state !== "missing") overlays.set("hidden", hidden);
+      const gutter = {
+        innerHTML: "",
+        style: { removeProperty: vi.fn() },
+        appendChild: vi.fn(),
+      };
+      Object.assign(doc, {
+        getElementById: (id: string) =>
+          id === HighlightContainer.R2_ID_GUTTER_RIGHT_CONTAINER
+            ? gutter
+            : {
+                querySelector: (selector: string) =>
+                  overlays.get(selector.slice(1)),
+              },
+      });
+      Object.assign(highlighter.navigator, {
+        view: { isScrollMode: () => true },
+        currentLocator: () => ({ href: "chapter.xhtml" }),
+      });
+      const module = annotationModule();
+      module.navigator = highlighter.navigator;
+      module.properties = { enableComments: true };
+      vi.spyOn(module.annotator!, "getAnnotationsByChapter").mockReturnValue(
+        ["visible", "hidden"].map((id) => ({
+          href: "chapter.xhtml",
+          locations: {},
+          created: new Date(),
+          highlight: { ...highlight, id, note: id },
+        }))
+      );
+
+      module.repositionGutters();
+      expect(gutter.appendChild).toHaveBeenCalledTimes(1);
+      expect(gutter.appendChild.mock.calls[0][0].childNodes[1].innerHTML).toBe(
+        "visible"
+      );
+
+      hidden.style.display = "";
+      area.style.width = "40px";
+      area.style.height = "20px";
+      if (!areas.length) areas.push(area);
+      overlays.set("hidden", hidden);
+      gutter.appendChild.mockClear();
+      module.repositionGutters();
+      expect(gutter.appendChild).toHaveBeenCalledTimes(2);
+      expect(gutter.appendChild.mock.calls[1][0].childNodes[1].innerHTML).toBe(
+        "hidden"
+      );
+    }
+  );
 
   it.each([
     "transitionend",
