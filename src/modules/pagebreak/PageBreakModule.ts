@@ -127,9 +127,6 @@ export class PageBreakModule implements ReaderModule {
   }
 
   async handleResize() {
-    await this.navigator.highlighter?.destroyHighlights(
-      HighlightType.PageBreak
-    );
     await this.drawPageBreaks();
   }
 
@@ -159,6 +156,7 @@ export class PageBreakModule implements ReaderModule {
           return "";
         }
       }
+      this.navigator.highlighter?.destroyHighlights(HighlightType.PageBreak);
       if (pageBreaks) {
         for (let i = 0; i < pageBreaks.length; i++) {
           let img = pageBreaks[i] as HTMLElement;

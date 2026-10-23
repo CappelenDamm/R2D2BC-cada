@@ -107,12 +107,19 @@ export class AnnotationModule implements ReaderModule {
       typeof target.closest === "function" &&
       target.closest("details")
     ) {
-      void this.drawHighlights().catch((error) => {
-        log.error(
-          "Failed to redraw annotations after details layout change",
-          error
-        );
-      });
+      void this.drawHighlights()
+        .then(async () => {
+          const pageBreakModule = this.navigator?.pageBreakModule;
+          if (pageBreakModule) {
+            await pageBreakModule.drawPageBreaks();
+          }
+        })
+        .catch((error) => {
+          log.error(
+            "Failed to redraw annotations or page breaks after details layout change",
+            error
+          );
+        });
     }
   };
 

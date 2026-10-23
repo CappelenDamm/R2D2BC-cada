@@ -740,6 +740,8 @@ Copy protection, text selection control, and content obfuscation. Can disable co
 
 Displays print page numbers in the margins for reflowable content. Uses the EPUB page-list.
 
+Page-break redraws replace both the overlay DOM and its highlight models, so repeated redraws do not accumulate duplicate page-break entries. Existing page numbers remain visible during the redraw delay and are replaced in the same browser task to avoid flashing. Annotation-only redraws preserve page-break and definition models. Details toggles and completed or cancelled transitions and animations within details redraw page breaks after annotations, keeping page numbers aligned with their anchors.
+
 ### TimelineModule
 
 **Flag:** `enableTimeline: true`

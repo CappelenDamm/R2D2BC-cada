@@ -3,6 +3,7 @@ import { AnnotationMarker } from "../../src/model/Locator";
 import { Publication } from "../../src/model/Publication";
 import { Link } from "../../src/model/Link";
 import { AnnotationModule } from "../../src/modules/AnnotationModule";
+import { PageBreakModule } from "../../src/modules/pagebreak/PageBreakModule";
 import {
   TextHighlighter,
   _highlights,
@@ -13,12 +14,16 @@ import {
   HighlightType,
   IHighlight,
 } from "../../src/modules/highlight/common/highlight";
-import { convertRangeInfo } from "../../src/modules/highlight/renderer/iframe/selection";
+import {
+  convertRange,
+  convertRangeInfo,
+} from "../../src/modules/highlight/renderer/iframe/selection";
 import LocalAnnotator from "../../src/store/LocalAnnotator";
 import MemoryStore from "../../src/store/MemoryStore";
 import log from "loglevel";
 
 vi.mock("../../src/modules/highlight/renderer/iframe/selection", () => ({
+  convertRange: vi.fn(),
   convertRangeInfo: vi.fn(),
 }));
 vi.mock("../../src/modules/highlight/common/rect-utils", () => ({
@@ -363,6 +368,96 @@ describe("annotations in details", () => {
     expect(draw).toHaveBeenCalledTimes(1);
   });
 
+  it.each([
+    "toggle",
+    "transitionend",
+    "transitioncancel",
+    "animationend",
+    "animationcancel",
+  ])("redraws page breaks after annotations on details %s", async (event) => {
+    const module = annotationModule();
+    const draw = vi.spyOn(module, "drawHighlights").mockResolvedValue();
+    const destroy = vi.spyOn(highlighter, "destroyHighlights");
+    const drawPageBreaks = vi.fn(async () => {});
+    module.navigator = highlighter.navigator;
+    Object.assign(module.navigator, {
+      pageBreakModule: { drawPageBreaks },
+    });
+    await module.initialize(
+      Object.assign(Object.create(null), { contentDocument: doc })
+    );
+
+    layoutEvent(event);
+    await vi.waitFor(() => expect(drawPageBreaks).toHaveBeenCalledTimes(1));
+    expect(draw).toHaveBeenCalledTimes(1);
+    expect(destroy).not.toHaveBeenCalled();
+    expect(draw.mock.invocationCallOrder[0]).toBeLessThan(
+      drawPageBreaks.mock.invocationCallOrder[0]
+    );
+  });
+
+  it.each(["drawPageBreaks", "handleResize"] as const)(
+    "keeps page numbers visible until their replacements are drawn by %s",
+    async (method) => {
+      Object.assign(highlighter.navigator, { highlighter });
+      const pageBreakModule: PageBreakModule = Object.assign(
+        Object.create(PageBreakModule.prototype),
+        { navigator: highlighter.navigator }
+      );
+      const pageNumbers: HTMLDivElement[] = [];
+      const container = {
+        get firstChild() {
+          return pageNumbers[0];
+        },
+        removeChild: () => pageNumbers.shift(),
+      };
+      Object.assign(doc, {
+        getElementById: (id: string) =>
+          id === HighlightContainer.R2_ID_PAGEBREAK_CONTAINER
+            ? container
+            : overlay(),
+      });
+      Object.assign(doc.body, {
+        querySelectorAll: () => [{ innerHTML: "1" }],
+      });
+      doc.createRange.mockReturnValue({ selectNodeContents: vi.fn() });
+      vi.spyOn(highlighter, "dom").mockReturnValue({
+        getWindow: () => ({ document: doc }),
+        getSelection: () => ({
+          removeAllRanges: vi.fn(),
+          addRange: vi.fn(),
+          isCollapsed: false,
+        }),
+      });
+      vi.mocked(convertRange).mockReturnValue(
+        highlight.selectionInfo.rangeInfo
+      );
+      let top = 20;
+      vi.spyOn(highlighter, "createHighlightDom").mockImplementation(() => {
+        const dom = document.createElement("div");
+        dom.style.top = `${top}px`;
+        pageNumbers.push(dom);
+        return dom;
+      });
+      pageBreakModule.createPageBreakHighlight(highlight.selectionInfo, "1");
+
+      for (let cycle = 0; cycle < 3; cycle++) {
+        const previous = pageNumbers[0];
+        top += 100;
+        await pageBreakModule[method]();
+        expect(pageNumbers).toEqual([previous]);
+        await vi.advanceTimersByTimeAsync(199);
+        expect(pageNumbers).toEqual([previous]);
+        await vi.advanceTimersByTimeAsync(1);
+        expect(pageNumbers).toHaveLength(1);
+        expect(pageNumbers[0]).not.toBe(previous);
+        expect(pageNumbers[0].style.top).toBe(`${top}px`);
+        expect(_highlights).toHaveLength(1);
+        expect(_highlights[0].position).toBe(top);
+      }
+    }
+  );
+
   it("keeps definitions clickable after an actual details annotation redraw", async () => {
     Object.assign(doc, { readyState: "complete" });
     const definition = {
@@ -423,6 +518,57 @@ describe("annotations in details", () => {
     await Promise.all(interactions);
     expect(click).toHaveBeenCalledWith(result, definition);
     expect(emit).toHaveBeenCalledWith("definition.click", result, definition);
+  });
+
+  it("keeps one model per page break across annotation and page-break redraws", () => {
+    Object.assign(highlighter.navigator, { highlighter });
+    const pageBreakModule: PageBreakModule = Object.assign(
+      Object.create(PageBreakModule.prototype),
+      { navigator: highlighter.navigator }
+    );
+    vi.spyOn(highlighter, "createHighlightDom").mockImplementation(() => {
+      const dom = document.createElement("div");
+      dom.style.top = "20px";
+      return dom;
+    });
+    const definition = {
+      ...highlight,
+      id: "definition",
+      type: HighlightType.Definition,
+      pointerInteraction: true,
+    };
+    _highlights.push(definition);
+    const redrawPageBreaks = () =>
+      ["1", "2"].map((page) =>
+        pageBreakModule.createPageBreakHighlight(
+          {
+            rangeInfo: {
+              ...highlight.selectionInfo.rangeInfo,
+              startContainerElementCssSelector: `#page-${page}`,
+              endContainerElementCssSelector: `#page-${page}`,
+            },
+          },
+          page
+        )
+      );
+    const pageBreakIds = redrawPageBreaks().map((pageBreak) => pageBreak.id);
+
+    for (let cycle = 0; cycle < 5; cycle++) {
+      _highlights.push({ ...highlight });
+      highlighter.destroyHighlights(HighlightType.Annotation);
+      expect(_highlights.map((model) => model.id)).toEqual([
+        definition.id,
+        ...pageBreakIds,
+      ]);
+
+      highlighter.destroyHighlights(HighlightType.PageBreak);
+      expect(_highlights).toEqual([definition]);
+      redrawPageBreaks();
+      expect(_highlights.map((model) => model.id)).toEqual([
+        definition.id,
+        ...pageBreakIds,
+      ]);
+    }
   });
 
   it.each(["hidden", "empty", "missing", "zero-height", "zero-width"])(
@@ -582,10 +728,11 @@ describe("annotations in details", () => {
       Object.assign(Object.create(null), { contentDocument: doc })
     );
     layoutEvent();
-    await Promise.resolve();
-    expect(report).toHaveBeenCalledWith(
-      "Failed to redraw annotations after details layout change",
-      error
+    await vi.waitFor(() =>
+      expect(report).toHaveBeenCalledWith(
+        "Failed to redraw annotations or page breaks after details layout change",
+        error
+      )
     );
   });
 });

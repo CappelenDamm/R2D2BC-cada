@@ -1219,7 +1219,6 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
             }
 
             if (this.rights.enablePageBreaks && this.pageBreakModule) {
-              await this.highlighter.destroyHighlights(HighlightType.PageBreak);
               await this.pageBreakModule.drawPageBreaks();
             }
 
@@ -3243,7 +3242,6 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
         }
 
         if (this.pageBreakModule) {
-          await this.highlighter?.destroyHighlights(HighlightType.PageBreak);
           await this.pageBreakModule.drawPageBreaks();
         }
 
