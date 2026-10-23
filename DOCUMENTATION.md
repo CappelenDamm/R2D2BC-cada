@@ -1453,6 +1453,7 @@ D2Reader.load({
 
 - Constrain `#iframe-wrapper` to the available reader height and let the reader size the iframe to its content; do not apply a fixed CSS height or max-height to the iframe.
 - The content resize observer measures rendered body and child margin boxes, including child margins that collapse through the body, after styles load. It avoids root viewport heights so the iframe can also shrink when content collapses.
+- Chapters written from cross-origin fetches or `api.getContent` are given an HTML5 doctype to preserve standards mode, including both fixed-layout spread frames. Without it, `document.write` would parse the serialized XHTML in quirks mode, where `body.scrollHeight` can include the iframe viewport and prevent shrinking.
 
 ### Content styles look wrong
 

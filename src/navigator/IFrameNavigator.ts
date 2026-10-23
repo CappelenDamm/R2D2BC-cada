@@ -1775,7 +1775,8 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
           );
         }
       }
-      const newHTML = doc.documentElement.outerHTML;
+      // document.write reparses XHTML as HTML; outerHTML omits the doctype.
+      const newHTML = "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
       const iframeDoc = self.iframes[0].contentDocument;
       if (iframeDoc) {
         iframeDoc.open();
@@ -1796,7 +1797,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
           );
         }
       }
-      const newHTML = doc.documentElement.outerHTML;
+      const newHTML = "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
       const iframeDoc = self.iframes[1].contentDocument;
       if (iframeDoc) {
         iframeDoc.open();
