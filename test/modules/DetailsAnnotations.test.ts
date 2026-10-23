@@ -420,7 +420,10 @@ describe("annotations in details", () => {
       Object.assign(doc.body, {
         querySelectorAll: () => [{ innerHTML: "1" }],
       });
-      doc.createRange.mockReturnValue({ selectNodeContents: vi.fn() });
+      doc.createRange.mockReturnValue({
+        selectNodeContents: vi.fn(),
+        collapsed: false,
+      });
       vi.spyOn(highlighter, "dom").mockReturnValue({
         getWindow: () => ({ document: doc }),
         getSelection: () => ({
@@ -454,6 +457,71 @@ describe("annotations in details", () => {
         expect(pageNumbers[0].style.top).toBe(`${top}px`);
         expect(_highlights).toHaveLength(1);
         expect(_highlights[0].position).toBe(top);
+      }
+    }
+  );
+
+  it.each([false, true])(
+    "preserves an existing selection through a details redraw with anchor collapsed=%s",
+    async (collapsed) => {
+      const passage = { startOffset: 2, endOffset: 10 };
+      let selectedRange: object | null = passage;
+      const selection = {
+        removeAllRanges: vi.fn(() => {
+          selectedRange = null;
+        }),
+        addRange: vi.fn((range: Range) => {
+          selectedRange = range;
+        }),
+        get isCollapsed() {
+          return selectedRange === null;
+        },
+      };
+      const range = { selectNodeContents: vi.fn(), collapsed };
+      const anchor = { innerHTML: "1" };
+      doc.createRange.mockReturnValue(range);
+      Object.assign(doc.body, { querySelectorAll: () => [anchor] });
+      Object.assign(highlighter.navigator, { highlighter });
+      vi.spyOn(highlighter, "dom").mockReturnValue({
+        getWindow: () => ({ document: doc }),
+        getSelection: () => selection,
+      });
+      vi.mocked(convertRange)
+        .mockReset()
+        .mockReturnValue(highlight.selectionInfo.rangeInfo);
+      const pageBreakModule: PageBreakModule = Object.assign(
+        Object.create(PageBreakModule.prototype),
+        { navigator: highlighter.navigator }
+      );
+      const create = vi
+        .spyOn(pageBreakModule, "createPageBreakHighlight")
+        .mockReturnValue(highlight);
+      const redraw = vi.spyOn(pageBreakModule, "drawPageBreaks");
+      const module = annotationModule();
+      module.navigator = highlighter.navigator;
+      Object.assign(module.navigator, { pageBreakModule });
+      vi.spyOn(module, "drawHighlights").mockResolvedValue();
+      await module.initialize(
+        Object.assign(Object.create(null), { contentDocument: doc })
+      );
+      vi.clearAllTimers();
+
+      layoutEvent("transitionend");
+      await vi.waitFor(() => expect(redraw).toHaveBeenCalledTimes(1));
+      await vi.advanceTimersByTimeAsync(200);
+
+      expect(range.selectNodeContents).toHaveBeenCalledExactlyOnceWith(anchor);
+      expect(selectedRange).toBe(passage);
+      expect(selection.removeAllRanges).not.toHaveBeenCalled();
+      expect(selection.addRange).not.toHaveBeenCalled();
+      expect(create).toHaveBeenCalledTimes(collapsed ? 0 : 1);
+      if (collapsed) {
+        expect(convertRange).not.toHaveBeenCalled();
+      } else {
+        expect(convertRange).toHaveBeenCalledExactlyOnceWith(
+          range,
+          expect.any(Function)
+        );
       }
     }
   );

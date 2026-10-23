@@ -176,19 +176,10 @@ export class PageBreakModule implements ReaderModule {
           }
           let doc = this.navigator.iframes[0].contentDocument;
           if (doc) {
-            const range = this.navigator.highlighter
-              ?.dom(doc.body)
-              .getWindow()
-              .document.createRange();
-            const selection = this.navigator.highlighter
-              ?.dom(doc.body)
-              .getSelection();
-            selection.removeAllRanges();
+            const range = doc.createRange();
             range.selectNodeContents(img);
-            selection.addRange(range);
-            if (!selection.isCollapsed) {
+            if (!range.collapsed) {
               const rangeInfo = convertRange(range, getCssSelector);
-              selection.removeAllRanges();
               if (rangeInfo) {
                 this.createPageBreakHighlight(
                   {
