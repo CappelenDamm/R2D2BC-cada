@@ -460,11 +460,15 @@ describe("annotations in details", () => {
       for (let cycle = 0; cycle < 3; cycle++) {
         const previous = pageNumbers[0];
         top += 100;
-        await pageBreakModule[method]();
+        const completed = vi.fn();
+        const rendering = pageBreakModule[method]().then(completed);
         expect(pageNumbers).toEqual([previous]);
         await vi.advanceTimersByTimeAsync(199);
         expect(pageNumbers).toEqual([previous]);
+        expect(completed).not.toHaveBeenCalled();
         await vi.advanceTimersByTimeAsync(1);
+        await rendering;
+        expect(completed).toHaveBeenCalledTimes(1);
         expect(pageNumbers).toHaveLength(1);
         expect(pageNumbers[0]).not.toBe(previous);
         expect(pageNumbers[0].style.top).toBe(`${top}px`);
@@ -879,23 +883,39 @@ describe("annotations in details", () => {
     expect(redraw).not.toHaveBeenCalled();
   });
 
-  it("reports a failed page-break redraw", async () => {
+  it("reports a failure thrown by delayed page-break rendering", async () => {
     const module: PageBreakModule = Object.assign(
       Object.create(PageBreakModule.prototype),
       { navigator: highlighter.navigator }
     );
     const error = new Error("page-break redraw failed");
-    vi.spyOn(module, "drawPageBreaks").mockRejectedValue(error);
+    Object.assign(highlighter.navigator, { highlighter });
+    Object.assign(doc.body, {
+      querySelectorAll: () => [{ innerHTML: "1" }],
+    });
+    doc.createRange.mockReturnValue({
+      selectNodeContents: vi.fn(),
+      collapsed: false,
+    });
+    vi.mocked(convertRange).mockReturnValue(highlight.selectionInfo.rangeInfo);
+    const create = vi
+      .spyOn(module, "createPageBreakHighlight")
+      .mockImplementation(() => {
+        throw error;
+      });
     const report = vi.spyOn(log, "error").mockImplementation(() => {});
     module.initialize(
       Object.assign(Object.create(null), { contentDocument: doc })
     );
     layoutEvent();
-    await vi.waitFor(() =>
-      expect(report).toHaveBeenCalledWith(
-        "Failed to redraw page breaks after details layout change",
-        error
-      )
+    await vi.advanceTimersByTimeAsync(199);
+    expect(create).not.toHaveBeenCalled();
+    expect(report).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(1);
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(report).toHaveBeenCalledExactlyOnceWith(
+      "Failed to redraw page breaks after details layout change",
+      error
     );
   });
 

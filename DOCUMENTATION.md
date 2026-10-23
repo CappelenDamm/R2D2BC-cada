@@ -746,6 +746,8 @@ Page-number overlays follow their EPUB page-break anchors during details toggles
 
 The module maintains one highlight model per page-break anchor. Details-layout listeners are scoped to the active chapter and removed when the module stops.
 
+`drawPageBreaks()` returns a promise that resolves after delayed rendering completes and rejects if rendering fails.
+
 ### TimelineModule
 
 **Flag:** `enableTimeline: true`
