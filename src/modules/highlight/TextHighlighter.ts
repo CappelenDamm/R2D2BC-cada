@@ -2733,6 +2733,30 @@ export class TextHighlighter {
     highlightParent.setAttribute("id", highlight.id);
     highlightParent.setAttribute("class", CLASS_HIGHLIGHT_CONTAINER);
     highlightParent.style.setProperty("pointer-events", "none");
+    if (
+      highlight.type === HighlightType.Annotation &&
+      highlight.marker !== AnnotationMarker.Bookmark
+    ) {
+      let ancestor: Node | null = range.commonAncestorContainer;
+      while (ancestor) {
+        if (ancestor.nodeType === NODE_TYPE.ELEMENT_NODE) {
+          const element = ancestor as Element;
+          if (
+            element.localName === "details" &&
+            !element.hasAttribute("open")
+          ) {
+            const summary = Array.from(element.children).find(
+              (child) => child.localName === "summary"
+            );
+            if (!summary?.contains(range.commonAncestorContainer)) {
+              highlightParent.style.display = "none";
+              break;
+            }
+          }
+        }
+        ancestor = ancestor.parentElement;
+      }
+    }
     if (highlight.pointerInteraction) {
       highlightParent.setAttribute("data-click", "1");
       highlightParent.addEventListener("mouseover", (ev) => {

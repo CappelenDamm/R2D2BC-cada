@@ -51,6 +51,14 @@ import { Action } from "./consumption/ConsumptionModule";
 
 export type Highlight = (highlight: Annotation) => Promise<Annotation>;
 
+const detailsLayoutEvents = [
+  "toggle",
+  "transitionend",
+  "transitioncancel",
+  "animationend",
+  "animationcancel",
+];
+
 export interface AnnotationModuleAPI {
   addAnnotation: Highlight;
   deleteAnnotation: Highlight;
@@ -88,6 +96,25 @@ export class AnnotationModule implements ReaderModule {
   api?: AnnotationModuleAPI;
   activeAnnotationMarkerId?: string;
   activeAnnotationMarkerPosition?: string;
+  private detailsDocument: Document | null = null;
+  private readonly onDetailsLayoutChange = (event: Event) => {
+    const target = event.target;
+    if (
+      target &&
+      (event.type !== "toggle" ||
+        ("localName" in target && target.localName === "details")) &&
+      "closest" in target &&
+      typeof target.closest === "function" &&
+      target.closest("details")
+    ) {
+      void this.drawHighlights().catch((error) => {
+        log.error(
+          "Failed to redraw annotations after details layout change",
+          error
+        );
+      });
+    }
+  };
 
   public static async create(config: AnnotationModuleConfig) {
     const annotations = new this(
@@ -125,6 +152,14 @@ export class AnnotationModule implements ReaderModule {
   }
 
   async stop() {
+    for (const event of detailsLayoutEvents) {
+      this.detailsDocument?.removeEventListener(
+        event,
+        this.onDetailsLayoutChange,
+        true
+      );
+    }
+    this.detailsDocument = null;
     log.log("Annotation module stop");
   }
 
@@ -198,6 +233,23 @@ export class AnnotationModule implements ReaderModule {
   }
 
   initialize(iframe: HTMLIFrameElement) {
+    for (const event of detailsLayoutEvents) {
+      this.detailsDocument?.removeEventListener(
+        event,
+        this.onDetailsLayoutChange,
+        true
+      );
+    }
+    this.detailsDocument = this.rights.enableAnnotations
+      ? iframe.contentDocument
+      : null;
+    for (const event of detailsLayoutEvents) {
+      this.detailsDocument?.addEventListener(
+        event,
+        this.onDetailsLayoutChange,
+        true
+      );
+    }
     return new Promise(async (resolve) => {
       await (document as any).fonts.ready;
       if (this.rights.enableAnnotations) {
