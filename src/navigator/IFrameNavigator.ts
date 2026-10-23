@@ -1219,7 +1219,6 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
             }
 
             if (this.rights.enablePageBreaks && this.pageBreakModule) {
-              await this.highlighter.destroyHighlights(HighlightType.PageBreak);
               await this.pageBreakModule.drawPageBreaks();
             }
 
@@ -1551,6 +1550,10 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
 
       if (this.rights.enableAnnotations && this.annotationModule) {
         await this.annotationModule.initialize(iframe);
+      }
+
+      if (this.rights.enablePageBreaks && this.pageBreakModule) {
+        this.pageBreakModule.initialize(iframe);
       }
 
       if (this.rights.enableBookmarks && this.bookmarkModule) {
@@ -3243,7 +3246,6 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
         }
 
         if (this.pageBreakModule) {
-          await this.highlighter?.destroyHighlights(HighlightType.PageBreak);
           await this.pageBreakModule.drawPageBreaks();
         }
 

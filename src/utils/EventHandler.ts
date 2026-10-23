@@ -41,6 +41,40 @@ export function removeEventListenerOptional(
   }
 }
 
+export function addDetailsLayoutListener(
+  doc: Document | null,
+  onLayoutChange: () => void
+): () => void {
+  const events = [
+    "toggle",
+    "transitionend",
+    "transitioncancel",
+    "animationend",
+    "animationcancel",
+  ];
+  const listener = (event: Event) => {
+    const target = event.target;
+    if (
+      target &&
+      (event.type !== "toggle" ||
+        ("localName" in target && target.localName === "details")) &&
+      "closest" in target &&
+      typeof target.closest === "function" &&
+      target.closest("details")
+    ) {
+      onLayoutChange();
+    }
+  };
+  for (const event of events) {
+    doc?.addEventListener(event, listener, true);
+  }
+  return () => {
+    for (const event of events) {
+      doc?.removeEventListener(event, listener, true);
+    }
+  };
+}
+
 export default class EventHandler {
   navigator: IFrameNavigator;
   popup: Popup;

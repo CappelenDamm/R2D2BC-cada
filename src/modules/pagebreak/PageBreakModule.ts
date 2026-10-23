@@ -33,6 +33,7 @@ import { SHA256 } from "jscrypto/es6/SHA256";
 import { _highlights } from "../highlight/TextHighlighter";
 import { Publication } from "../../model/Publication";
 import log from "loglevel";
+import { addDetailsLayoutListener } from "../../utils/EventHandler";
 
 export interface PageBreakModuleProperties {
   hideLayer?: boolean;
@@ -50,6 +51,7 @@ export class PageBreakModule implements ReaderModule {
   private properties: PageBreakModuleProperties;
 
   private goToPageView: HTMLLIElement;
+  private removeDetailsLayoutListener?: () => void;
 
   public static async create(config: PageBreakModuleConfig) {
     const pageBreak = new this(
@@ -72,7 +74,24 @@ export class PageBreakModule implements ReaderModule {
   }
 
   async stop() {
+    this.removeDetailsLayoutListener?.();
+    this.removeDetailsLayoutListener = undefined;
     log.log("Page Break module stop");
+  }
+
+  initialize(iframe: HTMLIFrameElement) {
+    this.removeDetailsLayoutListener?.();
+    this.removeDetailsLayoutListener = addDetailsLayoutListener(
+      iframe.contentDocument,
+      () => {
+        void this.drawPageBreaks().catch((error) => {
+          log.error(
+            "Failed to redraw page breaks after details layout change",
+            error
+          );
+        });
+      }
+    );
   }
 
   protected async start(): Promise<void> {
@@ -127,88 +146,76 @@ export class PageBreakModule implements ReaderModule {
   }
 
   async handleResize() {
-    await this.navigator.highlighter?.destroyHighlights(
-      HighlightType.PageBreak
-    );
     await this.drawPageBreaks();
   }
 
-  async drawPageBreaks() {
-    setTimeout(() => {
-      const body = this.navigator.iframes[0].contentDocument?.body;
-      let pageBreaks = body?.querySelectorAll('[*|type="pagebreak"]');
-      if (pageBreaks?.length === 0) {
-        pageBreaks = body?.querySelectorAll("[epub\\:type='pagebreak']");
-      }
-      if (pageBreaks?.length === 0) {
-        pageBreaks = body?.querySelectorAll("[role='doc-pagebreak']");
-      }
-      let self = this;
+  async drawPageBreaks(): Promise<void> {
+    await new Promise<void>((resolve) => setTimeout(resolve, 200));
+    const body = this.navigator.iframes[0].contentDocument?.body;
+    let pageBreaks = body?.querySelectorAll('[*|type="pagebreak"]');
+    if (pageBreaks?.length === 0) {
+      pageBreaks = body?.querySelectorAll("[epub\\:type='pagebreak']");
+    }
+    if (pageBreaks?.length === 0) {
+      pageBreaks = body?.querySelectorAll("[role='doc-pagebreak']");
+    }
+    let self = this;
 
-      function getCssSelector(element: Element): string {
-        try {
-          let doc = self.navigator.iframes[0].contentDocument;
-          if (doc) {
-            return uniqueCssSelector(element, doc, _getCssSelectorOptions);
-          } else {
-            return "";
-          }
-        } catch (err) {
-          log.log("uniqueCssSelector:");
-          log.error(err);
+    function getCssSelector(element: Element): string {
+      try {
+        let doc = self.navigator.iframes[0].contentDocument;
+        if (doc) {
+          return uniqueCssSelector(element, doc, _getCssSelectorOptions);
+        } else {
           return "";
         }
+      } catch (err) {
+        log.log("uniqueCssSelector:");
+        log.error(err);
+        return "";
       }
-      if (pageBreaks) {
-        for (let i = 0; i < pageBreaks.length; i++) {
-          let img = pageBreaks[i] as HTMLElement;
-          log.log(img);
+    }
+    this.navigator.highlighter?.destroyHighlights(HighlightType.PageBreak);
+    if (pageBreaks) {
+      for (let i = 0; i < pageBreaks.length; i++) {
+        let img = pageBreaks[i] as HTMLElement;
+        log.log(img);
 
-          let title = img.innerHTML;
-          let hide = false;
-          if (img.innerHTML.length === 0) {
-            title = img.getAttribute("title") ?? "";
-            img.textContent = title;
-            hide = true;
-          }
-          if (img.innerHTML.length === 0) {
-            title = (img.getAttribute("id") ?? "").replace(/[^0-9]/g, "");
-            img.innerHTML = title;
-            hide = true;
-          }
-          let doc = this.navigator.iframes[0].contentDocument;
-          if (doc) {
-            const range = this.navigator.highlighter
-              ?.dom(doc.body)
-              .getWindow()
-              .document.createRange();
-            const selection = this.navigator.highlighter
-              ?.dom(doc.body)
-              .getSelection();
-            selection.removeAllRanges();
-            range.selectNodeContents(img);
-            selection.addRange(range);
-            if (!selection.isCollapsed) {
-              const rangeInfo = convertRange(range, getCssSelector);
-              selection.removeAllRanges();
-              if (rangeInfo) {
-                this.createPageBreakHighlight(
-                  {
-                    rangeInfo: rangeInfo,
-                    cleanText: "",
-                    rawText: "",
-                  },
-                  title
-                );
-              }
+        let title = img.innerHTML;
+        let hide = false;
+        if (img.innerHTML.length === 0) {
+          title = img.getAttribute("title") ?? "";
+          img.textContent = title;
+          hide = true;
+        }
+        if (img.innerHTML.length === 0) {
+          title = (img.getAttribute("id") ?? "").replace(/[^0-9]/g, "");
+          img.innerHTML = title;
+          hide = true;
+        }
+        let doc = this.navigator.iframes[0].contentDocument;
+        if (doc) {
+          const range = doc.createRange();
+          range.selectNodeContents(img);
+          if (!range.collapsed) {
+            const rangeInfo = convertRange(range, getCssSelector);
+            if (rangeInfo) {
+              this.createPageBreakHighlight(
+                {
+                  rangeInfo: rangeInfo,
+                  cleanText: "",
+                  rawText: "",
+                },
+                title
+              );
             }
           }
-          if (hide) {
-            img.innerHTML = "";
-          }
+        }
+        if (hide) {
+          img.innerHTML = "";
         }
       }
-    }, 200);
+    }
   }
 
   createPageBreakHighlight(selectionInfo: ISelectionInfo, title: string) {

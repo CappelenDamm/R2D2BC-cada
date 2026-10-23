@@ -2603,6 +2603,11 @@ export class TextHighlighter {
           if (container) {
             this.removeAllChildNodes(container);
           }
+          for (let i = _highlights.length - 1; i >= 0; i--) {
+            if (_highlights[i].type === HighlightType.PageBreak) {
+              _highlights.splice(i, 1);
+            }
+          }
           break;
         case HighlightType.Definition:
           container = doc.getElementById(
@@ -2610,6 +2615,11 @@ export class TextHighlighter {
           );
           if (container) {
             this.removeAllChildNodes(container);
+          }
+          for (let i = _highlights.length - 1; i >= 0; i--) {
+            if (_highlights[i].type === HighlightType.Definition) {
+              _highlights.splice(i, 1);
+            }
           }
           break;
         case HighlightType.LineFocus:
@@ -2635,7 +2645,11 @@ export class TextHighlighter {
           if (container) {
             this.removeAllChildNodes(container);
           }
-          _highlights.splice(0, _highlights.length);
+          for (let i = _highlights.length - 1; i >= 0; i--) {
+            if (_highlights[i].type === HighlightType.Annotation) {
+              _highlights.splice(i, 1);
+            }
+          }
           break;
       }
     }
@@ -2714,6 +2728,75 @@ export class TextHighlighter {
       throw "Can't create highlight: " + e;
     }
   }
+  private getVisibleDetailsRanges(doc: Document, range: Range): Range[] {
+    let ancestor: Node | null = range.commonAncestorContainer;
+    while (ancestor) {
+      if (ancestor.nodeType === NODE_TYPE.ELEMENT_NODE) {
+        const element = ancestor as Element;
+        if (element.localName === "details" && !element.hasAttribute("open")) {
+          const summary = Array.from(element.children).find(
+            (child) => child.localName === "summary",
+          );
+          if (
+            !summary ||
+            (element !== range.commonAncestorContainer &&
+              !summary.contains(range.commonAncestorContainer))
+          ) {
+            return [];
+          }
+        }
+      }
+      ancestor = ancestor.parentElement;
+    }
+
+    let ranges = [range];
+    for (const details of Array.from(
+      doc.querySelectorAll("details:not([open])")
+    )) {
+      if (!range.intersectsNode(details)) continue;
+      const summary = Array.from(details.children).find(
+        (child) => child.localName === "summary"
+      );
+      const hidden = doc.createRange();
+      hidden.selectNodeContents(details);
+      const hiddenRanges = [hidden];
+      if (summary) {
+        const beforeSummary = hidden.cloneRange();
+        beforeSummary.setEndBefore(summary);
+        hidden.setStartAfter(summary);
+        hiddenRanges.unshift(beforeSummary);
+      }
+      for (const hiddenRange of hiddenRanges) {
+        if (hiddenRange.collapsed) continue;
+        ranges = ranges.flatMap((fragment) => {
+          const start = hiddenRange.comparePoint(
+            fragment.startContainer,
+            fragment.startOffset
+          );
+          const end = hiddenRange.comparePoint(
+            fragment.endContainer,
+            fragment.endOffset
+          );
+          if (start > 0 || end < 0) return [fragment];
+
+          const visible: Range[] = [];
+          if (start < 0) {
+            const before = fragment.cloneRange();
+            before.setEnd(hiddenRange.startContainer, hiddenRange.startOffset);
+            visible.push(before);
+          }
+          if (end > 0) {
+            const after = fragment.cloneRange();
+            after.setStart(hiddenRange.endContainer, hiddenRange.endOffset);
+            visible.push(after);
+          }
+          return visible;
+        });
+      }
+    }
+    return ranges;
+  }
+
   createHighlightDom(
     win: any,
     highlight: IHighlight,
@@ -2733,6 +2816,14 @@ export class TextHighlighter {
     highlightParent.setAttribute("id", highlight.id);
     highlightParent.setAttribute("class", CLASS_HIGHLIGHT_CONTAINER);
     highlightParent.style.setProperty("pointer-events", "none");
+    const visibleRanges =
+      highlight.type === HighlightType.Annotation &&
+      highlight.marker !== AnnotationMarker.Bookmark
+        ? this.getVisibleDetailsRanges(doc, range)
+        : [range];
+    if (!visibleRanges.length) {
+      highlightParent.style.display = "none";
+    }
     if (highlight.pointerInteraction) {
       highlightParent.setAttribute("data-click", "1");
       highlightParent.addEventListener("mouseover", (ev) => {
@@ -2822,9 +2913,8 @@ export class TextHighlighter {
     // TODO: override doNotMergeHorizontallyAlignedRects to always be true, will need to come back to this if any changes need to be done, or the above removed
     doNotMergeHorizontallyAlignedRects = true;
 
-    const clientRects = getClientRectsNoOverlap(
-      range,
-      doNotMergeHorizontallyAlignedRects,
+    const clientRects = visibleRanges.flatMap((fragment) =>
+      getClientRectsNoOverlap(fragment, doNotMergeHorizontallyAlignedRects),
     );
 
     const roundedCorner = 3;
@@ -3099,7 +3189,28 @@ export class TextHighlighter {
       }
     }
 
-    const rangeBoundingClientRect = range.getBoundingClientRect();
+    const boundingRects =
+      visibleRanges.length === 1 && visibleRanges[0] === range
+        ? [range.getBoundingClientRect()]
+        : clientRects;
+    const boundingLeft = boundingRects.length
+      ? Math.min(...boundingRects.map((rect) => rect.left))
+      : 0;
+    const boundingTop = boundingRects.length
+      ? Math.min(...boundingRects.map((rect) => rect.top))
+      : 0;
+    const rangeBoundingClientRect = {
+      left: boundingLeft,
+      top: boundingTop,
+      width: boundingRects.length
+        ? Math.max(...boundingRects.map((rect) => rect.left + rect.width)) -
+          boundingLeft
+        : 0,
+      height: boundingRects.length
+        ? Math.max(...boundingRects.map((rect) => rect.top + rect.height)) -
+          boundingTop
+        : 0,
+    };
     const highlightBounding = doc.createElement(
       "div",
     ) as IHTMLDivElementWithRect;

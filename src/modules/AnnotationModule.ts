@@ -28,7 +28,10 @@ import {
   HighlightContainer,
 } from "./highlight/TextHighlighter";
 import { ReaderModule } from "./ReaderModule";
-import { addEventListenerOptional } from "../utils/EventHandler";
+import {
+  addDetailsLayoutListener,
+  addEventListenerOptional,
+} from "../utils/EventHandler";
 import { HighlightType, IHighlight } from "./highlight/common/highlight";
 import {
   Annotation,
@@ -88,6 +91,7 @@ export class AnnotationModule implements ReaderModule {
   api?: AnnotationModuleAPI;
   activeAnnotationMarkerId?: string;
   activeAnnotationMarkerPosition?: string;
+  private removeDetailsLayoutListener?: () => void;
 
   public static async create(config: AnnotationModuleConfig) {
     const annotations = new this(
@@ -125,6 +129,8 @@ export class AnnotationModule implements ReaderModule {
   }
 
   async stop() {
+    this.removeDetailsLayoutListener?.();
+    this.removeDetailsLayoutListener = undefined;
     log.log("Annotation module stop");
   }
 
@@ -198,6 +204,21 @@ export class AnnotationModule implements ReaderModule {
   }
 
   initialize(iframe: HTMLIFrameElement) {
+    this.removeDetailsLayoutListener?.();
+    this.removeDetailsLayoutListener = undefined;
+    if (this.rights.enableAnnotations) {
+      this.removeDetailsLayoutListener = addDetailsLayoutListener(
+        iframe.contentDocument,
+        () => {
+          void this.drawHighlights().catch((error) => {
+            log.error(
+              "Failed to redraw annotations after details layout change",
+              error
+            );
+          });
+        }
+      );
+    }
     return new Promise(async (resolve) => {
       await (document as any).fonts.ready;
       if (this.rights.enableAnnotations) {
@@ -724,18 +745,10 @@ export class AnnotationModule implements ReaderModule {
               icon.className = "material-icons";
               icon.style.color = rangeRepresentation.highlight.color;
 
-              let container = doc!.getElementById("R2_ID_HIGHLIGHTS_CONTAINER");
-              let highlightArea;
-              let highlightIcon;
-              if (container) {
-                highlightArea = container.querySelector(
-                  `#${rangeRepresentation.highlight.id}`
-                );
-              }
-
-              let nodeList =
-                highlightArea.getElementsByClassName(CLASS_HIGHLIGHT_AREA);
-              highlightIcon = nodeList[0];
+              const highlightIcon = this.getVisibleHighlightArea(
+                rangeRepresentation.highlight.id
+              );
+              if (!highlightIcon) return;
 
               const size = parseInt(
                 highlightIcon.style.height.replace("px", "")
@@ -1026,21 +1039,31 @@ export class AnnotationModule implements ReaderModule {
   public async getAnnotationByID(id: string): Promise<any> {
     return this.annotator?.getAnnotationByID(id);
   }
+  private getVisibleHighlightArea(id: string): HTMLElement | undefined {
+    const doc = this.navigator.iframes[0].contentDocument;
+    const container = doc?.getElementById(
+      HighlightContainer.R2_ID_HIGHLIGHTS_CONTAINER
+    );
+    const overlay = container?.querySelector<HTMLElement>(`#${id}`);
+    if (!overlay || overlay.style.display === "none") return undefined;
+
+    return Array.from(
+      overlay.querySelectorAll<HTMLElement>(`.${CLASS_HIGHLIGHT_AREA}`)
+    ).find(
+      (area) =>
+        area.style.display !== "none" &&
+        parseFloat(area.style.width) > 0 &&
+        parseFloat(area.style.height) > 0 &&
+        Number.isFinite(parseFloat(area.style.top))
+    );
+  }
+
   syncPosition(highlights: Array<any>) {
-    let doc = this.navigator.iframes[0].contentDocument;
-
     const positionAnnotations = (newArray: Array<any>, currentElement: any) => {
-      let container = doc!.getElementById("R2_ID_HIGHLIGHTS_CONTAINER");
-      let highlightArea;
-      let highlightIcon;
-      if (container) {
-        highlightArea = container.querySelector(
-          `#${currentElement.highlight.id}`
-        );
-      }
-
-      let nodeList = highlightArea.getElementsByClassName(CLASS_HIGHLIGHT_AREA);
-      highlightIcon = nodeList[0];
+      const highlightIcon = this.getVisibleHighlightArea(
+        currentElement.highlight.id
+      );
+      if (!highlightIcon) return newArray;
 
       const newY = parseInt(highlightIcon.style.top.replace("px", ""));
 

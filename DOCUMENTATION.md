@@ -657,6 +657,8 @@ Manages saving, deleting, and listing bookmarks. Bookmarks are `Locator` objects
 
 Manages text highlights and annotations. Supports multiple highlight types (highlight, underline, bookmark marker, comment, custom) and colors. Works with the `TextHighlighter` to render highlights in the content iframe.
 
+Annotation visibility follows nested `<details>` elements. Overlays cover visible text fragments, including the first `<summary>`, while saved selections retain their full range. Comment gutters display annotations with visible, nonempty highlight areas. Overlay positions follow details toggles and completed or cancelled CSS transitions and animations. Definition overlays remain interactive during annotation redraws.
+
 Configuration:
 
 ```typescript
@@ -710,6 +712,8 @@ interface SearchModuleConfig {
 
 Word/phrase definition lookups. You provide definitions through the API; the module handles display.
 
+Definition overlays, highlight models, and term matches are scoped to the current chapter. Replacing or clearing definitions updates their DOM, registry entries, and chapter-local results together. Definition overlays remain interactive during annotation redraws.
+
 ### TTSModule2
 
 **Flag:** `enableTTS: true`
@@ -737,6 +741,12 @@ Copy protection, text selection control, and content obfuscation. Can disable co
 **Config key:** `pagebreak`
 
 Displays print page numbers in the margins for reflowable content. Uses the EPUB page-list.
+
+Page-number overlays follow their EPUB page-break anchors during details toggles and completed or cancelled transitions and animations. Page-break support is independent of annotations. Current page numbers remain visible until replacement overlays are ready, and anchor measurement leaves the reader's text selection intact.
+
+The module maintains one highlight model per page-break anchor. Details-layout listeners are scoped to the active chapter and removed when the module stops.
+
+`drawPageBreaks()` returns a promise that resolves after delayed rendering completes and rejects if rendering fails.
 
 ### TimelineModule
 
