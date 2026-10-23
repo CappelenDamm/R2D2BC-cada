@@ -33,6 +33,7 @@ import { SHA256 } from "jscrypto/es6/SHA256";
 import { _highlights } from "../highlight/TextHighlighter";
 import { Publication } from "../../model/Publication";
 import log from "loglevel";
+import { addDetailsLayoutListener } from "../../utils/EventHandler";
 
 export interface PageBreakModuleProperties {
   hideLayer?: boolean;
@@ -50,6 +51,7 @@ export class PageBreakModule implements ReaderModule {
   private properties: PageBreakModuleProperties;
 
   private goToPageView: HTMLLIElement;
+  private removeDetailsLayoutListener?: () => void;
 
   public static async create(config: PageBreakModuleConfig) {
     const pageBreak = new this(
@@ -72,7 +74,24 @@ export class PageBreakModule implements ReaderModule {
   }
 
   async stop() {
+    this.removeDetailsLayoutListener?.();
+    this.removeDetailsLayoutListener = undefined;
     log.log("Page Break module stop");
+  }
+
+  initialize(iframe: HTMLIFrameElement) {
+    this.removeDetailsLayoutListener?.();
+    this.removeDetailsLayoutListener = addDetailsLayoutListener(
+      iframe.contentDocument,
+      () => {
+        void this.drawPageBreaks().catch((error) => {
+          log.error(
+            "Failed to redraw page breaks after details layout change",
+            error
+          );
+        });
+      }
+    );
   }
 
   protected async start(): Promise<void> {

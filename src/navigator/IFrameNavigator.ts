@@ -1552,6 +1552,10 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
         await this.annotationModule.initialize(iframe);
       }
 
+      if (this.rights.enablePageBreaks && this.pageBreakModule) {
+        this.pageBreakModule.initialize(iframe);
+      }
+
       if (this.rights.enableBookmarks && this.bookmarkModule) {
         await this.bookmarkModule.initialize();
       }

@@ -165,7 +165,7 @@ export class DefinitionsModule implements ReaderModule {
   }
 
   definitions = debounce(async () => {
-    await this.highlighter.destroyHighlights(HighlightType.Definition);
+    await this.clearDefinitions();
     if (this.properties.definitions) {
       for (const item of this.properties.definitions) {
         await this.define(item);
@@ -275,5 +275,7 @@ export class DefinitionsModule implements ReaderModule {
 
   async clearDefinitions() {
     await this.highlighter.destroyHighlights(HighlightType.Definition);
+    this.currentChapterPopupResult = [];
+    this.currentPopupHighlights = [];
   }
 }

@@ -4,6 +4,7 @@ import { Publication } from "../../src/model/Publication";
 import { Link } from "../../src/model/Link";
 import { AnnotationModule } from "../../src/modules/AnnotationModule";
 import { PageBreakModule } from "../../src/modules/pagebreak/PageBreakModule";
+import { DefinitionsModule } from "../../src/modules/search/DefinitionsModule";
 import {
   TextHighlighter,
   _highlights,
@@ -343,19 +344,19 @@ describe("annotations in details", () => {
   }
 
   function layoutEvent(type = "toggle", insideDetails = true) {
-    const registration = doc.addEventListener.mock.calls.find(
+    const registrations = doc.addEventListener.mock.calls.filter(
       ([event]) => event === type
     );
-    if (!registration) throw new Error(`Missing ${type} listener`);
-    const [, listener, capture] = registration;
-    expect(capture).toBe(true);
+    if (!registrations.length) throw new Error(`Missing ${type} listener`);
     const target = Object.assign(new EventTarget(), {
       localName: type === "toggle" ? "details" : "summary",
       closest: () => (insideDetails ? {} : null),
     });
-    target.addEventListener(type, listener);
+    for (const [, listener, capture] of registrations) {
+      expect(capture).toBe(true);
+      target.addEventListener(type, listener);
+    }
     target.dispatchEvent(new Event(type));
-    return listener;
   }
 
   it("redraws on details toggles using a capturing listener", async () => {
@@ -368,33 +369,45 @@ describe("annotations in details", () => {
     expect(draw).toHaveBeenCalledTimes(1);
   });
 
-  it.each([
-    "toggle",
-    "transitionend",
-    "transitioncancel",
-    "animationend",
-    "animationcancel",
-  ])("redraws page breaks after annotations on details %s", async (event) => {
-    const module = annotationModule();
-    const draw = vi.spyOn(module, "drawHighlights").mockResolvedValue();
-    const destroy = vi.spyOn(highlighter, "destroyHighlights");
-    const drawPageBreaks = vi.fn(async () => {});
-    module.navigator = highlighter.navigator;
-    Object.assign(module.navigator, {
-      pageBreakModule: { drawPageBreaks },
-    });
-    await module.initialize(
-      Object.assign(Object.create(null), { contentDocument: doc })
-    );
+  it.each([true, false])(
+    "redraws page breaks on details events with annotations enabled=%s",
+    async (annotationsEnabled) => {
+      const iframe = Object.assign(Object.create(null), {
+        contentDocument: doc,
+      });
+      const drawAnnotations = vi.fn(async () => {});
+      if (annotationsEnabled) {
+        const module = annotationModule();
+        vi.spyOn(module, "drawHighlights").mockImplementation(drawAnnotations);
+        await module.initialize(iframe);
+      }
+      const pageBreakModule: PageBreakModule = Object.assign(
+        Object.create(PageBreakModule.prototype),
+        { navigator: highlighter.navigator }
+      );
+      const drawPageBreaks = vi
+        .spyOn(pageBreakModule, "drawPageBreaks")
+        .mockResolvedValue();
+      const destroy = vi.spyOn(highlighter, "destroyHighlights");
+      pageBreakModule.initialize(iframe);
 
-    layoutEvent(event);
-    await vi.waitFor(() => expect(drawPageBreaks).toHaveBeenCalledTimes(1));
-    expect(draw).toHaveBeenCalledTimes(1);
-    expect(destroy).not.toHaveBeenCalled();
-    expect(draw.mock.invocationCallOrder[0]).toBeLessThan(
-      drawPageBreaks.mock.invocationCallOrder[0]
-    );
-  });
+      const events = [
+        "toggle",
+        "transitionend",
+        "transitioncancel",
+        "animationend",
+        "animationcancel",
+      ];
+      for (const [index, event] of events.entries()) {
+        layoutEvent(event);
+        expect(drawPageBreaks).toHaveBeenCalledTimes(index + 1);
+        expect(drawAnnotations).toHaveBeenCalledTimes(
+          annotationsEnabled ? index + 1 : 0
+        );
+      }
+      expect(destroy).not.toHaveBeenCalled();
+    }
+  );
 
   it.each(["drawPageBreaks", "handleResize"] as const)(
     "keeps page numbers visible until their replacements are drawn by %s",
@@ -497,14 +510,9 @@ describe("annotations in details", () => {
         .spyOn(pageBreakModule, "createPageBreakHighlight")
         .mockReturnValue(highlight);
       const redraw = vi.spyOn(pageBreakModule, "drawPageBreaks");
-      const module = annotationModule();
-      module.navigator = highlighter.navigator;
-      Object.assign(module.navigator, { pageBreakModule });
-      vi.spyOn(module, "drawHighlights").mockResolvedValue();
-      await module.initialize(
+      pageBreakModule.initialize(
         Object.assign(Object.create(null), { contentDocument: doc })
       );
-      vi.clearAllTimers();
 
       layoutEvent("transitionend");
       await vi.waitFor(() => expect(redraw).toHaveBeenCalledTimes(1));
@@ -587,6 +595,68 @@ describe("annotations in details", () => {
     expect(click).toHaveBeenCalledWith(result, definition);
     expect(emit).toHaveBeenCalledWith("definition.click", result, definition);
   });
+
+  it.each([true, false])(
+    "replaces obsolete definition models across chapters with container present=%s",
+    async (containerPresent) => {
+      const module = await DefinitionsModule.create({
+        publication: Object.create(Publication.prototype),
+        highlighter,
+        definitions: [{ order: 1, terms: ["Term"] }],
+      });
+      vi.clearAllTimers();
+      module.navigator = highlighter.navigator;
+      Object.assign(module.navigator, { definitionsModule: module });
+      vi.spyOn(highlighter, "createHighlightDom").mockReturnValue(undefined);
+      const pageBreak = {
+        ...highlight,
+        id: "page-break",
+        type: HighlightType.PageBreak,
+      };
+      _highlights.push(highlight, pageBreak);
+      let chapter = "";
+      vi.spyOn(module, "define").mockImplementation(async (item) => {
+        const model = module.createDefinitionHighlight(
+          {
+            rangeInfo: {
+              ...highlight.selectionInfo.rangeInfo,
+              startContainerElementCssSelector: `#${chapter}`,
+              endContainerElementCssSelector: `#${chapter}`,
+            },
+          },
+          item
+        );
+        module["currentChapterPopupResult"].push({ chapter });
+        module["currentPopupHighlights"].push(model);
+      });
+
+      for (chapter of ["chapter-1", "chapter-2", "chapter-3"]) {
+        const chapterDocument = documentFixture();
+        if (!containerPresent) {
+          Object.assign(chapterDocument, { getElementById: () => null });
+        }
+        Object.assign(module.navigator.iframes[0], {
+          contentDocument: chapterDocument,
+          contentWindow: { document: chapterDocument },
+        });
+        await module.drawDefinitions();
+        await vi.advanceTimersByTimeAsync(300);
+        expect(_highlights).toHaveLength(3);
+        expect(_highlights.slice(0, 2)).toEqual([highlight, pageBreak]);
+        expect(
+          _highlights[2].selectionInfo.rangeInfo
+            .startContainerElementCssSelector
+        ).toBe(`#${chapter}`);
+        expect(module["currentChapterPopupResult"]).toEqual([{ chapter }]);
+        expect(module["currentPopupHighlights"]).toEqual([_highlights[2]]);
+      }
+
+      await module.clearDefinitions();
+      expect(_highlights).toEqual([highlight, pageBreak]);
+      expect(module["currentChapterPopupResult"]).toEqual([]);
+      expect(module["currentPopupHighlights"]).toEqual([]);
+    }
+  );
 
   it("keeps one model per page break across annotation and page-break redraws", () => {
     Object.assign(highlighter.navigator, { highlighter });
@@ -753,31 +823,40 @@ describe("annotations in details", () => {
     expect(draw).not.toHaveBeenCalled();
   });
 
-  it("removes listeners on reinitialization and stop", async () => {
-    const module = annotationModule();
-    await module.initialize(
-      Object.assign(Object.create(null), { contentDocument: doc })
-    );
-    const listener = doc.addEventListener.mock.calls[0][1];
-    const nextDocument = documentFixture();
-    await module.initialize(
-      Object.assign(Object.create(null), { contentDocument: nextDocument })
-    );
-    await module.stop();
-    expect(doc.addEventListener).toHaveBeenCalledTimes(5);
-    for (const [event] of doc.addEventListener.mock.calls) {
-      expect(doc.removeEventListener).toHaveBeenCalledWith(
-        event,
-        listener,
-        true
+  it.each(["annotations", "page breaks"])(
+    "removes %s listeners on reinitialization and stop",
+    async (type) => {
+      const module: AnnotationModule | PageBreakModule =
+        type === "annotations"
+          ? annotationModule()
+          : Object.assign(Object.create(PageBreakModule.prototype), {
+              navigator: highlighter.navigator,
+            });
+      await module.initialize(
+        Object.assign(Object.create(null), { contentDocument: doc })
       );
-      expect(nextDocument.removeEventListener).toHaveBeenCalledWith(
-        event,
-        listener,
-        true
+      const listener = doc.addEventListener.mock.calls[0][1];
+      const nextDocument = documentFixture();
+      await module.initialize(
+        Object.assign(Object.create(null), { contentDocument: nextDocument })
       );
+      const nextListener = nextDocument.addEventListener.mock.calls[0][1];
+      await module.stop();
+      expect(doc.addEventListener).toHaveBeenCalledTimes(5);
+      for (const [event] of doc.addEventListener.mock.calls) {
+        expect(doc.removeEventListener).toHaveBeenCalledWith(
+          event,
+          listener,
+          true
+        );
+        expect(nextDocument.removeEventListener).toHaveBeenCalledWith(
+          event,
+          nextListener,
+          true
+        );
+      }
     }
-  });
+  );
 
   it("does not subscribe when annotations are disabled", async () => {
     const module = annotationModule(false);
@@ -785,6 +864,39 @@ describe("annotations in details", () => {
       Object.assign(Object.create(null), { contentDocument: doc })
     );
     expect(doc.addEventListener).not.toHaveBeenCalled();
+  });
+
+  it("ignores page-break layout events outside details", () => {
+    const module: PageBreakModule = Object.assign(
+      Object.create(PageBreakModule.prototype),
+      { navigator: highlighter.navigator }
+    );
+    const redraw = vi.spyOn(module, "drawPageBreaks").mockResolvedValue();
+    module.initialize(
+      Object.assign(Object.create(null), { contentDocument: doc })
+    );
+    layoutEvent("transitionend", false);
+    expect(redraw).not.toHaveBeenCalled();
+  });
+
+  it("reports a failed page-break redraw", async () => {
+    const module: PageBreakModule = Object.assign(
+      Object.create(PageBreakModule.prototype),
+      { navigator: highlighter.navigator }
+    );
+    const error = new Error("page-break redraw failed");
+    vi.spyOn(module, "drawPageBreaks").mockRejectedValue(error);
+    const report = vi.spyOn(log, "error").mockImplementation(() => {});
+    module.initialize(
+      Object.assign(Object.create(null), { contentDocument: doc })
+    );
+    layoutEvent();
+    await vi.waitFor(() =>
+      expect(report).toHaveBeenCalledWith(
+        "Failed to redraw page breaks after details layout change",
+        error
+      )
+    );
   });
 
   it("reports a failed redraw", async () => {
@@ -798,7 +910,7 @@ describe("annotations in details", () => {
     layoutEvent();
     await vi.waitFor(() =>
       expect(report).toHaveBeenCalledWith(
-        "Failed to redraw annotations or page breaks after details layout change",
+        "Failed to redraw annotations after details layout change",
         error
       )
     );

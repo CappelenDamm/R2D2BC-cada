@@ -2616,6 +2616,11 @@ export class TextHighlighter {
           if (container) {
             this.removeAllChildNodes(container);
           }
+          for (let i = _highlights.length - 1; i >= 0; i--) {
+            if (_highlights[i].type === HighlightType.Definition) {
+              _highlights.splice(i, 1);
+            }
+          }
           break;
         case HighlightType.LineFocus:
           container = doc.getElementById(

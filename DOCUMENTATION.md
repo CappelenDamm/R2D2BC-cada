@@ -657,7 +657,7 @@ Manages saving, deleting, and listing bookmarks. Bookmarks are `Locator` objects
 
 Manages text highlights and annotations. Supports multiple highlight types (highlight, underline, bookmark marker, comment, custom) and colors. Works with the `TextHighlighter` to render highlights in the content iframe.
 
-Annotation overlays inside the collapsed content of a closed `<details>` element are hidden and restored when it opens. Annotations spanning visible and collapsed content render only their visible fragments, including the first `<summary>`, without changing the saved selection. Nested closed details are respected. Comment gutters omit hidden annotations and ranges without renderable highlight areas, and restore them on reopening. Bookmarks are unchanged. Overlays are repositioned on details toggles and again when CSS transitions or animations within details finish or are cancelled, so animated layout changes do not leave highlights offset from their text. Annotation redraws preserve definition overlays and their interactions.
+Annotation visibility follows nested `<details>` elements. Overlays cover visible text fragments, including the first `<summary>`, while saved selections retain their full range. Comment gutters display annotations with visible, nonempty highlight areas. Overlay positions follow details toggles and completed or cancelled CSS transitions and animations. Definition overlays remain interactive during annotation redraws.
 
 Configuration:
 
@@ -712,6 +712,8 @@ interface SearchModuleConfig {
 
 Word/phrase definition lookups. You provide definitions through the API; the module handles display.
 
+Definition overlays, highlight models, and term matches are scoped to the current chapter. Replacing or clearing definitions updates their DOM, registry entries, and chapter-local results together. Definition overlays remain interactive during annotation redraws.
+
 ### TTSModule2
 
 **Flag:** `enableTTS: true`
@@ -740,7 +742,9 @@ Copy protection, text selection control, and content obfuscation. Can disable co
 
 Displays print page numbers in the margins for reflowable content. Uses the EPUB page-list.
 
-Page-break redraws replace both the overlay DOM and its highlight models, so repeated redraws do not accumulate duplicate page-break entries. Existing page numbers remain visible during the redraw delay and are replaced in the same browser task to avoid flashing. Anchors are measured using local ranges without modifying the reader's active text selection. Annotation-only redraws preserve page-break and definition models. Details toggles and completed or cancelled transitions and animations within details redraw page breaks after annotations, keeping page numbers aligned with their anchors.
+Page-number overlays follow their EPUB page-break anchors during details toggles and completed or cancelled transitions and animations. Page-break support is independent of annotations. Current page numbers remain visible until replacement overlays are ready, and anchor measurement leaves the reader's text selection intact.
+
+The module maintains one highlight model per page-break anchor. Details-layout listeners are scoped to the active chapter and removed when the module stops.
 
 ### TimelineModule
 

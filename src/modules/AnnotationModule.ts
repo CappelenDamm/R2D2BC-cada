@@ -28,7 +28,10 @@ import {
   HighlightContainer,
 } from "./highlight/TextHighlighter";
 import { ReaderModule } from "./ReaderModule";
-import { addEventListenerOptional } from "../utils/EventHandler";
+import {
+  addDetailsLayoutListener,
+  addEventListenerOptional,
+} from "../utils/EventHandler";
 import { HighlightType, IHighlight } from "./highlight/common/highlight";
 import {
   Annotation,
@@ -50,14 +53,6 @@ import log from "loglevel";
 import { Action } from "./consumption/ConsumptionModule";
 
 export type Highlight = (highlight: Annotation) => Promise<Annotation>;
-
-const detailsLayoutEvents = [
-  "toggle",
-  "transitionend",
-  "transitioncancel",
-  "animationend",
-  "animationcancel",
-];
 
 export interface AnnotationModuleAPI {
   addAnnotation: Highlight;
@@ -96,32 +91,7 @@ export class AnnotationModule implements ReaderModule {
   api?: AnnotationModuleAPI;
   activeAnnotationMarkerId?: string;
   activeAnnotationMarkerPosition?: string;
-  private detailsDocument: Document | null = null;
-  private readonly onDetailsLayoutChange = (event: Event) => {
-    const target = event.target;
-    if (
-      target &&
-      (event.type !== "toggle" ||
-        ("localName" in target && target.localName === "details")) &&
-      "closest" in target &&
-      typeof target.closest === "function" &&
-      target.closest("details")
-    ) {
-      void this.drawHighlights()
-        .then(async () => {
-          const pageBreakModule = this.navigator?.pageBreakModule;
-          if (pageBreakModule) {
-            await pageBreakModule.drawPageBreaks();
-          }
-        })
-        .catch((error) => {
-          log.error(
-            "Failed to redraw annotations or page breaks after details layout change",
-            error
-          );
-        });
-    }
-  };
+  private removeDetailsLayoutListener?: () => void;
 
   public static async create(config: AnnotationModuleConfig) {
     const annotations = new this(
@@ -159,14 +129,8 @@ export class AnnotationModule implements ReaderModule {
   }
 
   async stop() {
-    for (const event of detailsLayoutEvents) {
-      this.detailsDocument?.removeEventListener(
-        event,
-        this.onDetailsLayoutChange,
-        true
-      );
-    }
-    this.detailsDocument = null;
+    this.removeDetailsLayoutListener?.();
+    this.removeDetailsLayoutListener = undefined;
     log.log("Annotation module stop");
   }
 
@@ -240,21 +204,19 @@ export class AnnotationModule implements ReaderModule {
   }
 
   initialize(iframe: HTMLIFrameElement) {
-    for (const event of detailsLayoutEvents) {
-      this.detailsDocument?.removeEventListener(
-        event,
-        this.onDetailsLayoutChange,
-        true
-      );
-    }
-    this.detailsDocument = this.rights.enableAnnotations
-      ? iframe.contentDocument
-      : null;
-    for (const event of detailsLayoutEvents) {
-      this.detailsDocument?.addEventListener(
-        event,
-        this.onDetailsLayoutChange,
-        true
+    this.removeDetailsLayoutListener?.();
+    this.removeDetailsLayoutListener = undefined;
+    if (this.rights.enableAnnotations) {
+      this.removeDetailsLayoutListener = addDetailsLayoutListener(
+        iframe.contentDocument,
+        () => {
+          void this.drawHighlights().catch((error) => {
+            log.error(
+              "Failed to redraw annotations after details layout change",
+              error
+            );
+          });
+        }
       );
     }
     return new Promise(async (resolve) => {
