@@ -1449,6 +1449,11 @@ D2Reader.load({
 - Set an explicit `height` on `#iframe-wrapper` (e.g., `height: 100vh`).
 - Verify the manifest URL is accessible and returns valid JSON.
 
+### Scrolled content is clipped
+
+- Constrain `#iframe-wrapper` to the available reader height and let the reader size the iframe to its content; do not apply a fixed CSS height or max-height to the iframe.
+- The content resize observer measures rendered body and child margin boxes, including child margins that collapse through the body, after styles load. It avoids root viewport heights so the iframe can also shrink when content collapses.
+
 ### Content styles look wrong
 
 - Ensure all three Readium CSS files are provided as injectables in the correct order: `r2before`, `r2default`, `r2after`.

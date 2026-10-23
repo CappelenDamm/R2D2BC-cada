@@ -539,8 +539,10 @@ export default class ReflowableBookView implements BookView {
    * such as the <details> element expanding/collapsing.
    */
   private bindContentResizeObserver(iframe: HTMLIFrameElement | undefined) {
-    const body = iframe?.contentDocument?.body;
-    if (!body || !iframe) return;
+    const doc = iframe?.contentDocument;
+    const body = doc?.body;
+    const win = iframe?.contentWindow;
+    if (!doc || !body || !iframe || !win) return;
 
     // Do not re-bind if the same body is already being observed.
     if (this._contentResizeBody === body) {
@@ -549,21 +551,8 @@ export default class ReflowableBookView implements BookView {
 
     this.unbindContentResizeObserver();
 
-    // Capture how much taller the <html> element is than the <body> at bind
-    // time (e.g. from `html { height: 100%; }` in Readium CSS). This produces
-    // the visual "padding" below the content. We store it as a fixed offset so
-    // the observer can reproduce it without querying html.scrollHeight /
-    // html.offsetHeight — those are inflated by the iframe's own height and
-    // create a circular dependency that prevents the iframe from ever shrinking.
-    const html = iframe.contentWindow?.document?.documentElement;
-    const initialBodyHeight = body.getBoundingClientRect().height;
-    const htmlExtra = Math.max(
-      0,
-      (html?.offsetHeight ?? 0) - initialBodyHeight
-    );
-
     let _resizeObserver: ResizeObserver | undefined;
-    const debouncedResize = debounce((entries: ResizeObserverEntry[]) => {
+    const debouncedResize = debounce(() => {
       // Ignore any pending debounced callbacks after the observer has been unbound/replaced.
       if (this._contentResizeObserver !== _resizeObserver) return;
       // Defer the DOM write to the next frame so mutating iframe.height here
@@ -571,20 +560,54 @@ export default class ReflowableBookView implements BookView {
       // "ResizeObserver loop completed with undelivered notifications" warning).
       requestAnimationFrame(() => {
         if (this._contentResizeObserver !== _resizeObserver) return;
-        for (const entry of entries) {
-          const height = entry.contentRect.height + htmlExtra;
+        const bodyStyle = win.getComputedStyle(body);
+        const htmlStyle = win.getComputedStyle(doc.documentElement);
+        const pixels = (value: string) => parseFloat(value) || 0;
+        const bodyBorders =
+          pixels(bodyStyle.borderTopWidth) +
+          pixels(bodyStyle.borderBottomWidth);
 
-          if (height) {
-            const minHeight =
-              BrowserUtilities.getHeight() - this.attributes.margin;
-            iframe.height = Math.max(minHeight, height) + "px";
+        const bodyRect = body.getBoundingClientRect();
+        const rootTop = doc.documentElement.getBoundingClientRect().top;
+        let bottom =
+          bodyRect.top +
+          Math.max(bodyRect.height, body.scrollHeight + bodyBorders) +
+          pixels(bodyStyle.marginBottom);
+
+        // Child margins can collapse through the body. Use rendered margin
+        // boxes rather than root viewport heights, which prevent shrinking.
+        for (const child of Array.from(body.children)) {
+          const style = win.getComputedStyle(child);
+          if (
+            style.display === "none" ||
+            style.position === "fixed" ||
+            style.position === "absolute"
+          ) {
+            continue;
           }
+          bottom = Math.max(
+            bottom,
+            child.getBoundingClientRect().bottom + pixels(style.marginBottom)
+          );
+        }
+
+        const height = Math.ceil(
+          bottom -
+            rootTop +
+            pixels(htmlStyle.paddingBottom) +
+            pixels(htmlStyle.borderBottomWidth)
+        );
+
+        if (height) {
+          const minHeight =
+            BrowserUtilities.getHeight() - this.attributes.margin;
+          iframe.height = Math.max(minHeight, height) + "px";
         }
       });
     }, 20);
     _resizeObserver = new ResizeObserver(debouncedResize);
     this._contentResizeObserver = _resizeObserver;
-    _resizeObserver.observe(body);
+    _resizeObserver.observe(body, { box: "border-box" });
     this._contentResizeBody = body;
   }
 
