@@ -501,8 +501,13 @@ export default class ReflowableBookView implements BookView {
   }
 
   setIframeHeight(iframe: any) {
+    if (!this.isScrollMode()) return;
     let d = debounce((iframe: any) => {
-      if (iframe) {
+      if (
+        iframe &&
+        this.isScrollMode() &&
+        this._contentResizeBody === iframe.contentDocument?.body
+      ) {
         let body = iframe.contentWindow.document.body,
           html = iframe.contentWindow.document.documentElement;
 
@@ -526,12 +531,25 @@ export default class ReflowableBookView implements BookView {
 
   private _contentResizeObserver: ResizeObserver | undefined;
   private _contentResizeBody: HTMLElement | undefined;
+  private _contentHeightStyles: {
+    style: CSSStyleDeclaration;
+    property: string;
+    value: string;
+    priority: string;
+  }[] = [];
 
   private unbindContentResizeObserver() {
-    if (!this._contentResizeObserver) return;
-    this._contentResizeObserver.disconnect();
+    this._contentResizeObserver?.disconnect();
     this._contentResizeObserver = undefined;
     this._contentResizeBody = undefined;
+    for (const { style, property, value, priority } of this._contentHeightStyles) {
+      if (value) {
+        style.setProperty(property, value, priority);
+      } else {
+        style.removeProperty(property);
+      }
+    }
+    this._contentHeightStyles = [];
   }
 
   /** Binds a ResizeObserver to the iframe's body to adjust its height dynamically.
@@ -550,6 +568,25 @@ export default class ReflowableBookView implements BookView {
     }
 
     this.unbindContentResizeObserver();
+
+    // Root viewport heights feed iframe growth back into its own measurement.
+    // Scroll mode owns these constraints; restore publication values on unbind.
+    for (const element of [doc.documentElement, body]) {
+      for (const [property, value] of [
+        ["height", "auto"],
+        ["min-height", "0"],
+        ["max-height", "none"],
+      ]) {
+        const style = element.style;
+        this._contentHeightStyles.push({
+          style,
+          property,
+          value: style.getPropertyValue(property),
+          priority: style.getPropertyPriority(property),
+        });
+        style.setProperty(property, value, "important");
+      }
+    }
 
     let _resizeObserver: ResizeObserver | undefined;
     const debouncedResize = debounce(() => {
