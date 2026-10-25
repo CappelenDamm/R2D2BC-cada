@@ -158,6 +158,101 @@ describe("written iframe documents", () => {
     expect(stop).toHaveBeenCalledOnce();
   });
 
+  function setupRestoration() {
+    const { navigator } = setup();
+    let finishSize: () => void = () => {};
+    const sizeReady = new Promise<void>((resolve) => {
+      finishSize = resolve;
+    });
+    const view = {
+      stop: vi.fn(),
+      setSize: vi.fn(() => sizeReady),
+      getCurrentPosition: () => 0.5,
+      goToProgression: vi.fn(),
+    };
+    Object.assign(navigator, {
+      view,
+      rights: {},
+      newPosition: { locations: { progression: 0.5 } },
+      settings: {
+        applyProperties: vi.fn(async () => {}),
+        isPaginated: async () => false,
+      },
+      updateBookView: vi.fn(),
+      injectInjectablesIntoIframeHead: vi.fn(async () => {}),
+      updatePositionInfo: vi.fn(),
+      hideLoadingMessage: vi.fn(),
+      showIframeContents: vi.fn(),
+      emit: vi.fn(),
+    });
+    Object.assign(navigator.publication, {
+      Metadata: {},
+      getPreviousSpineItem: () => undefined,
+      getSpineItem: () => undefined,
+      getTOCItem: () => undefined,
+    });
+    return { navigator, view, finishSize };
+  }
+
+  it("waits for final content sizing before restoring the saved position", async () => {
+    const { navigator, view, finishSize } = setupRestoration();
+    vi.spyOn(navigator, "handleResize").mockResolvedValue();
+    const loaded = navigator["handleIFrameLoad"](navigator.iframes[0]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(view.setSize).toHaveBeenCalledOnce();
+    expect(view.goToProgression).not.toHaveBeenCalled();
+
+    finishSize();
+    await loaded;
+
+    expect(view.goToProgression).toHaveBeenCalledExactlyOnceWith(0.5);
+  });
+
+  it("does not restore or reveal a stopped reader after pending sizing completes", async () => {
+    const { navigator, view, finishSize } = setupRestoration();
+    vi.spyOn(navigator, "handleResize").mockResolvedValue();
+    const loaded = navigator["handleIFrameLoad"](navigator.iframes[0]);
+    await vi.advanceTimersByTimeAsync(0);
+    navigator.stop();
+    finishSize();
+    await loaded;
+    await vi.runAllTimersAsync();
+
+    expect(view.goToProgression).not.toHaveBeenCalled();
+    expect(navigator["showIframeContents"]).not.toHaveBeenCalled();
+    expect(view.setSize).toHaveBeenCalledOnce();
+  });
+
+  it("waits for resized content before restoring the pre-resize position", async () => {
+    const { navigator, view, finishSize } = setupRestoration();
+    Object.assign(navigator, { newPosition: undefined });
+    const resized = navigator.handleResize();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(view.setSize).toHaveBeenCalledOnce();
+    expect(view.goToProgression).not.toHaveBeenCalled();
+
+    finishSize();
+    await resized;
+
+    expect(view.goToProgression).toHaveBeenCalledExactlyOnceWith(0.5);
+  });
+
+  it("ignores a previous chapter's pending restoration", async () => {
+    const { navigator, view, finishSize } = setupRestoration();
+    vi.spyOn(navigator, "handleResize").mockResolvedValue();
+    const previous = navigator["handleIFrameLoad"](navigator.iframes[0]);
+    await vi.advanceTimersByTimeAsync(0);
+    Object.assign(navigator, {
+      newPosition: { locations: { progression: 0.75 } },
+    });
+    const current = navigator["handleIFrameLoad"](navigator.iframes[0]);
+    await vi.advanceTimersByTimeAsync(0);
+    finishSize();
+    await Promise.all([previous, current]);
+
+    expect(view.goToProgression).toHaveBeenCalledExactlyOnceWith(0.75);
+  });
+
   it("keeps same-origin URL navigation unchanged", async () => {
     const href = "https://reader.example/chapter.xhtml";
     const { navigator, iframes } = setup({ href });

@@ -1462,9 +1462,9 @@ D2Reader.load({
 ### Scrolled content is clipped
 
 - Constrain `#iframe-wrapper` to the available reader height and let the reader size the iframe to its content; do not apply a fixed CSS height or max-height to the iframe.
-- Scroll-mode sizing and the content resize observer share a measurement of rendered body and child margin boxes, including child margins that collapse through the body. Resource loads also trigger measurement, including late-loading images whose overflow changes without resizing the body border box. Only style loads rebuild the style probe. Sizing avoids root viewport heights so the iframe can also shrink when content collapses.
-- In scroll mode, the reader keeps the chapter's `html` element intrinsically sized (`height: auto`, `min-height: 0`, `max-height: none`, using inline `!important`). Publication body height constraints are resolved against the available reader viewport and pinned with inline `!important` during content sizing. Fixed constraints retain their values; viewport-dependent expressions such as `height: 100vh` or `min-height: max(100vh, 1000px)` cannot feed back into the growing iframe. Other relative constraints are also held at their resolved values until the next constraint refresh. When the publication supplies no body height constraints, a minimum fills the available reader height, accounting for margins, padding, and borders. Constraints are re-evaluated on resize or style loads, and original inline values and priorities are restored when leaving scroll mode, stopping the view, or binding a new chapter body.
-- Chapters written from cross-origin fetches or `api.getContent` are given an HTML5 doctype to preserve standards mode, including both fixed-layout spread frames. Without it, `document.write` would parse the serialized XHTML in quirks mode, where `body.scrollHeight` can include the iframe viewport and prevent shrinking.
+- The iframe resizes as content expands, collapses, or loads. Body height constraints resolve against the reader viewport and original styles are restored when leaving scroll mode.
+- Await `setSize()` before restoring a reading position in scroll mode.
+- Chapters loaded through fetch or `api.getContent` use an HTML5 doctype to ensure standards-mode sizing.
 
 ### Content styles look wrong
 

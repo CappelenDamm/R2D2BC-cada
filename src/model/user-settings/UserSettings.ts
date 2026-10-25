@@ -909,9 +909,7 @@ export class UserSettings implements IUserSettings {
           //     "readium-advanced-off"
           //   );
           // }
-          this.isScrollMode().then((scroll) => {
-            this.view?.setMode?.(scroll);
-          });
+          await this.view?.setMode?.(await this.isScrollMode());
         }
       }
     }
@@ -1391,7 +1389,7 @@ export class UserSettings implements IUserSettings {
         prop.value = this.verticalScroll;
         await this.saveProperty(prop);
       }
-      this.view?.setMode?.(this.verticalScroll);
+      await this.view?.setMode?.(this.verticalScroll);
       if (position) {
         this.view?.goToProgression(position);
       }
@@ -1507,7 +1505,7 @@ export class UserSettings implements IUserSettings {
       await this.saveProperty(prop);
     }
     await this.applyProperties();
-    this.view?.setMode?.(this.verticalScroll);
+    await this.view?.setMode?.(this.verticalScroll);
     if (position) {
       this.view?.goToProgression(position);
     }
