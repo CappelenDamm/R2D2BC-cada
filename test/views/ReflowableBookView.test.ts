@@ -129,6 +129,7 @@ describe("scrolling content resize", () => {
     });
     Object.assign(body, { ownerDocument: doc });
     const probeLoads = vi.fn();
+    const measurement = { style: style(), remove: vi.fn() };
     const probe = {
       style: style(),
       isConnected: false,
@@ -141,9 +142,28 @@ describe("scrolling content resize", () => {
         probeLoads();
         setTimeout(() => probe.onload?.(), 0);
       },
-      contentDocument: { body: {}, documentElement: { style: style() } },
+      contentDocument: {
+        body: {},
+        createElement: () => measurement,
+        documentElement: { style: style(), appendChild: vi.fn() },
+      },
       contentWindow: {
-        getComputedStyle: () => ({
+        getComputedStyle: (element: object) => ({
+          get height() {
+            if (element !== measurement) return "auto";
+            const value = measurement.style.getPropertyValue("height");
+            const viewport = parseFloat(probe.style.getPropertyValue("height"));
+            const percentage = /^([\d.]+)%$/.exec(value);
+            const calculation = /^calc\(([\d.]+)% \+ ([\d.]+)px\)$/.exec(value);
+            if (percentage) {
+              return `${(Number(percentage[1]) * viewport) / 100}px`;
+            }
+            if (calculation) {
+              const relativeHeight = (Number(calculation[1]) * viewport) / 100;
+              return `${relativeHeight + Number(calculation[2])}px`;
+            }
+            throw new Error(`Unexpected measurement height: ${value}`);
+          },
           getPropertyValue: (key: string) =>
             computedConstraint(
               key,
@@ -230,6 +250,10 @@ describe("scrolling content resize", () => {
     ["min-height", "80vh", 662.4, "828px"],
     ["min-height", "120vh", 993.6, "1106px"],
     ["min-height", "max(100vh, 1000px)", 1000, "1112px"],
+    ["height", "120%", 993.6, "1106px"],
+    ["min-height", "120%", 993.6, "1106px"],
+    ["min-height", "calc(100% + 100px)", 928, "1040px"],
+    ["max-height", "120%", 993.6, "828px"],
   ])(
     "resolves %s: %s against the reader rather than the growing iframe",
     (property, value, resolved, collapsed) => {

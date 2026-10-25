@@ -756,11 +756,30 @@ export default class ReflowableBookView implements BookView {
       constraint.applied = undefined;
     }
     doc.documentElement.style.cssText = viewport.styles;
+    doc.documentElement.style.setProperty(
+      "height",
+      viewport.height + "px",
+      "important"
+    );
     probe.style.setProperty("width", viewport.width + "px", "important");
     probe.style.setProperty("height", viewport.height + "px", "important");
     const declared = bodyConstraints.map(({ property }) =>
       win.getComputedStyle(doc.body).getPropertyValue(property)
     );
+    // Keep the body hidden to distinguish auto from a used pixel height.
+    // Resolve remaining percentages with a separate reader-sized box.
+    if (declared.some((value) => value.includes("%"))) {
+      const measurement = doc.createElement("div");
+      measurement.style.cssText =
+        "all:initial!important;display:block!important;position:fixed!important;box-sizing:content-box!important;min-height:0!important;max-height:none!important;padding:0!important;border:0!important;";
+      doc.documentElement.appendChild(measurement);
+      for (const [index, value] of declared.entries()) {
+        if (!value.includes("%")) continue;
+        measurement.style.setProperty("height", value, "important");
+        declared[index] = win.getComputedStyle(measurement).height;
+      }
+      measurement.remove();
+    }
     const unconstrained = ["auto", "0px", "none"];
     for (const [index, constraint] of bodyConstraints.entries()) {
       // Matching samples cannot detect viewport units hidden by min/max/clamp.
