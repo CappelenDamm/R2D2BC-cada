@@ -53,6 +53,7 @@ describe("written iframe documents", () => {
   } = {}) {
     const iframes = Array.from({ length: spread ? 2 : 1 }, () => ({
       src: "",
+      style: { opacity: "0" },
       removeEventListener: vi.fn(),
       contentDocument: {
         open: vi.fn(),
@@ -64,6 +65,7 @@ describe("written iframe documents", () => {
       Object.create(IFrameNavigator.prototype),
       {
         iframes,
+        iframeLoadTokens: new WeakMap<HTMLIFrameElement, object>(),
         currentChapterLink: { href },
         settings: { columnCount: spread ? 2 : 1 },
         publication: {
@@ -158,13 +160,14 @@ describe("written iframe documents", () => {
     expect(stop).toHaveBeenCalledOnce();
   });
 
-  function setupRestoration() {
-    const { navigator } = setup();
+  function setupRestoration(spread = false) {
+    const { navigator } = setup({ spread });
     let finishSize: () => void = () => {};
     const sizeReady = new Promise<void>((resolve) => {
       finishSize = resolve;
     });
     const view = {
+      layout: spread ? "fixed" : "reflowable",
       stop: vi.fn(),
       setSize: vi.fn(() => sizeReady),
       getCurrentPosition: () => 0.5,
@@ -190,6 +193,7 @@ describe("written iframe documents", () => {
       getPreviousSpineItem: () => undefined,
       getSpineItem: () => undefined,
       getTOCItem: () => undefined,
+      getStartLink: () => undefined,
     });
     return { navigator, view, finishSize };
   }
@@ -237,7 +241,7 @@ describe("written iframe documents", () => {
     expect(view.goToProgression).toHaveBeenCalledExactlyOnceWith(0.5);
   });
 
-  it("ignores a previous chapter's pending restoration", async () => {
+  it("ignores a superseded load of the same iframe", async () => {
     const { navigator, view, finishSize } = setupRestoration();
     vi.spyOn(navigator, "handleResize").mockResolvedValue();
     const previous = navigator["handleIFrameLoad"](navigator.iframes[0]);
@@ -251,6 +255,66 @@ describe("written iframe documents", () => {
     await Promise.all([previous, current]);
 
     expect(view.goToProgression).toHaveBeenCalledExactlyOnceWith(0.75);
+  });
+
+  it.each(["resizing", "injectables"])(
+    "initializes and reveals both spread frames when loads overlap during %s",
+    async (phase) => {
+      const { navigator, finishSize } = setupRestoration(true);
+      let finishPending: () => void = () => {};
+      const pending = new Promise<void>((resolve) => {
+        finishPending = resolve;
+      });
+      vi.spyOn(navigator, "handleResize").mockImplementation(
+        () => phase === "resizing" ? pending : Promise.resolve()
+      );
+      if (phase === "injectables") {
+        vi.mocked(navigator["injectInjectablesIntoIframeHead"])
+          .mockImplementation(() => pending);
+      }
+      const initialize = vi.fn();
+      Object.assign(navigator, {
+        rights: { enablePageBreaks: true },
+        pageBreakModule: { initialize },
+      });
+      vi.mocked(navigator["showIframeContents"]).mockImplementation(
+        IFrameNavigator.prototype["showIframeContents"].bind(navigator)
+      );
+      const loads = navigator.iframes.map((iframe) =>
+        navigator["handleIFrameLoad"](iframe)
+      );
+      await vi.advanceTimersByTimeAsync(0);
+      finishPending();
+      finishSize();
+      await Promise.all(loads);
+      await vi.runAllTimersAsync();
+
+      for (const iframe of navigator.iframes) {
+        expect(navigator["injectInjectablesIntoIframeHead"])
+          .toHaveBeenCalledWith(iframe);
+        expect(initialize).toHaveBeenCalledWith(iframe);
+        expect(navigator["showIframeContents"]).toHaveBeenCalledWith(iframe);
+        expect(iframe.style.opacity).toBe("1");
+      }
+      expect(navigator["showIframeContents"]).toHaveBeenCalledTimes(2);
+    }
+  );
+
+  it("ignores spread loads from an older navigation generation", async () => {
+    const { navigator, finishSize } = setupRestoration(true);
+    vi.spyOn(navigator, "handleResize").mockResolvedValue();
+    const loads = navigator.iframes.map((iframe) =>
+      navigator["handleIFrameLoad"](iframe)
+    );
+    await vi.advanceTimersByTimeAsync(0);
+    await navigator.navigate({
+      href: "https://publication.example/next.xhtml",
+      locations: { progression: 0 },
+    });
+    finishSize();
+    await Promise.all(loads);
+
+    expect(navigator["showIframeContents"]).not.toHaveBeenCalled();
   });
 
   it("keeps same-origin URL navigation unchanged", async () => {

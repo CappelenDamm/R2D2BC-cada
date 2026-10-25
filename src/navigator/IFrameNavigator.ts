@@ -332,6 +332,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
   private isLoading: boolean;
   private stopped = false;
   private navigationToken: object = {};
+  private iframeLoadTokens = new WeakMap<HTMLIFrameElement, object>();
   private resizeToken: object = {};
   private readonly initialLastReadingPosition?: ReadingPosition;
   private readonly initialScrollPosition?: ScrollLogicalPosition;
@@ -1403,7 +1404,13 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
 
   private async handleIFrameLoad(iframe: HTMLIFrameElement): Promise<void> {
     if (this.stopped) return;
-    const token = (this.navigationToken = {});
+    const token = this.navigationToken;
+    const loadToken = {};
+    this.iframeLoadTokens.set(iframe, loadToken);
+    const isCurrentLoad = () =>
+      !this.stopped &&
+      token === this.navigationToken &&
+      loadToken === this.iframeLoadTokens.get(iframe);
     if (this.errorMessage) this.errorMessage.style.display = "none";
     this.showLoadingMessageAfterDelay();
     try {
@@ -1412,11 +1419,11 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
         bookViewPosition = this.newPosition.locations.progression;
       }
       await this.handleResize();
-      if (this.stopped || token !== this.navigationToken) return;
+      if (!isCurrentLoad()) return;
       this.updateBookView({ skipDrawingAnnotations: true });
 
       await this.settings.applyProperties();
-      if (this.stopped || token !== this.navigationToken) return;
+      if (!isCurrentLoad()) return;
 
       let currentLocation = this.currentChapterLink.href;
       if (currentLocation) {
@@ -1520,6 +1527,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
       }
 
       await this.injectInjectablesIntoIframeHead(iframe);
+      if (!isCurrentLoad()) return;
 
       if (this.view?.layout !== "fixed" && this.highlighter !== undefined) {
         await this.highlighter.initialize(iframe);
@@ -1577,9 +1585,9 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
         await this.mediaOverlayModule.initialize();
       }
 
-      if (this.stopped || token !== this.navigationToken) return;
+      if (!isCurrentLoad()) return;
       await this.view?.setSize();
-      if (this.stopped || token !== this.navigationToken) return;
+      if (!isCurrentLoad()) return;
       if (this.newElementId) {
         const element = (iframe.contentDocument as any).getElementById(
           this.newElementId
@@ -1628,11 +1636,11 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
         await this.annotationModule.handleResize();
       }
 
-      if (this.stopped || token !== this.navigationToken) return;
+      if (!isCurrentLoad()) return;
       this.hideLoadingMessage();
       this.showIframeContents(iframe);
       setTimeout(() => {
-        if (this.stopped || token !== this.navigationToken) return;
+        if (!isCurrentLoad()) return;
         if (this.mediaOverlayModule) {
           this.mediaOverlayModule.settings.resourceReady = true;
         }
