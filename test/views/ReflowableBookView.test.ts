@@ -8,28 +8,15 @@ vi.mock("../../src/utils/BrowserUtilities", () => ({
 describe("scrolling content resize", () => {
   let notifyResize: () => void;
   let contentHeight: number;
-  let padding: number;
-  let border: number;
-  let margin: number;
-  let rootHeight: number;
-  let childMargin: number;
 
   beforeEach(() => {
     vi.useFakeTimers();
-    contentHeight = 794;
-    padding = 16;
-    border = 0;
-    margin = 40;
-    rootHeight = 828;
-    childMargin = 0;
+    contentHeight = 100;
     vi.stubGlobal(
       "ResizeObserver",
       class {
-        constructor(
-          callback: (entries: { contentRect: { height: number } }[]) => void
-        ) {
-          notifyResize = () =>
-            callback([{ contentRect: { height: contentHeight } }]);
+        constructor(callback: () => void) {
+          notifyResize = callback;
         }
         observe() {}
         disconnect() {}
@@ -46,98 +33,146 @@ describe("scrolling content resize", () => {
     vi.unstubAllGlobals();
   });
 
-  function setup(viewportDependent = false) {
+  function setup(constraints: Record<string, string> = {}) {
     function style() {
       const properties = new Map<string, { value: string; priority: string }>();
       return {
-        getPropertyValue: (property: string) =>
-          properties.get(property)?.value ?? "",
-        getPropertyPriority: (property: string) =>
-          properties.get(property)?.priority ?? "",
-        setProperty: (property: string, value: string, priority = "") => {
-          properties.set(property, { value, priority });
+        get cssText() {
+          return JSON.stringify([...properties]);
         },
-        removeProperty: (property: string) => {
-          const value = properties.get(property)?.value ?? "";
-          properties.delete(property);
-          return value;
+        set cssText(value: string) {
+          properties.clear();
+          if (value.startsWith("[")) {
+            for (const [key, entry] of JSON.parse(value))
+              properties.set(key, entry);
+          }
         },
+        getPropertyValue: (key: string) => properties.get(key)?.value ?? "",
+        getPropertyPriority: (key: string) =>
+          properties.get(key)?.priority ?? "",
+        setProperty: (key: string, value: string, priority = "") =>
+          properties.set(key, { value, priority }),
+        removeProperty: (key: string) => properties.delete(key),
       };
     }
     const bodyStyle = style();
     const htmlStyle = style();
     htmlStyle.setProperty("--USER__scroll", "readium-scroll-on");
-    if (viewportDependent) {
-      htmlStyle.setProperty("height", "100vh", "important");
-      bodyStyle.setProperty("min-height", "100vh", "important");
+    htmlStyle.setProperty("height", "100vh", "important");
+    for (const [key, value] of Object.entries(constraints)) {
+      bodyStyle.setProperty(key, value, "important");
     }
-    const measuredContentHeight = () =>
-      viewportDependent &&
-      (bodyStyle.getPropertyValue("height") !== "auto" ||
-        bodyStyle.getPropertyValue("min-height") !== "0")
-        ? Math.max(contentHeight, parseFloat(iframe.height))
-        : contentHeight;
-    const content = {
-      getBoundingClientRect: () => ({
-        bottom:
-          Math.max(margin, childMargin) +
-          contentHeight +
-          padding * 2 +
-          border * 2,
-      }),
+    const computedConstraint = (
+      key: string,
+      source = bodyStyle,
+      viewport = parseFloat(iframe.height)
+    ) => {
+      const value = source.getPropertyValue(key);
+      return value.endsWith("vh")
+        ? `${(parseFloat(value) / 100) * viewport}px`
+        : value || ({ height: "auto", "max-height": "none" }[key] ?? "0px");
     };
+    const bodyHeight = () =>
+      Math.max(
+        Math.min(
+          parseFloat(computedConstraint("height")) || contentHeight,
+          parseFloat(computedConstraint("max-height")) || Infinity
+        ),
+        parseFloat(computedConstraint("min-height")) || 0
+      );
+    const events = new EventTarget();
     const body = {
+      addEventListener: events.addEventListener.bind(events),
+      removeEventListener: events.removeEventListener.bind(events),
+      dispatchEvent: events.dispatchEvent.bind(events),
       style: bodyStyle,
-      children: [content],
+      children: [
+        {
+          getBoundingClientRect: () => ({ bottom: 40 + contentHeight + 32 }),
+        },
+      ],
       get scrollHeight() {
-        return Math.ceil(measuredContentHeight() + padding * 2);
+        return Math.ceil(Math.max(contentHeight, bodyHeight()) + 32);
       },
-      get offsetHeight() {
-        return Math.ceil(measuredContentHeight() + padding * 2 + border * 2);
-      },
-      getBoundingClientRect: () => ({
-        top: Math.max(margin, childMargin),
-        bottom:
-          Math.max(margin, childMargin) +
-          measuredContentHeight() +
-          padding * 2 +
-          border * 2,
-        height: measuredContentHeight() + padding * 2 + border * 2,
-      }),
+      getBoundingClientRect: () => ({ top: 40, height: bodyHeight() + 32 }),
       querySelectorAll: () => [],
     };
+    let probeBodyStyle = style();
     const html = {
       style: htmlStyle,
+      // A stale root viewport must not prevent the chapter from shrinking.
+      offsetHeight: 2000,
+      clientHeight: 2000,
+      scrollHeight: 2000,
       getBoundingClientRect: () => ({ top: 0 }),
-      get offsetHeight() {
-        return rootHeight;
-      },
-      get clientHeight() {
-        return rootHeight;
-      },
-      get scrollHeight() {
-        return Math.max(rootHeight, body.offsetHeight + margin * 2);
+      cloneNode: () => {
+        probeBodyStyle = style();
+        return {
+          querySelectorAll: () => [],
+          querySelector: (selector: string) =>
+            selector === "body" ? { style: probeBodyStyle } : { prepend() {} },
+          outerHTML: "<html><head></head><body></body></html>",
+        };
       },
     };
-    const doc = {
+    const doc = Object.assign(new EventTarget(), {
       body,
       documentElement: html,
       querySelector: (selector: string) =>
-        selector === "body" ? body : selector === "html" ? html : null,
-      getElementById: () => null,
+        selector === "html" ? html : selector === "body" ? body : null,
+    });
+    Object.assign(body, { ownerDocument: doc });
+    const probe = {
+      style: style(),
+      isConnected: false,
+      onload: undefined as (() => void) | undefined,
+      setAttribute() {},
+      remove() {
+        probe.isConnected = false;
+      },
+      set srcdoc(_value: string) {
+        setTimeout(() => probe.onload?.(), 0);
+      },
+      contentDocument: { body: {}, documentElement: { style: style() } },
+      contentWindow: {
+        getComputedStyle: () => ({
+          getPropertyValue: (key: string) =>
+            computedConstraint(
+              key,
+              probeBodyStyle,
+              parseFloat(probe.style.getPropertyValue("height"))
+            ),
+        }),
+      },
     };
+    const heightWrites: string[] = [];
+    let height = "828px";
     const iframe = {
-      height: "828px",
+      get height() {
+        return height;
+      },
+      set height(value: string) {
+        height = value;
+        heightWrites.push(value);
+      },
+      ownerDocument: {
+        createElement: (tag: string) =>
+          tag === "iframe" ? probe : { href: "" },
+        body: {
+          appendChild: () => {
+            probe.isConnected = true;
+          },
+        },
+      },
       contentDocument: doc,
       contentWindow: {
-        document: doc,
         getComputedStyle: (element: object) => ({
-          marginTop: `${element === body ? margin : childMargin}px`,
-          marginBottom: `${element === body ? margin : childMargin}px`,
-          paddingTop: "0px",
-          paddingBottom: "0px",
-          borderTopWidth: `${element === body ? border : 0}px`,
-          borderBottomWidth: `${element === body ? border : 0}px`,
+          marginBottom: element === body ? "40px" : "0px",
+          paddingTop: element === body ? "16px" : "0px",
+          paddingBottom: element === body ? "16px" : "0px",
+          borderTopWidth: "0px",
+          borderBottomWidth: "0px",
+          boxSizing: "content-box",
         }),
       },
     } as unknown as HTMLIFrameElement;
@@ -148,136 +183,91 @@ describe("scrolling content resize", () => {
     });
     Object.assign(view, { navigator: { rights: {} } });
     view.iframe = iframe;
-    view.setIframeHeight(iframe);
+    view.bindContentResizeObserver(iframe);
     vi.runAllTimers();
-    return { view, iframe, body, bodyStyle, htmlStyle };
+    return { view, iframe, body, bodyStyle, htmlStyle, probe, heightWrites };
   }
 
-  it("includes current margins and padding after styles load", () => {
-    margin = 0;
-    padding = 0;
-    const { iframe } = setup();
-    margin = 40;
-    padding = 16;
-    notifyResize();
-    vi.runAllTimers();
-    expect(iframe.height).toBe("906px");
-  });
-
-  it("includes borders without losing padding from the observed content box", () => {
-    border = 2;
-    const { iframe } = setup();
-    notifyResize();
-    vi.runAllTimers();
-    expect(iframe.height).toBe("910px");
-  });
-
-  it("shrinks when content collapses instead of retaining the root viewport height", () => {
-    contentHeight = 1500;
-    const { iframe } = setup();
-    rootHeight = 1612;
-    contentHeight = 500;
-    notifyResize();
-    vi.runAllTimers();
+  it("fills unconstrained short chapters and resizes details without intermediate height writes", () => {
+    const { iframe, body, bodyStyle, heightWrites } = setup();
+    expect(bodyStyle.getPropertyValue("min-height")).toBe("716px");
     expect(iframe.height).toBe("828px");
-  });
+    heightWrites.length = 0;
 
-  it("rounds fractional content height up to avoid clipping the last pixel", () => {
-    contentHeight = 794.25;
-    const { iframe } = setup();
+    contentHeight = 1800.25;
+    body.dispatchEvent(new Event("toggle"));
+    vi.runAllTimers();
+    expect(iframe.height).toBe("1913px");
+
+    contentHeight = 100;
+    body.dispatchEvent(new Event("toggle"));
+    vi.runAllTimers();
     notifyResize();
     vi.runAllTimers();
-    expect(iframe.height).toBe("907px");
+    expect(heightWrites).toEqual(["1913px", "828px"]);
   });
 
-  it("includes child margins that collapse through the body after details expand", () => {
-    margin = 8;
-    padding = 0;
-    childMargin = 50;
-    const { iframe } = setup();
-    contentHeight = 1800;
-    notifyResize();
-    vi.runAllTimers();
-    expect(iframe.height).toBe("1900px");
-
-    rootHeight = 1900;
-    contentHeight = 500;
-    notifyResize();
-    vi.runAllTimers();
-    expect(iframe.height).toBe("828px");
-  });
-
-  it("ignores a queued resize after the view stops", () => {
-    const { view, iframe } = setup();
-    notifyResize();
-    view.stop();
-    vi.runAllTimers();
-    expect(iframe.height).toBe("0");
-  });
-
-  it("stabilizes when publication body height follows the iframe viewport", () => {
-    contentHeight = 300;
-    padding = 0;
-    const { iframe } = setup(true);
-    for (let cycle = 0; cycle < 6; cycle++) {
-      notifyResize();
-      vi.runAllTimers();
-      expect(iframe.height).toBe("828px");
+  it.each([
+    ["height", "100vh", 828, "940px"],
+    ["min-height", "80vh", 662.4, "828px"],
+    ["min-height", "120vh", 993.6, "1106px"],
+  ])(
+    "resolves %s: %s against the reader rather than the growing iframe",
+    (property, value, resolved, collapsed) => {
+      const { iframe, bodyStyle } = setup({ [property]: value });
+      for (const height of [1800, 100, 100]) {
+        contentHeight = height;
+        notifyResize();
+        vi.runAllTimers();
+        expect(iframe.height).toBe(height === 1800 ? "1912px" : collapsed);
+        expect(parseFloat(bodyStyle.getPropertyValue(property))).toBeCloseTo(
+          resolved
+        );
+      }
     }
-  });
+  );
 
-  it("expands and shrinks despite viewport-based publication height constraints", () => {
-    contentHeight = 1800;
-    padding = 0;
-    const { iframe } = setup(true);
-    notifyResize();
-    vi.runAllTimers();
-    expect(iframe.height).toBe("1880px");
-
-    contentHeight = 300;
-    for (let cycle = 0; cycle < 6; cycle++) {
-      notifyResize();
-      vi.runAllTimers();
-      expect(iframe.height).toBe("828px");
-    }
-  });
-
-  it("restores publication height properties and priorities when stopped", () => {
-    const { view, bodyStyle, htmlStyle } = setup(true);
-    expect(bodyStyle.getPropertyValue("min-height")).toBe("0");
-    expect(bodyStyle.getPropertyPriority("min-height")).toBe("important");
-    view.stop();
-    expect(bodyStyle.getPropertyValue("min-height")).toBe("100vh");
-    expect(bodyStyle.getPropertyPriority("min-height")).toBe("important");
-    expect(bodyStyle.getPropertyValue("height")).toBe("");
-    expect(htmlStyle.getPropertyValue("height")).toBe("100vh");
-    expect(htmlStyle.getPropertyPriority("height")).toBe("important");
-  });
-
-  it("restores publication constraints before returning to paginated mode", () => {
-    const { view, bodyStyle, htmlStyle } = setup(true);
-    view.setIframeHeight(view.iframe);
-    vi.spyOn(view, "setSize").mockImplementation(() => {
-      view.iframe.height = "788px";
-    });
-    vi.spyOn(view, "padOddColumns").mockReturnValue(false);
-    view.setMode(false);
-    expect(bodyStyle.getPropertyValue("min-height")).toBe("100vh");
-    expect(htmlStyle.getPropertyValue("height")).toBe("100vh");
-    expect(htmlStyle.getPropertyValue("--USER__scroll")).toBe(
-      "readium-scroll-off"
+  it.each([
+    ["height", "400px", "828px"],
+    ["min-height", "1000px", "1112px"],
+    ["max-height", "400px", "828px"],
+  ])("preserves fixed publication %s", (property, value, expected) => {
+    const { iframe, bodyStyle } = setup({ [property]: value });
+    expect(bodyStyle.getPropertyValue(property)).toBe(value);
+    expect(bodyStyle.getPropertyValue("min-height")).toBe(
+      property === "min-height" ? value : ""
     );
-    view.setIframeHeight(view.iframe);
-    vi.runAllTimers();
-    expect(bodyStyle.getPropertyValue("min-height")).toBe("100vh");
-    expect(view.iframe.height).toBe("788px");
+    expect(iframe.height).toBe(expected);
   });
 
-  it("ignores an initial height update queued before stopping", () => {
-    const { view, iframe } = setup(true);
-    view.setIframeHeight(iframe);
+  it("refreshes a pending resize when rebinding or loading styles", () => {
+    const { view, iframe, body } = setup();
+    contentHeight = 1800;
+    body.dispatchEvent(new Event("toggle"));
+    view.bindContentResizeObserver(iframe);
+    iframe.contentDocument!.dispatchEvent(new Event("load"));
+    vi.runAllTimers();
+    expect(iframe.height).toBe("1912px");
+  });
+
+  it("restores publication styles and ignores pending work after stopping", () => {
+    const { view, iframe, body, bodyStyle, htmlStyle, probe } = setup({
+      "min-height": "100vh",
+    });
+    notifyResize();
     view.stop();
+    probe.onload?.();
     vi.runAllTimers();
     expect(iframe.height).toBe("0");
+    expect(probe.isConnected).toBe(false);
+    for (const [style, property] of [
+      [bodyStyle, "min-height"],
+      [htmlStyle, "height"],
+    ] as const) {
+      expect(style.getPropertyValue(property)).toBe("100vh");
+      expect(style.getPropertyPriority(property)).toBe("important");
+    }
+    body.dispatchEvent(new Event("toggle"));
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

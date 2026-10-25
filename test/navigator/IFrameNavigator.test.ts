@@ -13,6 +13,7 @@ describe("written iframe documents", () => {
     vi.useFakeTimers();
     vi.stubGlobal("window", {
       location: new URL("https://reader.example/"),
+      removeEventListener: vi.fn(),
     });
     vi.stubGlobal("document", {
       createElement: () => ({}),
@@ -52,6 +53,7 @@ describe("written iframe documents", () => {
   } = {}) {
     const iframes = Array.from({ length: spread ? 2 : 1 }, () => ({
       src: "",
+      removeEventListener: vi.fn(),
       contentDocument: {
         open: vi.fn(),
         write: vi.fn(),
@@ -147,6 +149,14 @@ describe("written iframe documents", () => {
       }
     }
   );
+
+  it("stops the book view when the navigator stops", () => {
+    const { navigator } = setup();
+    const stop = vi.fn();
+    Object.assign(navigator, { view: { stop } });
+    navigator.stop();
+    expect(stop).toHaveBeenCalledOnce();
+  });
 
   it("keeps same-origin URL navigation unchanged", async () => {
     const href = "https://reader.example/chapter.xhtml";

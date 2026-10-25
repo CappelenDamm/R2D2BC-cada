@@ -42,7 +42,7 @@ interface BookView {
     scrollPosition?: ScrollLogicalPosition
   ): void;
   setSize(): void;
-  setIframeHeight?(iframe: any);
+  bindContentResizeObserver?(iframe: HTMLIFrameElement | undefined): void;
   setSize(): void;
   getScreenHeight(): number;
 

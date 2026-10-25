@@ -480,6 +480,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
 
   stop() {
     log.log("Iframe navigator stop");
+    this.view?.stop();
 
     removeEventListenerOptional(
       this.previousChapterAnchorElement,
@@ -926,8 +927,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     let lastReadingPosition: ReadingPosition | undefined = undefined;
     if (this.annotator) {
       lastReadingPosition = (await this.annotator.getLastReadingPosition()) as
-        | ReadingPosition
-        | undefined;
+        ReadingPosition | undefined;
     }
 
     if (lastReadingPosition) {
@@ -1349,8 +1349,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
       if (this.annotator) {
         lastReadingPosition =
           (await this.annotator.getLastReadingPosition()) as
-            | ReadingPosition
-            | undefined;
+            ReadingPosition | undefined;
       }
 
       const startLink = this.publication.getStartLink();
@@ -1512,16 +1511,6 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
       if (this.view?.layout !== "fixed" && this.highlighter !== undefined) {
         await this.highlighter.initialize(iframe);
       }
-      const body = iframe.contentDocument?.body;
-
-      // resize on toggle details
-      let details = body?.querySelector("details");
-      if (details) {
-        let self = this;
-        details.addEventListener("toggle", async (_event) => {
-          await self.view?.setIframeHeight?.(iframe);
-        });
-      }
 
       if (this.eventHandler) {
         this.eventHandler.setupEvents(iframe.contentDocument);
@@ -1533,13 +1522,6 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
           this.didInitKeyboardEventHandler = true;
         }
       }
-      if (this.view?.layout !== "fixed") {
-        if (this.view?.isScrollMode()) {
-          iframe.height = "0";
-          this.view?.setIframeHeight?.(iframe);
-        }
-      }
-
       if (this.rights.enableContentProtection && this.contentProtectionModule) {
         await this.contentProtectionModule.initialize(iframe);
       }
@@ -2815,13 +2797,6 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
       });
     }
 
-    setTimeout(() => {
-      if (this.view?.layout !== "fixed") {
-        if (this.view?.isScrollMode()) {
-          this.view?.setIframeHeight?.(this.iframes[0]);
-        }
-      }
-    }, 100);
     setTimeout(async () => {
       // Skip restoring the pre-resize scroll fraction when a navigation is in flight,
       // otherwise it reapplies the previous chapter's stale scroll position.
