@@ -325,6 +325,64 @@ describe("scrolling content resize", () => {
     expect(iframe.height).toBe("1912px");
   });
 
+  it("finishes sizing before restoring a saved progression", async () => {
+    const { view, iframe } = setup();
+    let scrollTop = 0;
+    const wrapper = {
+      get scrollTop() {
+        return scrollTop;
+      },
+      set scrollTop(value: number) {
+        scrollTop = Math.min(value, Math.max(0, parseFloat(iframe.height) - 828));
+      },
+    };
+    vi.stubGlobal("document", { querySelector: () => wrapper });
+    vi.stubGlobal("HTMLElement", Object);
+    Object.assign(iframe.contentDocument!, {
+      scrollingElement: {
+        get scrollHeight() {
+          return parseFloat(iframe.height);
+        },
+      },
+    });
+    contentHeight = 3000;
+    let restored = false;
+    const restoration = view.setSize().then(() => {
+      view.goToProgression(0.5);
+      restored = true;
+    });
+    await Promise.resolve();
+    expect(restored).toBe(false);
+    expect(scrollTop).toBe(0);
+
+    await vi.runAllTimersAsync();
+    await restoration;
+
+    expect(iframe.height).toBe("3112px");
+    expect(scrollTop).toBe(1556);
+  });
+
+  it("settles sizing on stop and refuses stale rebinding until restarted", async () => {
+    const { view, iframe, probe, probeLoads } = setup();
+    const sizing = view.setSize();
+    view.stop();
+    await sizing;
+
+    await view.setSize();
+    view.bindContentResizeObserver(iframe);
+    await view.setMode(true);
+    await vi.runAllTimersAsync();
+    expect(probeLoads).toHaveBeenCalledTimes(1);
+    expect(probe.isConnected).toBe(false);
+    expect(iframe.height).toBe("0");
+
+    view.start();
+    await vi.runAllTimersAsync();
+    expect(probeLoads).toHaveBeenCalledTimes(2);
+    expect(probe.isConnected).toBe(true);
+    expect(iframe.height).toBe("828px");
+  });
+
   it("restores publication styles and ignores pending work after stopping", () => {
     const { view, iframe, body, bodyStyle, htmlStyle, probe } = setup({
       "min-height": "100vh",

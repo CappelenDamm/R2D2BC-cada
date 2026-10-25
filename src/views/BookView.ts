@@ -33,7 +33,7 @@ interface BookView {
   navigator: IFrameNavigator;
   attributes?: IFrameAttributes;
 
-  setMode?(scroll: boolean);
+  setMode?(scroll: boolean): void | Promise<void>;
   isScrollMode();
   isPaginated();
   goToElement?(
@@ -41,9 +41,8 @@ interface BookView {
     relative?: boolean,
     scrollPosition?: ScrollLogicalPosition
   ): void;
-  setSize(): void;
+  setSize(): void | Promise<void>;
   bindContentResizeObserver?(iframe: HTMLIFrameElement | undefined): void;
-  setSize(): void;
   getScreenHeight(): number;
 
   /** Load this view in its book element, at the specified position. */

@@ -51,6 +51,7 @@ export default class ReflowableBookView implements BookView {
   private readonly USERSETTINGS = "userSetting";
   private readonly store: Store;
   private scrollMode: boolean;
+  private stopped = false;
   navigator: IFrameNavigator;
   constructor(store: Store) {
     this.store = store;
@@ -64,7 +65,8 @@ export default class ReflowableBookView implements BookView {
     }
   }
 
-  setMode(scroll: boolean) {
+  async setMode(scroll: boolean): Promise<void> {
+    if (this.stopped) return;
     this.scrollMode = scroll;
     if (scroll) {
       this.name = "readium-scroll-on";
@@ -95,8 +97,7 @@ export default class ReflowableBookView implements BookView {
         const spacer = doc.getElementById("r2d2bc-column-spacer");
         if (spacer) spacer.remove();
       }
-      this.setSize();
-      this.bindContentResizeObserver(this.iframe);
+      await this.setSize();
     } else {
       this.unbindContentResizeObserver();
       this.height = BrowserUtilities.getHeight() - 40 - this.attributes.margin;
@@ -117,9 +118,10 @@ export default class ReflowableBookView implements BookView {
           html.style.setProperty("--USER__scroll", "readium-scroll-off");
         }
       }
-      this.setSize();
+      await this.setSize();
       this.padOddColumns();
     }
+    if (this.stopped) return;
     if (this.navigator.rights.enableContentProtection) {
       this.navigator.contentProtectionModule?.recalculate();
     }
@@ -133,6 +135,7 @@ export default class ReflowableBookView implements BookView {
   attributes: IFrameAttributes = { margin: 0 };
 
   start(): void {
+    this.stopped = false;
     if (this.scrollMode) {
       let doc = this.iframe.contentDocument;
       if (doc) {
@@ -152,7 +155,6 @@ export default class ReflowableBookView implements BookView {
         }
       }
       this.setSize();
-      this.bindContentResizeObserver(this.iframe);
     } else {
       this.iframe.height = "0";
       this.iframe.width = "0";
@@ -170,6 +172,7 @@ export default class ReflowableBookView implements BookView {
   }
 
   stop(): void {
+    this.stopped = true;
     this.unbindContentResizeObserver();
 
     this.iframe.height = "0";
@@ -205,6 +208,7 @@ export default class ReflowableBookView implements BookView {
   }
 
   goToProgression(position: number): void {
+    if (this.stopped) return;
     const wrapper = HTMLUtilities.findRequiredElement(
       document,
       "#iframe-wrapper"
@@ -286,7 +290,7 @@ export default class ReflowableBookView implements BookView {
     relative?: boolean,
     scrollPosition?: ScrollLogicalPosition
   ): void {
-    if (!element) return;
+    if (this.stopped || !element) return;
 
     if (this.scrollMode) {
       this.focusElement(element, scrollPosition);
@@ -523,6 +527,12 @@ export default class ReflowableBookView implements BookView {
   private _contentHeightRefreshHandler: (() => void) | undefined;
   private _contentHeightProbe: HTMLIFrameElement | undefined;
   private _contentHeightStyles: SavedHeightStyle[] = [];
+  private _contentResizeWaiters = new Set<() => void>();
+
+  private finishContentResize(): void {
+    for (const resolve of this._contentResizeWaiters) resolve();
+    this._contentResizeWaiters.clear();
+  }
 
   /** Removes resize listeners and the probe, then restores publication styles. */
   private unbindContentResizeObserver() {
@@ -551,6 +561,7 @@ export default class ReflowableBookView implements BookView {
       this.restoreHeightStyle(savedStyle);
     }
     this._contentHeightStyles = [];
+    this.finishContentResize();
   }
 
   /** Binds a ResizeObserver to the iframe's body to adjust its height dynamically.
@@ -558,7 +569,7 @@ export default class ReflowableBookView implements BookView {
    * such as the <details> element expanding/collapsing.
    */
   bindContentResizeObserver(iframe: HTMLIFrameElement | undefined) {
-    if (!this.isScrollMode()) return;
+    if (this.stopped || !this.isScrollMode()) return;
     const doc = iframe?.contentDocument;
     const body = doc?.body;
     const win = iframe?.contentWindow;
@@ -630,6 +641,7 @@ export default class ReflowableBookView implements BookView {
           constraintViewport = viewport;
         }
         this.updateContentHeight(iframe, minHeight, bodyConstraints, declared);
+        this.finishContentResize();
       });
     }, 20);
     _resizeObserver = new ResizeObserver(debouncedResize);
@@ -891,7 +903,8 @@ export default class ReflowableBookView implements BookView {
     }
   }
 
-  setSize(): void {
+  async setSize(): Promise<void> {
+    if (this.stopped) return;
     this.iframe.width = BrowserUtilities.getWidth() + "px";
     if (!this.scrollMode) {
       let doc = this.iframe.contentDocument;
@@ -901,6 +914,11 @@ export default class ReflowableBookView implements BookView {
       this.iframe.height = this.height + "px";
     } else {
       this.bindContentResizeObserver(this.iframe);
+      if (this._contentResizeBody) {
+        await new Promise<void>((resolve) => {
+          this._contentResizeWaiters.add(resolve);
+        });
+      }
     }
   }
 
