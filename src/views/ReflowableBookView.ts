@@ -638,13 +638,13 @@ export default class ReflowableBookView implements BookView {
     this._contentHeightRefreshHandler = (event?: Event) => {
       const target = event?.target as Element | null;
       if (
-        target?.localName &&
-        target.localName !== "link" &&
-        target.localName !== "style"
-      )
-        return;
-      probeDirty = true;
-      declared = undefined;
+        !target?.localName ||
+        target.localName === "link" ||
+        target.localName === "style"
+      ) {
+        probeDirty = true;
+        declared = undefined;
+      }
       debouncedResize.call(this);
     };
     doc.addEventListener("load", this._contentHeightRefreshHandler, {
@@ -740,7 +740,7 @@ export default class ReflowableBookView implements BookView {
     if (!probe.isConnected) iframe.ownerDocument.body.appendChild(probe);
   }
 
-  /** Resolves viewport-dependent body constraints against the reader viewport. */
+  /** Resolves body constraints against the reader viewport before content sizing. */
   private resolveBodyHeightConstraints(
     probe: HTMLIFrameElement,
     bodyConstraints: BodyHeightConstraint[],
@@ -761,16 +761,10 @@ export default class ReflowableBookView implements BookView {
     const declared = bodyConstraints.map(({ property }) =>
       win.getComputedStyle(doc.body).getPropertyValue(property)
     );
-    probe.style.setProperty(
-      "height",
-      viewport.height + 100 + "px",
-      "important"
-    );
-    const resized = bodyConstraints.map(({ property }) =>
-      win.getComputedStyle(doc.body).getPropertyValue(property)
-    );
+    const unconstrained = ["auto", "0px", "none"];
     for (const [index, constraint] of bodyConstraints.entries()) {
-      if (declared[index] !== resized[index]) {
+      // Matching samples cannot detect viewport units hidden by min/max/clamp.
+      if (declared[index] !== unconstrained[index]) {
         constraint.applied = declared[index];
         constraint.style.setProperty(
           constraint.property,
@@ -887,8 +881,7 @@ export default class ReflowableBookView implements BookView {
       }
       this.iframe.height = this.height + "px";
     } else {
-      let html = this.iframe.contentWindow?.document?.documentElement;
-      this.iframe.height = html?.offsetHeight + "px";
+      this.bindContentResizeObserver(this.iframe);
     }
   }
 

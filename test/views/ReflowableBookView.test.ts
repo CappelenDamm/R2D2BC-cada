@@ -3,6 +3,7 @@ import ReflowableBookView from "../../src/views/ReflowableBookView";
 
 vi.mock("../../src/utils/BrowserUtilities", () => ({
   getHeight: () => 828,
+  getWidth: () => 600,
 }));
 
 describe("scrolling content resize", () => {
@@ -68,6 +69,11 @@ describe("scrolling content resize", () => {
       viewport = parseFloat(iframe.height)
     ) => {
       const value = source.getPropertyValue(key);
+      const minimum = /^max\((\d+)vh,\s*(\d+)px\)$/.exec(value);
+      if (minimum) {
+        const viewportMinimum = (Number(minimum[1]) / 100) * viewport;
+        return `${Math.max(viewportMinimum, Number(minimum[2]))}px`;
+      }
       return value.endsWith("vh")
         ? `${(parseFloat(value) / 100) * viewport}px`
         : value || ({ height: "auto", "max-height": "none" }[key] ?? "0px");
@@ -122,6 +128,7 @@ describe("scrolling content resize", () => {
         selector === "html" ? html : selector === "body" ? body : null,
     });
     Object.assign(body, { ownerDocument: doc });
+    const probeLoads = vi.fn();
     const probe = {
       style: style(),
       isConnected: false,
@@ -131,6 +138,7 @@ describe("scrolling content resize", () => {
         probe.isConnected = false;
       },
       set srcdoc(_value: string) {
+        probeLoads();
         setTimeout(() => probe.onload?.(), 0);
       },
       contentDocument: { body: {}, documentElement: { style: style() } },
@@ -166,6 +174,7 @@ describe("scrolling content resize", () => {
       },
       contentDocument: doc,
       contentWindow: {
+        document: doc,
         getComputedStyle: (element: object) => ({
           marginBottom: element === body ? "40px" : "0px",
           paddingTop: element === body ? "16px" : "0px",
@@ -181,11 +190,20 @@ describe("scrolling content resize", () => {
       set: vi.fn(),
       remove: vi.fn(),
     });
-    Object.assign(view, { navigator: { rights: {} } });
+    Object.assign(view, { navigator: { rights: {} }, scrollMode: true });
     view.iframe = iframe;
     view.bindContentResizeObserver(iframe);
     vi.runAllTimers();
-    return { view, iframe, body, bodyStyle, htmlStyle, probe, heightWrites };
+    return {
+      view,
+      iframe,
+      body,
+      bodyStyle,
+      htmlStyle,
+      probe,
+      probeLoads,
+      heightWrites,
+    };
   }
 
   it("fills unconstrained short chapters and resizes details without intermediate height writes", () => {
@@ -211,11 +229,12 @@ describe("scrolling content resize", () => {
     ["height", "100vh", 828, "940px"],
     ["min-height", "80vh", 662.4, "828px"],
     ["min-height", "120vh", 993.6, "1106px"],
+    ["min-height", "max(100vh, 1000px)", 1000, "1112px"],
   ])(
     "resolves %s: %s against the reader rather than the growing iframe",
     (property, value, resolved, collapsed) => {
       const { iframe, bodyStyle } = setup({ [property]: value });
-      for (const height of [1800, 100, 100]) {
+      for (const height of [100, 1800, 100, 100]) {
         contentHeight = height;
         notifyResize();
         vi.runAllTimers();
@@ -239,6 +258,38 @@ describe("scrolling content resize", () => {
     );
     expect(iframe.height).toBe(expected);
   });
+
+  it("keeps overflowing content measured when a delayed setSize runs", () => {
+    const { view, iframe, body, heightWrites } = setup({ height: "400px" });
+    contentHeight = 3000;
+    body.dispatchEvent(new Event("toggle"));
+    vi.runAllTimers();
+    expect(iframe.height).toBe("3112px");
+    heightWrites.length = 0;
+
+    setTimeout(() => view.setSize(), 200);
+    vi.runAllTimers();
+
+    expect(iframe.height).toBe("3112px");
+    expect(heightWrites).toEqual([]);
+  });
+
+  it.each(["height", "max-height"])(
+    "remeasures image overflow with a fixed %s without rebuilding the probe",
+    (property) => {
+      const { iframe, probeLoads } = setup({ [property]: "400px" });
+      expect(iframe.height).toBe("828px");
+      expect(probeLoads).toHaveBeenCalledTimes(1);
+      contentHeight = 1800;
+      const event = new Event("load");
+      Object.defineProperty(event, "target", { value: { localName: "img" } });
+      iframe.contentDocument!.dispatchEvent(event);
+      vi.runAllTimers();
+
+      expect(iframe.height).toBe("1912px");
+      expect(probeLoads).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it("refreshes a pending resize when rebinding or loading styles", () => {
     const { view, iframe, body } = setup();
