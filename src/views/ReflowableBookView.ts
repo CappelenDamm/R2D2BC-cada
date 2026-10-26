@@ -26,24 +26,7 @@ import {
   IFrameAttributes,
   IFrameNavigator,
 } from "../navigator/IFrameNavigator";
-import debounce from "debounce";
-
-interface SavedHeightStyle {
-  style: CSSStyleDeclaration;
-  property: string;
-  value: string;
-  priority: string;
-}
-
-interface BodyHeightConstraint extends SavedHeightStyle {
-  applied: string | undefined;
-}
-
-interface ContentHeightViewport {
-  height: number;
-  width: number;
-  styles: string;
-}
+import ScrollContentSizer from "./ScrollContentSizer";
 
 export default class ReflowableBookView implements BookView {
   layout = "reflowable";
@@ -52,6 +35,9 @@ export default class ReflowableBookView implements BookView {
   private readonly store: Store;
   private scrollMode: boolean;
   private stopped = false;
+  private readonly contentSizer = new ScrollContentSizer(
+    () => BrowserUtilities.getHeight() - this.attributes.margin
+  );
   navigator: IFrameNavigator;
   constructor(store: Store) {
     this.store = store;
@@ -99,7 +85,7 @@ export default class ReflowableBookView implements BookView {
       }
       await this.setSize();
     } else {
-      this.unbindContentResizeObserver();
+      this.contentSizer.unbind();
       this.height = BrowserUtilities.getHeight() - 40 - this.attributes.margin;
       this.name = "readium-scroll-off";
       this.label = "Paginated";
@@ -173,7 +159,7 @@ export default class ReflowableBookView implements BookView {
 
   stop(): void {
     this.stopped = true;
-    this.unbindContentResizeObserver();
+    this.contentSizer.unbind();
 
     this.iframe.height = "0";
     this.iframe.width = "0";
@@ -521,370 +507,9 @@ export default class ReflowableBookView implements BookView {
     return wrapper.clientHeight;
   }
 
-  private _contentResizeObserver: ResizeObserver | undefined;
-  private _contentResizeBody: HTMLElement | undefined;
-  private _contentResizeHandler: (() => void) | undefined;
-  private _contentHeightRefreshHandler: (() => void) | undefined;
-  private _contentHeightProbe: HTMLIFrameElement | undefined;
-  private _contentHeightStyles: SavedHeightStyle[] = [];
-  private _contentResizeWaiters = new Set<() => void>();
-
-  private finishContentResize(): void {
-    for (const resolve of this._contentResizeWaiters) resolve();
-    this._contentResizeWaiters.clear();
-  }
-
-  /** Removes resize listeners and the probe, then restores publication styles. */
-  private unbindContentResizeObserver() {
-    this._contentResizeObserver?.disconnect();
-    this._contentHeightProbe?.remove();
-    this._contentHeightProbe = undefined;
-    if (this._contentHeightRefreshHandler) {
-      this._contentResizeBody?.ownerDocument.removeEventListener(
-        "load",
-        this._contentHeightRefreshHandler,
-        { capture: true }
-      );
-    }
-    if (this._contentResizeHandler) {
-      this._contentResizeBody?.removeEventListener(
-        "toggle",
-        this._contentResizeHandler,
-        { capture: true }
-      );
-    }
-    this._contentResizeObserver = undefined;
-    this._contentResizeBody = undefined;
-    this._contentResizeHandler = undefined;
-    this._contentHeightRefreshHandler = undefined;
-    for (const savedStyle of this._contentHeightStyles) {
-      this.restoreHeightStyle(savedStyle);
-    }
-    this._contentHeightStyles = [];
-    this.finishContentResize();
-  }
-
-  /** Binds a ResizeObserver to the iframe's body to adjust its height dynamically.
-   * This is needed to accommodate content that changes size after initial load,
-   * such as the <details> element expanding/collapsing.
-   */
   bindContentResizeObserver(iframe: HTMLIFrameElement | undefined) {
     if (this.stopped || !this.isScrollMode()) return;
-    const doc = iframe?.contentDocument;
-    const body = doc?.body;
-    const win = iframe?.contentWindow;
-    if (!doc || !body || !iframe || !win) return;
-
-    // Do not re-bind if the same body is already being observed.
-    if (this._contentResizeBody === body) {
-      this._contentResizeHandler?.();
-      return;
-    }
-
-    this.unbindContentResizeObserver();
-
-    const bodyConstraints = this.prepareContentHeightStyles(doc);
-    let declared: string[] | undefined;
-    let constraintViewport: ContentHeightViewport | undefined;
-    let probeReady = false;
-    let probeDirty = true;
-    let _resizeObserver: ResizeObserver | undefined;
-    const debouncedResize = debounce(() => {
-      // Ignore any pending debounced callbacks after the observer has been unbound/replaced.
-      if (this._contentResizeObserver !== _resizeObserver) return;
-      // Defer the DOM write to the next frame so mutating iframe.height here
-      // doesn't re-trigger this same observation cycle (avoids the browser's
-      // "ResizeObserver loop completed with undelivered notifications" warning).
-      requestAnimationFrame(() => {
-        if (this._contentResizeObserver !== _resizeObserver) return;
-        const minHeight = BrowserUtilities.getHeight() - this.attributes.margin;
-        const viewport: ContentHeightViewport = {
-          height: minHeight,
-          width: iframe.clientWidth,
-          styles: doc.documentElement.style.cssText,
-        };
-        if (probeDirty) {
-          probeReady = false;
-          probeDirty = false;
-          this.loadContentHeightProbe(
-            iframe,
-            doc,
-            bodyConstraints,
-            viewport,
-            () => {
-              probeReady = true;
-              declared = undefined;
-              debouncedResize.call(this);
-            }
-          );
-          return;
-        }
-        const probe = this._contentHeightProbe;
-        if (
-          !probeReady ||
-          !probe?.contentDocument?.body ||
-          !probe.contentWindow
-        )
-          return;
-        if (
-          !declared ||
-          constraintViewport?.height !== viewport.height ||
-          constraintViewport?.width !== viewport.width ||
-          constraintViewport?.styles !== viewport.styles
-        ) {
-          declared = this.resolveBodyHeightConstraints(
-            probe,
-            bodyConstraints,
-            viewport
-          );
-          if (!declared) return;
-          constraintViewport = viewport;
-        }
-        this.updateContentHeight(iframe, minHeight, bodyConstraints, declared);
-        this.finishContentResize();
-      });
-    }, 20);
-    _resizeObserver = new ResizeObserver(debouncedResize);
-    this._contentResizeObserver = _resizeObserver;
-    this._contentResizeHandler = debouncedResize;
-    this._contentHeightRefreshHandler = (event?: Event) => {
-      const target = event?.target as Element | null;
-      if (
-        !target?.localName ||
-        target.localName === "link" ||
-        target.localName === "style"
-      ) {
-        probeDirty = true;
-        declared = undefined;
-      }
-      debouncedResize.call(this);
-    };
-    doc.addEventListener("load", this._contentHeightRefreshHandler, {
-      capture: true,
-    });
-    body.addEventListener("toggle", debouncedResize, { capture: true });
-    _resizeObserver.observe(body, { box: "border-box" });
-    if (iframe.parentElement) _resizeObserver.observe(iframe.parentElement);
-    this._contentResizeBody = body;
-    this._contentResizeHandler();
-  }
-
-  /** Saves publication height styles and makes the root intrinsically sized. */
-  private prepareContentHeightStyles(doc: Document): BodyHeightConstraint[] {
-    // Keep the root intrinsic without suppressing the publication's body styles.
-    const rootStyle = doc.documentElement.style;
-    for (const [property, value] of [
-      ["height", "auto"],
-      ["min-height", "0"],
-      ["max-height", "none"],
-    ]) {
-      this._contentHeightStyles.push({
-        style: rootStyle,
-        property,
-        value: rootStyle.getPropertyValue(property),
-        priority: rootStyle.getPropertyPriority(property),
-      });
-      rootStyle.setProperty(property, value, "important");
-    }
-
-    const bodyConstraints: BodyHeightConstraint[] = [
-      "height",
-      "min-height",
-      "max-height",
-    ].map((property) => ({
-      style: doc.body.style,
-      property,
-      value: doc.body.style.getPropertyValue(property),
-      priority: doc.body.style.getPropertyPriority(property),
-      applied: undefined,
-    }));
-    this._contentHeightStyles.push(...bodyConstraints);
-    return bodyConstraints;
-  }
-
-  /** Restores a saved CSS value and priority on the original or supplied style. */
-  private restoreHeightStyle(
-    savedStyle: SavedHeightStyle,
-    style = savedStyle.style
-  ): void {
-    const { property, value, priority } = savedStyle;
-    if (value) {
-      style.setProperty(property, value, priority);
-    } else {
-      style.removeProperty(property);
-    }
-  }
-
-  /** Loads a script-free chapter copy in a hidden, sandboxed measurement iframe. */
-  private loadContentHeightProbe(
-    iframe: HTMLIFrameElement,
-    doc: Document,
-    bodyConstraints: BodyHeightConstraint[],
-    viewport: ContentHeightViewport,
-    onLoad: () => void
-  ): void {
-    const probe =
-      this._contentHeightProbe ?? iframe.ownerDocument.createElement("iframe");
-    this._contentHeightProbe = probe;
-    probe.setAttribute("aria-hidden", "true");
-    probe.setAttribute("sandbox", "allow-same-origin");
-    probe.tabIndex = -1;
-    probe.style.cssText =
-      "position:fixed!important;left:-100000px!important;top:0!important;visibility:hidden!important;pointer-events:none!important;border:0!important;";
-    probe.style.setProperty("width", viewport.width + "px", "important");
-    probe.style.setProperty("height", viewport.height + "px", "important");
-
-    const root = doc.documentElement.cloneNode(true) as HTMLElement;
-    root.querySelectorAll("script").forEach((script) => script.remove());
-    const base = iframe.ownerDocument.createElement("base");
-    base.href = doc.baseURI;
-    root.querySelector("head")?.prepend(base);
-    const probeBody = root.querySelector("body") as HTMLElement;
-    for (const constraint of bodyConstraints) {
-      this.restoreHeightStyle(constraint, probeBody.style);
-    }
-    probeBody.style.setProperty("display", "none", "important");
-    probe.onload = () => {
-      if (this._contentHeightProbe !== probe) return;
-      onLoad();
-    };
-    probe.srcdoc = "<!DOCTYPE html>\n" + root.outerHTML;
-    if (!probe.isConnected) iframe.ownerDocument.body.appendChild(probe);
-  }
-
-  /** Resolves body constraints against the reader viewport before content sizing. */
-  private resolveBodyHeightConstraints(
-    probe: HTMLIFrameElement,
-    bodyConstraints: BodyHeightConstraint[],
-    viewport: ContentHeightViewport
-  ): string[] | undefined {
-    const doc = probe.contentDocument;
-    const win = probe.contentWindow;
-    if (!doc?.body || !win) return;
-
-    for (const constraint of bodyConstraints) {
-      if (constraint.applied === undefined) continue;
-      this.restoreHeightStyle(constraint);
-      constraint.applied = undefined;
-    }
-    doc.documentElement.style.cssText = viewport.styles;
-    doc.documentElement.style.setProperty(
-      "height",
-      viewport.height + "px",
-      "important"
-    );
-    probe.style.setProperty("width", viewport.width + "px", "important");
-    probe.style.setProperty("height", viewport.height + "px", "important");
-    const declared = bodyConstraints.map(({ property }) =>
-      win.getComputedStyle(doc.body).getPropertyValue(property)
-    );
-    // Keep the body hidden to distinguish auto from a used pixel height.
-    // Resolve remaining percentages with a separate reader-sized box.
-    if (declared.some((value) => value.includes("%"))) {
-      const measurement = doc.createElement("div");
-      measurement.style.cssText =
-        "all:initial!important;display:block!important;position:fixed!important;box-sizing:content-box!important;min-height:0!important;max-height:none!important;padding:0!important;border:0!important;";
-      doc.documentElement.appendChild(measurement);
-      for (const [index, value] of declared.entries()) {
-        if (!value.includes("%")) continue;
-        measurement.style.setProperty("height", value, "important");
-        declared[index] = win.getComputedStyle(measurement).height;
-      }
-      measurement.remove();
-    }
-    const unconstrained = ["auto", "0px", "none"];
-    for (const [index, constraint] of bodyConstraints.entries()) {
-      // Matching samples cannot detect viewport units hidden by min/max/clamp.
-      if (declared[index] !== unconstrained[index]) {
-        constraint.applied = declared[index];
-        constraint.style.setProperty(
-          constraint.property,
-          constraint.applied,
-          "important"
-        );
-      }
-    }
-    return declared;
-  }
-
-  /** Fills unconstrained short content and fits the iframe to rendered content. */
-  private updateContentHeight(
-    iframe: HTMLIFrameElement,
-    minHeight: number,
-    bodyConstraints: BodyHeightConstraint[],
-    declared: string[]
-  ): void {
-    const doc = iframe.contentDocument;
-    const win = iframe.contentWindow;
-    if (!doc?.body || !win) return;
-    const body = doc.body;
-    const bodyStyle = win.getComputedStyle(body);
-    const htmlStyle = win.getComputedStyle(doc.documentElement);
-    const pixels = (value: string) => parseFloat(value) || 0;
-    const bodyBorders =
-      pixels(bodyStyle.borderTopWidth) + pixels(bodyStyle.borderBottomWidth);
-
-    const rootTop = doc.documentElement.getBoundingClientRect().top;
-    const availableMinimum = Math.max(
-      0,
-      minHeight -
-        (body.getBoundingClientRect().top - rootTop) -
-        pixels(bodyStyle.marginBottom) -
-        pixels(htmlStyle.paddingBottom) -
-        pixels(htmlStyle.borderBottomWidth) -
-        (bodyStyle.boxSizing === "border-box"
-          ? 0
-          : pixels(bodyStyle.paddingTop) +
-            pixels(bodyStyle.paddingBottom) +
-            bodyBorders)
-    );
-    if (
-      declared[0] === "auto" &&
-      pixels(declared[1]) === 0 &&
-      declared[2] === "none" &&
-      bodyConstraints[1].applied !== availableMinimum + "px"
-    ) {
-      bodyConstraints[1].applied = availableMinimum + "px";
-      body.style.setProperty(
-        "min-height",
-        bodyConstraints[1].applied,
-        "important"
-      );
-    }
-    const bodyRect = body.getBoundingClientRect();
-    let bottom =
-      bodyRect.top +
-      Math.max(bodyRect.height, body.scrollHeight + bodyBorders) +
-      pixels(bodyStyle.marginBottom);
-
-    // Child margins can collapse through the body. Use rendered margin
-    // boxes rather than root viewport heights, which prevent shrinking.
-    for (const child of Array.from(body.children)) {
-      const style = win.getComputedStyle(child);
-      if (
-        style.display === "none" ||
-        style.position === "fixed" ||
-        style.position === "absolute"
-      ) {
-        continue;
-      }
-      bottom = Math.max(
-        bottom,
-        child.getBoundingClientRect().bottom + pixels(style.marginBottom)
-      );
-    }
-
-    const height = Math.ceil(
-      bottom -
-        rootTop +
-        pixels(htmlStyle.paddingBottom) +
-        pixels(htmlStyle.borderBottomWidth)
-    );
-
-    const nextHeight = Math.max(minHeight, height) + "px";
-    if (height && iframe.height !== nextHeight) {
-      iframe.height = nextHeight;
-    }
+    this.contentSizer.bind(iframe);
   }
 
   // paginated functions
@@ -914,11 +539,7 @@ export default class ReflowableBookView implements BookView {
       this.iframe.height = this.height + "px";
     } else {
       this.bindContentResizeObserver(this.iframe);
-      if (this._contentResizeBody) {
-        await new Promise<void>((resolve) => {
-          this._contentResizeWaiters.add(resolve);
-        });
-      }
+      await this.contentSizer.whenSized();
     }
   }
 
