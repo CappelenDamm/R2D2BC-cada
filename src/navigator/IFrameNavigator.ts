@@ -255,6 +255,13 @@ export interface ReaderConfig {
   workerSrc?: string;
 }
 
+interface IFrameLoadState {
+  ready: Promise<boolean>;
+  positionToken: object;
+  status: "pending" | "loading" | "ready" | "failed";
+  finish: (ready: boolean) => void;
+}
+
 /** Class that shows webpub resources in an iframe, with navigation controls outside the iframe. */
 export class IFrameNavigator extends EventEmitter implements Navigator {
   iframes: Array<HTMLIFrameElement> = [];
@@ -331,8 +338,8 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
   private isBeingStyled: boolean;
   private isLoading: boolean;
   private stopped = false;
-  private navigationToken: object = {};
-  private iframeLoadTokens = new WeakMap<HTMLIFrameElement, object>();
+  private positionRequestToken: object = {};
+  private iframeLoads = new Map<HTMLIFrameElement, IFrameLoadState>();
   private resizeToken: object = {};
   private readonly initialLastReadingPosition?: ReadingPosition;
   private readonly initialScrollPosition?: ScrollLogicalPosition;
@@ -484,8 +491,10 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
 
   stop() {
     log.log("Iframe navigator stop");
+    this.savePosition.flush();
     this.stopped = true;
-    this.navigationToken = {};
+    this.invalidateIFrameLoads();
+    this.positionRequestToken = {};
     this.resizeToken = {};
     clearTimeout(this.timeout);
     this.view?.stop();
@@ -570,7 +579,8 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     footerMenu?: HTMLElement | null
   ): Promise<void> {
     this.stopped = false;
-    this.navigationToken = {};
+    this.invalidateIFrameLoads();
+    this.positionRequestToken = {};
     this.headerMenu = headerMenu;
     this.mainElement = mainElement;
     try {
@@ -1404,19 +1414,25 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
 
   private async handleIFrameLoad(iframe: HTMLIFrameElement): Promise<void> {
     if (this.stopped) return;
-    const token = this.navigationToken;
-    const loadToken = {};
-    this.iframeLoadTokens.set(iframe, loadToken);
+    const loads = this.iframeLoads;
+    const pendingLoad = this.iframeLoads.get(iframe);
+    const load =
+      pendingLoad?.status === "pending"
+        ? pendingLoad
+        : this.createIFrameLoad(iframe);
+    load.status = "loading";
+    const positionToken = load.positionToken;
     const isCurrentLoad = () =>
       !this.stopped &&
-      token === this.navigationToken &&
-      loadToken === this.iframeLoadTokens.get(iframe);
+      loads === this.iframeLoads &&
+      load === this.iframeLoads.get(iframe);
     if (this.errorMessage) this.errorMessage.style.display = "none";
     this.showLoadingMessageAfterDelay();
     try {
+      const initialPosition = this.newPosition;
       let bookViewPosition: number | undefined = 0;
-      if (this.newPosition) {
-        bookViewPosition = this.newPosition.locations.progression;
+      if (initialPosition) {
+        bookViewPosition = initialPosition.locations.progression;
       }
       await this.handleResize();
       if (!isCurrentLoad()) return;
@@ -1531,6 +1547,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
 
       if (this.view?.layout !== "fixed" && this.highlighter !== undefined) {
         await this.highlighter.initialize(iframe);
+        if (!isCurrentLoad()) return;
       }
 
       if (this.eventHandler) {
@@ -1545,14 +1562,17 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
       }
       if (this.rights.enableContentProtection && this.contentProtectionModule) {
         await this.contentProtectionModule.initialize(iframe);
+        if (!isCurrentLoad()) return;
       }
 
       if (this.rights.enableConsumption && this.consumptionModule) {
         await this.consumptionModule.initialize(iframe);
+        if (!isCurrentLoad()) return;
       }
 
       if (this.rights.enableAnnotations && this.annotationModule) {
         await this.annotationModule.initialize(iframe);
+        if (!isCurrentLoad()) return;
       }
 
       if (this.rights.enablePageBreaks && this.pageBreakModule) {
@@ -1561,20 +1581,24 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
 
       if (this.rights.enableBookmarks && this.bookmarkModule) {
         await this.bookmarkModule.initialize();
+        if (!isCurrentLoad()) return;
       }
 
       if (this.rights.enableLineFocus && this.lineFocusModule) {
         await this.lineFocusModule.initialize(iframe);
+        if (!isCurrentLoad()) return;
       }
 
       if (this.rights.enableTTS && this.ttsModule) {
         const body = iframe.contentDocument?.body;
         const ttsModule = this.ttsModule as TTSModule2;
         await ttsModule.initialize(body);
+        if (!isCurrentLoad()) return;
       }
 
       if (this.rights.enableTimeline && this.timelineModule) {
         await this.timelineModule.initialize();
+        if (!isCurrentLoad()) return;
       }
 
       if (
@@ -1583,40 +1607,54 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
         this.hasMediaOverlays
       ) {
         await this.mediaOverlayModule.initialize();
+        if (!isCurrentLoad()) return;
       }
 
       if (!isCurrentLoad()) return;
       await this.view?.setSize();
       if (!isCurrentLoad()) return;
-      if (this.newElementId) {
-        const element = (iframe.contentDocument as any).getElementById(
-          this.newElementId
-        );
-        this.view?.goToElement?.(
-          element,
-          undefined,
-          this.newElementScrollPosition
-        );
-        this.newElementId = undefined;
-        this.newElementScrollPosition = undefined;
-      } else if (
-        this.newPosition &&
-        (this.newPosition as Annotation).highlight
-      ) {
-        let startContainer = (this.newPosition as Annotation).highlight
-          ?.selectionInfo.rangeInfo.startContainerElementCssSelector;
-        if (startContainer) {
-          this.view?.goToCssSelector(startContainer);
-        }
-      } else if (bookViewPosition !== undefined && bookViewPosition >= 0) {
-        this.view?.goToProgression(bookViewPosition);
+      if (this.rights.enablePageBreaks && this.pageBreakModule) {
+        await this.pageBreakModule.handleResize();
+        if (!isCurrentLoad()) return;
       }
+      if (
+        positionToken === this.positionRequestToken &&
+        initialPosition === this.newPosition
+      ) {
+        if (this.view?.layout !== "fixed") {
+          this.view?.padOddColumns?.();
+        }
+        if (this.newElementId) {
+          const element = (iframe.contentDocument as any).getElementById(
+            this.newElementId
+          );
+          this.view?.goToElement?.(
+            element,
+            undefined,
+            this.newElementScrollPosition
+          );
+          this.newElementId = undefined;
+          this.newElementScrollPosition = undefined;
+        } else if (
+          this.newPosition &&
+          (this.newPosition as Annotation).highlight
+        ) {
+          let startContainer = (this.newPosition as Annotation).highlight
+            ?.selectionInfo.rangeInfo.startContainerElementCssSelector;
+          if (startContainer) {
+            this.view?.goToCssSelector(startContainer);
+          }
+        } else if (bookViewPosition !== undefined && bookViewPosition >= 0) {
+          this.view?.goToProgression(bookViewPosition);
+        }
 
-      this.newPosition = undefined;
+        this.newPosition = undefined;
+      }
 
       if (this.rights?.enableContentProtection) {
         if (this.contentProtectionModule !== undefined) {
           await this.contentProtectionModule.recalculate(10);
+          if (!isCurrentLoad()) return;
         }
       }
 
@@ -1627,8 +1665,10 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
       ) {
         let link = this.currentLink();
         await this.mediaOverlayModule?.initializeResource(link);
+        if (!isCurrentLoad()) return;
       }
       await this.updatePositionInfo();
+      if (!isCurrentLoad()) return;
 
       // The final size can change the iframe width in scroll mode, which
       // reflows ranges and must happen before their rectangles are drawn.
@@ -1639,6 +1679,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
       if (!isCurrentLoad()) return;
       this.hideLoadingMessage();
       this.showIframeContents(iframe);
+      load.finish(true);
       setTimeout(() => {
         if (!isCurrentLoad()) return;
         if (this.mediaOverlayModule) {
@@ -1648,10 +1689,58 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
 
       return new Promise<void>((resolve) => resolve());
     } catch (err: unknown) {
+      if (!isCurrentLoad()) {
+        log.debug("Superseded iframe load failed", err);
+        return;
+      }
       log.error(err);
       this.abortOnError(err);
       return Promise.reject(err);
+    } finally {
+      load.finish(false);
     }
+  }
+
+  private createIFrameLoad(iframe: HTMLIFrameElement): IFrameLoadState {
+    let resolveReady: (ready: boolean) => void = () => {};
+    const ready = new Promise<boolean>((resolve) => {
+      resolveReady = resolve;
+    });
+    const load: IFrameLoadState = {
+      ready,
+      positionToken: this.positionRequestToken,
+      status: "pending",
+      finish: (ready) => {
+        if (load.status === "ready" || load.status === "failed") return;
+        load.status = ready ? "ready" : "failed";
+        resolveReady(ready);
+      },
+    };
+    const previousLoad = this.iframeLoads.get(iframe);
+    this.iframeLoads.set(iframe, load);
+    previousLoad?.finish(false);
+    return load;
+  }
+
+  private invalidateIFrameLoads() {
+    for (const load of this.iframeLoads.values()) load.finish(false);
+    // Changing the registry cancels chapter work; keep failures for waiting callers.
+    this.iframeLoads = new Map(this.iframeLoads);
+  }
+
+  private async waitForIFrameLoads(): Promise<boolean> {
+    while (!this.stopped) {
+      const loads = this.iframes.map((iframe) => this.iframeLoads.get(iframe));
+      if (loads.some((load) => load?.status === "failed")) return false;
+      const ready = await Promise.all(loads.map((load) => load?.ready));
+      if (
+        loads.every(
+          (load, index) => load === this.iframeLoads.get(this.iframes[index])
+        )
+      )
+        return !this.stopped && ready.every((result) => result !== false);
+    }
+    return false;
   }
 
   private async injectInjectablesIntoIframeHead(
@@ -1663,12 +1752,20 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     const addLoadingInjectable = (
       injectable: HTMLLinkElement | HTMLScriptElement
     ) => {
-      const loadPromise = new Promise<boolean>((resolve) => {
+      const loadPromise = new Promise<boolean>((resolve, reject) => {
         injectable.onload = () => {
           resolve(true);
         };
-        injectable.onerror = () => {
-          resolve(false);
+        injectable.onerror = (event) => {
+          reject(
+            new Error(
+              typeof event === "string"
+                ? event
+                : `Injectable failed to load at: ${
+                    "href" in injectable ? injectable.href : injectable.src
+                  }`
+            )
+          );
         };
       });
       injectablesToLoad.push(loadPromise);
@@ -1739,6 +1836,8 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
    * Displays standard error UI.
    */
   private abortOnError(e: unknown) {
+    this.invalidateIFrameLoads();
+    this.positionRequestToken = {};
     // if there is an onError event passed in, depend on that
     // to catch it.
     if (this.api?.onError) {
@@ -1754,7 +1853,11 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
       // otherwise just display the standard error UI
       if (this.errorMessage) this.errorMessage.style.display = "block";
       if (this.isLoading) {
-        this.hideLoadingMessage();
+        this.isLoading = false;
+        if (this.loadingMessage) {
+          this.loadingMessage.style.display = "none";
+          this.loadingMessage.classList.remove("is-loading");
+        }
       }
     }
   }
@@ -1764,6 +1867,26 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
   }
 
   private precessContentForIframe() {
+    if (this.stopped) return;
+    this.invalidateIFrameLoads();
+    this.iframeLoads.clear();
+    const loads = this.iframeLoads;
+    const currentHref = this.currentChapterLink.href;
+    const frames =
+      this.publication.isFixedLayout && this.settings.columnCount !== 1
+        ? this.iframes
+        : this.iframes.slice(0, 1);
+    frames.forEach((iframe) => this.createIFrameLoad(iframe));
+    const isCurrentNavigation = () =>
+      !this.stopped && loads === this.iframeLoads;
+    const onContentError = (err: unknown) => {
+      if (!isCurrentNavigation()) {
+        log.debug("Superseded document request failed", err);
+        return;
+      }
+      log.error(err);
+      this.abortOnError(err);
+    };
     const self = this;
     var index = this.publication.getSpineIndex(this.currentChapterLink.href);
     var even: boolean = (index ?? 0) % 2 === 1;
@@ -1772,6 +1895,8 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     this.currentSpreadLinks = {};
 
     function writeIframeDoc(content: string, href: string) {
+      if (!isCurrentNavigation()) return;
+      href = self.currentSpreadLinks.left?.href ?? href;
       const parser = new DOMParser();
       const doc = parser.parseFromString(content, "application/xhtml+xml");
       if (doc.head) {
@@ -1794,6 +1919,8 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     }
 
     function writeIframe2Doc(content: string, href: string) {
+      if (!isCurrentNavigation()) return;
+      href = self.currentSpreadLinks.right?.href ?? href;
       const parser = new DOMParser();
       const doc = parser.parseFromString(content, "application/xhtml+xml");
       if (doc.head) {
@@ -1831,11 +1958,12 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
             this.api
               ?.getContent(this.currentChapterLink.href)
               .then((content) => {
+                if (!isCurrentNavigation()) return;
                 if (content === undefined) {
                   if (isSameOrigin) {
-                    this.iframes[0].src = this.currentChapterLink.href;
+                    this.iframes[0].src = currentHref;
                   } else {
-                    fetch(this.currentChapterLink.href, this.requestConfig)
+                    fetch(currentHref, this.requestConfig)
                       .then((r) => r.text())
                       .then(async (content) => {
                         writeIframeDoc.call(
@@ -1843,7 +1971,8 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                           content,
                           this.currentChapterLink.href
                         );
-                      });
+                      })
+                      .catch(onContentError);
                   }
                 } else {
                   writeIframeDoc.call(
@@ -1852,7 +1981,8 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                     this.currentChapterLink.href
                   );
                 }
-              });
+              })
+              .catch(onContentError);
             if (this.iframes.length === 2) {
               if ((index ?? 0) < this.publication.readingOrder.length - 1) {
                 const next = this.publication.getNextSpineItem(
@@ -1863,24 +1993,30 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                   this.currentSpreadLinks.right = {
                     href: href,
                   };
-                  this.api?.getContent(href).then((content) => {
-                    if (content === undefined) {
-                      if (isSameOrigin) {
-                        this.iframes[1].src = href;
+                  this.api
+                    ?.getContent(href)
+                    .then((content) => {
+                      if (!isCurrentNavigation()) return;
+                      if (content === undefined) {
+                        if (isSameOrigin) {
+                          this.iframes[1].src = href;
+                        } else {
+                          fetch(href, this.requestConfig)
+                            .then((r) => r.text())
+                            .then(async (content) => {
+                              if (!isCurrentNavigation()) return;
+                              writeIframe2Doc.call(this, content, href);
+                              this.currentSpreadLinks.right = {
+                                href: href,
+                              };
+                            })
+                            .catch(onContentError);
+                        }
                       } else {
-                        fetch(href, this.requestConfig)
-                          .then((r) => r.text())
-                          .then(async (content) => {
-                            writeIframe2Doc.call(this, content, href);
-                            this.currentSpreadLinks.right = {
-                              href: href,
-                            };
-                          });
+                        writeIframe2Doc.call(this, content, href);
                       }
-                    } else {
-                      writeIframe2Doc.call(this, content, href);
-                    }
-                  });
+                    })
+                    .catch(onContentError);
                 }
               } else {
                 this.iframes[1].src = "about:blank";
@@ -1897,21 +2033,26 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                 this.currentSpreadLinks.left = {
                   href: href,
                 };
-                this.api?.getContent(href).then((content) => {
-                  if (content === undefined) {
-                    if (isSameOrigin) {
-                      this.iframes[0].src = href;
+                this.api
+                  ?.getContent(href)
+                  .then((content) => {
+                    if (!isCurrentNavigation()) return;
+                    if (content === undefined) {
+                      if (isSameOrigin) {
+                        this.iframes[0].src = href;
+                      } else {
+                        fetch(href, this.requestConfig)
+                          .then((r) => r.text())
+                          .then(async (content) => {
+                            writeIframeDoc.call(this, content, href);
+                          })
+                          .catch(onContentError);
+                      }
                     } else {
-                      fetch(href, this.requestConfig)
-                        .then((r) => r.text())
-                        .then(async (content) => {
-                          writeIframeDoc.call(this, content, href);
-                        });
+                      writeIframeDoc.call(this, content, href);
                     }
-                  } else {
-                    writeIframeDoc.call(this, content, href);
-                  }
-                });
+                  })
+                  .catch(onContentError);
               }
             } else {
               this.iframes[0].src = "about:blank";
@@ -1925,11 +2066,12 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
               this.api
                 .getContent(this.currentChapterLink.href)
                 .then((content) => {
+                  if (!isCurrentNavigation()) return;
                   if (content === undefined) {
                     if (isSameOrigin) {
-                      this.iframes[1].src = this.currentChapterLink.href;
+                      this.iframes[1].src = currentHref;
                     } else {
-                      fetch(this.currentChapterLink.href, this.requestConfig)
+                      fetch(currentHref, this.requestConfig)
                         .then((r) => r.text())
                         .then(async (content) => {
                           writeIframe2Doc.call(
@@ -1937,7 +2079,8 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                             content,
                             this.currentChapterLink.href
                           );
-                        });
+                        })
+                        .catch(onContentError);
                     }
                   } else {
                     writeIframe2Doc.call(
@@ -1946,19 +2089,57 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                       this.currentChapterLink.href
                     );
                   }
-                });
+                })
+                .catch(onContentError);
             }
           }
         } else {
           this.currentSpreadLinks.left = {
             href: this.currentChapterLink.href,
           };
-          this.api?.getContent(this.currentChapterLink.href).then((content) => {
+          this.api
+            ?.getContent(this.currentChapterLink.href)
+            .then((content) => {
+              if (!isCurrentNavigation()) return;
+              if (content === undefined) {
+                if (isSameOrigin) {
+                  this.iframes[0].src = currentHref;
+                } else {
+                  fetch(currentHref, this.requestConfig)
+                    .then((r) => r.text())
+                    .then(async (content) => {
+                      writeIframeDoc.call(
+                        this,
+                        content,
+                        this.currentChapterLink.href
+                      );
+                    })
+                    .catch(onContentError);
+                }
+              } else {
+                writeIframeDoc.call(
+                  this,
+                  content,
+                  this.currentChapterLink.href
+                );
+              }
+            })
+            .catch(onContentError);
+        }
+      } else {
+        this.api
+          ?.getContent(this.currentChapterLink.href)
+          .then((content) => {
+            if (!isCurrentNavigation()) return;
+            this.currentSpreadLinks.left = {
+              href: currentHref,
+            };
+
             if (content === undefined) {
               if (isSameOrigin) {
-                this.iframes[0].src = this.currentChapterLink.href;
+                this.iframes[0].src = currentHref;
               } else {
-                fetch(this.currentChapterLink.href, this.requestConfig)
+                fetch(currentHref, this.requestConfig)
                   .then((r) => r.text())
                   .then(async (content) => {
                     writeIframeDoc.call(
@@ -1966,37 +2147,14 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                       content,
                       this.currentChapterLink.href
                     );
-                  });
+                  })
+                  .catch(onContentError);
               }
             } else {
               writeIframeDoc.call(this, content, this.currentChapterLink.href);
             }
-          });
-        }
-      } else {
-        this.api?.getContent(this.currentChapterLink.href).then((content) => {
-          this.currentSpreadLinks.left = {
-            href: this.currentChapterLink.href,
-          };
-
-          if (content === undefined) {
-            if (isSameOrigin) {
-              this.iframes[0].src = this.currentChapterLink.href;
-            } else {
-              fetch(this.currentChapterLink.href, this.requestConfig)
-                .then((r) => r.text())
-                .then(async (content) => {
-                  writeIframeDoc.call(
-                    this,
-                    content,
-                    this.currentChapterLink.href
-                  );
-                });
-            }
-          } else {
-            writeIframeDoc.call(this, content, this.currentChapterLink.href);
-          }
-        });
+          })
+          .catch(onContentError);
       }
     } else {
       if (this.publication.isFixedLayout) {
@@ -2034,7 +2192,8 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                     content,
                     this.currentChapterLink.href
                   );
-                });
+                })
+                .catch(onContentError);
               this.currentSpreadLinks.left = {
                 href: this.currentChapterLink.href,
               };
@@ -2053,7 +2212,8 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                       .then((r) => r.text())
                       .then(async (content) => {
                         writeIframe2Doc.call(this, content, href);
-                      });
+                      })
+                      .catch(onContentError);
                   }
                 } else {
                   this.iframes[1].src = "about:blank";
@@ -2084,7 +2244,8 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                     .then((r) => r.text())
                     .then(async (content) => {
                       writeIframeDoc.call(this, content, href);
-                    });
+                    })
+                    .catch(onContentError);
                   if (this.iframes.length === 2) {
                     this.currentSpreadLinks.right = {
                       href: this.currentChapterLink.href,
@@ -2097,7 +2258,8 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                           content,
                           this.currentChapterLink.href
                         );
-                      });
+                      })
+                      .catch(onContentError);
                   }
                 }
               }
@@ -2120,7 +2282,8 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                         content,
                         this.currentChapterLink.href
                       );
-                    });
+                    })
+                    .catch(onContentError);
                 }
               }
             }
@@ -2140,7 +2303,8 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                   content,
                   this.currentChapterLink.href
                 );
-              });
+              })
+              .catch(onContentError);
           }
         }
       } else {
@@ -2154,12 +2318,14 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
             .then((r) => r.text())
             .then(async (content) => {
               writeIframeDoc.call(this, content, this.currentChapterLink.href);
-            });
+            })
+            .catch(onContentError);
         }
       }
     }
     if (this.publication.isFixedLayout) {
       setTimeout(() => {
+        if (!isCurrentNavigation()) return;
         let height, width;
         let doc;
         if (index === 0 && this.iframes?.length === 2) {
@@ -2680,10 +2846,15 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
   }
 
   async handleResize(): Promise<void> {
-    if (this.stopped || this.isScrolling) {
+    if (this.stopped) {
       return;
     }
-    const navigationToken = this.navigationToken;
+    if (this.isScrolling) {
+      this.onResize();
+      return;
+    }
+    const loads = this.iframeLoads;
+    const positionToken = this.positionRequestToken;
     const resizeToken = (this.resizeToken = {});
 
     if (this.publication.isFixedLayout) {
@@ -2798,7 +2969,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     await this.settings.applyProperties();
     if (
       this.stopped ||
-      navigationToken !== this.navigationToken ||
+      loads !== this.iframeLoads ||
       resizeToken !== this.resizeToken
     )
       return;
@@ -2830,13 +3001,17 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     await this.view?.setSize();
     if (
       this.stopped ||
-      navigationToken !== this.navigationToken ||
+      loads !== this.iframeLoads ||
       resizeToken !== this.resizeToken
     )
       return;
     // Skip restoring the pre-resize scroll fraction when a navigation is in flight,
     // otherwise it reapplies the previous chapter's stale scroll position.
-    if (oldPosition && !this.newPosition) {
+    if (
+      positionToken === this.positionRequestToken &&
+      oldPosition !== undefined &&
+      !this.newPosition
+    ) {
       this.view?.goToProgression(oldPosition);
     }
     this.updatePositionInfo(false);
@@ -3021,7 +3196,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     options?: { scrollPosition?: ScrollLogicalPosition }
   ): Promise<void> {
     if (this.stopped) return;
-    const token = (this.navigationToken = {});
+    const positionToken = (this.positionRequestToken = {});
     if (this.rights.enableConsumption && this.consumptionModule) {
       if (history) {
         this.consumptionModule.startReadingSession(locator);
@@ -3030,7 +3205,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     if (this.historyModule) {
       await this.historyModule.push(locator, history);
     }
-    if (this.stopped || token !== this.navigationToken) return;
+    if (this.stopped || positionToken !== this.positionRequestToken) return;
 
     const exists = this.publication.getTOCItem(locator.href);
     if (exists) {
@@ -3057,9 +3232,12 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
         this.currentSpreadLinks.right !== undefined
       ) {
         if (
-          locator.href === this.currentSpreadLinks.left.href ||
-          locator.href === this.currentSpreadLinks.right.href
+          this.currentChapterLink.href === this.currentSpreadLinks.left.href ||
+          this.currentChapterLink.href === this.currentSpreadLinks.right.href
         ) {
+          this.newPosition = undefined;
+          this.newElementId = undefined;
+          this.newElementScrollPosition = undefined;
           return;
         }
       }
@@ -3077,13 +3255,19 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
         this.currentTOCRawLink = locator.href;
         if (locator.locations.fragment === undefined) {
           this.currentTocUrl = undefined;
+          this.newElementId = undefined;
         } else {
           this.newElementId = locator.locations.fragment;
           this.currentTocUrl =
             this.currentChapterLink.href + "#" + this.newElementId;
         }
+        if (!(await this.waitForIFrameLoads())) return;
+        if (this.stopped || positionToken !== this.positionRequestToken) return;
         await this.view?.setSize();
-        if (this.stopped || token !== this.navigationToken) return;
+        if (this.stopped || positionToken !== this.positionRequestToken) return;
+        if (this.view?.layout !== "fixed") {
+          this.view?.padOddColumns?.();
+        }
         if (this.newElementId) {
           for (const iframe of this.iframes) {
             const element = (iframe.contentDocument as any).getElementById(
@@ -3107,6 +3291,8 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
             this.view?.goToProgression(locator.locations.progression ?? 0);
           }
         }
+        this.newPosition = undefined;
+        this.newElementScrollPosition = undefined;
 
         let currentLocation = this.currentChapterLink.href;
 
@@ -3214,6 +3400,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
         }
         if (locator.locations.fragment === undefined) {
           this.currentTocUrl = undefined;
+          this.newElementId = undefined;
         } else {
           this.newElementId = locator.locations.fragment;
           this.currentTocUrl =
@@ -3355,9 +3542,16 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
 
   private showIframeContents(iframe: HTMLIFrameElement) {
     this.isBeingStyled = false;
+    const loads = this.iframeLoads;
+    const load = this.iframeLoads.get(iframe);
     // We set a timeOut so that settings can be applied when opacity is still 0
     setTimeout(() => {
-      if (!this.isBeingStyled) {
+      if (
+        !this.stopped &&
+        loads === this.iframeLoads &&
+        load === this.iframeLoads.get(iframe) &&
+        !this.isBeingStyled
+      ) {
         iframe.style.opacity = "1";
         iframe.style.border = "none";
         iframe.style.overflow = "hidden";
@@ -3386,7 +3580,17 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
   }
 
   private hideLoadingMessage() {
+    const loads = this.iframeLoads;
+    const frames = this.iframes.map((iframe) => loads.get(iframe));
     setTimeout(() => {
+      if (this.stopped || loads !== this.iframeLoads) return;
+      if (
+        this.iframes.some((iframe, index) => {
+          const load = loads.get(iframe);
+          return load !== frames[index] || (load && load.status !== "ready");
+        })
+      )
+        return;
       this.isLoading = false;
       if (this.loadingMessage) {
         this.loadingMessage.style.display = "none";
@@ -3411,6 +3615,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
   }
 
   private saveCurrentReadingPosition() {
+    if (this.stopped || this.newPosition) return;
     if (this.annotator) {
       var tocItem = this.publication.getTOCItem(this.currentChapterLink.href);
       if (this.currentTocUrl !== undefined) {
