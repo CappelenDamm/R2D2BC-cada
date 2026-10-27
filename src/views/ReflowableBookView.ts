@@ -26,7 +26,7 @@ import {
   IFrameAttributes,
   IFrameNavigator,
 } from "../navigator/IFrameNavigator";
-import debounce from "debounce";
+import ScrollContentSizer from "./ScrollContentSizer";
 
 export default class ReflowableBookView implements BookView {
   layout = "reflowable";
@@ -34,6 +34,10 @@ export default class ReflowableBookView implements BookView {
   private readonly USERSETTINGS = "userSetting";
   private readonly store: Store;
   private scrollMode: boolean;
+  private stopped = false;
+  private readonly contentSizer = new ScrollContentSizer(
+    () => BrowserUtilities.getHeight() - this.attributes.margin
+  );
   navigator: IFrameNavigator;
   constructor(store: Store) {
     this.store = store;
@@ -47,7 +51,8 @@ export default class ReflowableBookView implements BookView {
     }
   }
 
-  setMode(scroll: boolean) {
+  async setMode(scroll: boolean): Promise<void> {
+    if (this.stopped) return;
     this.scrollMode = scroll;
     if (scroll) {
       this.name = "readium-scroll-on";
@@ -78,10 +83,9 @@ export default class ReflowableBookView implements BookView {
         const spacer = doc.getElementById("r2d2bc-column-spacer");
         if (spacer) spacer.remove();
       }
-      this.setSize();
-      this.setIframeHeight(this.iframe);
+      await this.setSize();
     } else {
-      this.unbindContentResizeObserver();
+      this.contentSizer.unbind();
       this.height = BrowserUtilities.getHeight() - 40 - this.attributes.margin;
       this.name = "readium-scroll-off";
       this.label = "Paginated";
@@ -100,9 +104,10 @@ export default class ReflowableBookView implements BookView {
           html.style.setProperty("--USER__scroll", "readium-scroll-off");
         }
       }
-      this.setSize();
+      await this.setSize();
       this.padOddColumns();
     }
+    if (this.stopped) return;
     if (this.navigator.rights.enableContentProtection) {
       this.navigator.contentProtectionModule?.recalculate();
     }
@@ -116,6 +121,7 @@ export default class ReflowableBookView implements BookView {
   attributes: IFrameAttributes = { margin: 0 };
 
   start(): void {
+    this.stopped = false;
     if (this.scrollMode) {
       let doc = this.iframe.contentDocument;
       if (doc) {
@@ -135,7 +141,6 @@ export default class ReflowableBookView implements BookView {
         }
       }
       this.setSize();
-      this.setIframeHeight(this.iframe);
     } else {
       this.iframe.height = "0";
       this.iframe.width = "0";
@@ -153,7 +158,8 @@ export default class ReflowableBookView implements BookView {
   }
 
   stop(): void {
-    this.unbindContentResizeObserver();
+    this.stopped = true;
+    this.contentSizer.unbind();
 
     this.iframe.height = "0";
     this.iframe.width = "0";
@@ -188,6 +194,7 @@ export default class ReflowableBookView implements BookView {
   }
 
   goToProgression(position: number): void {
+    if (this.stopped) return;
     const wrapper = HTMLUtilities.findRequiredElement(
       document,
       "#iframe-wrapper"
@@ -269,7 +276,7 @@ export default class ReflowableBookView implements BookView {
     relative?: boolean,
     scrollPosition?: ScrollLogicalPosition
   ): void {
-    if (!element) return;
+    if (this.stopped || !element) return;
 
     if (this.scrollMode) {
       this.focusElement(element, scrollPosition);
@@ -500,152 +507,9 @@ export default class ReflowableBookView implements BookView {
     return wrapper.clientHeight;
   }
 
-  setIframeHeight(iframe: any) {
-    if (!this.isScrollMode()) return;
-    let d = debounce((iframe: any) => {
-      if (
-        iframe &&
-        this.isScrollMode() &&
-        this._contentResizeBody === iframe.contentDocument?.body
-      ) {
-        let body = iframe.contentWindow.document.body,
-          html = iframe.contentWindow.document.documentElement;
-
-        let height = Math.max(
-          body?.scrollHeight,
-          body?.offsetHeight,
-          html?.clientHeight,
-          html?.scrollHeight,
-          html?.offsetHeight
-        );
-        if (height) {
-          const minHeight =
-            BrowserUtilities.getHeight() - this.attributes.margin;
-          iframe.height = Math.max(minHeight, height) + "px";
-        }
-      }
-    }, 200);
-    d(iframe);
-    this.bindContentResizeObserver(iframe);
-  }
-
-  private _contentResizeObserver: ResizeObserver | undefined;
-  private _contentResizeBody: HTMLElement | undefined;
-  private _contentHeightStyles: {
-    style: CSSStyleDeclaration;
-    property: string;
-    value: string;
-    priority: string;
-  }[] = [];
-
-  private unbindContentResizeObserver() {
-    this._contentResizeObserver?.disconnect();
-    this._contentResizeObserver = undefined;
-    this._contentResizeBody = undefined;
-    for (const { style, property, value, priority } of this._contentHeightStyles) {
-      if (value) {
-        style.setProperty(property, value, priority);
-      } else {
-        style.removeProperty(property);
-      }
-    }
-    this._contentHeightStyles = [];
-  }
-
-  /** Binds a ResizeObserver to the iframe's body to adjust its height dynamically.
-   * This is needed to accommodate content that changes size after initial load,
-   * such as the <details> element expanding/collapsing.
-   */
-  private bindContentResizeObserver(iframe: HTMLIFrameElement | undefined) {
-    const doc = iframe?.contentDocument;
-    const body = doc?.body;
-    const win = iframe?.contentWindow;
-    if (!doc || !body || !iframe || !win) return;
-
-    // Do not re-bind if the same body is already being observed.
-    if (this._contentResizeBody === body) {
-      return;
-    }
-
-    this.unbindContentResizeObserver();
-
-    // Root viewport heights feed iframe growth back into its own measurement.
-    // Scroll mode owns these constraints; restore publication values on unbind.
-    for (const element of [doc.documentElement, body]) {
-      for (const [property, value] of [
-        ["height", "auto"],
-        ["min-height", "0"],
-        ["max-height", "none"],
-      ]) {
-        const style = element.style;
-        this._contentHeightStyles.push({
-          style,
-          property,
-          value: style.getPropertyValue(property),
-          priority: style.getPropertyPriority(property),
-        });
-        style.setProperty(property, value, "important");
-      }
-    }
-
-    let _resizeObserver: ResizeObserver | undefined;
-    const debouncedResize = debounce(() => {
-      // Ignore any pending debounced callbacks after the observer has been unbound/replaced.
-      if (this._contentResizeObserver !== _resizeObserver) return;
-      // Defer the DOM write to the next frame so mutating iframe.height here
-      // doesn't re-trigger this same observation cycle (avoids the browser's
-      // "ResizeObserver loop completed with undelivered notifications" warning).
-      requestAnimationFrame(() => {
-        if (this._contentResizeObserver !== _resizeObserver) return;
-        const bodyStyle = win.getComputedStyle(body);
-        const htmlStyle = win.getComputedStyle(doc.documentElement);
-        const pixels = (value: string) => parseFloat(value) || 0;
-        const bodyBorders =
-          pixels(bodyStyle.borderTopWidth) +
-          pixels(bodyStyle.borderBottomWidth);
-
-        const bodyRect = body.getBoundingClientRect();
-        const rootTop = doc.documentElement.getBoundingClientRect().top;
-        let bottom =
-          bodyRect.top +
-          Math.max(bodyRect.height, body.scrollHeight + bodyBorders) +
-          pixels(bodyStyle.marginBottom);
-
-        // Child margins can collapse through the body. Use rendered margin
-        // boxes rather than root viewport heights, which prevent shrinking.
-        for (const child of Array.from(body.children)) {
-          const style = win.getComputedStyle(child);
-          if (
-            style.display === "none" ||
-            style.position === "fixed" ||
-            style.position === "absolute"
-          ) {
-            continue;
-          }
-          bottom = Math.max(
-            bottom,
-            child.getBoundingClientRect().bottom + pixels(style.marginBottom)
-          );
-        }
-
-        const height = Math.ceil(
-          bottom -
-            rootTop +
-            pixels(htmlStyle.paddingBottom) +
-            pixels(htmlStyle.borderBottomWidth)
-        );
-
-        if (height) {
-          const minHeight =
-            BrowserUtilities.getHeight() - this.attributes.margin;
-          iframe.height = Math.max(minHeight, height) + "px";
-        }
-      });
-    }, 20);
-    _resizeObserver = new ResizeObserver(debouncedResize);
-    this._contentResizeObserver = _resizeObserver;
-    _resizeObserver.observe(body, { box: "border-box" });
-    this._contentResizeBody = body;
+  bindContentResizeObserver(iframe: HTMLIFrameElement | undefined) {
+    if (this.stopped || !this.isScrollMode()) return;
+    this.contentSizer.bind(iframe);
   }
 
   // paginated functions
@@ -664,7 +528,8 @@ export default class ReflowableBookView implements BookView {
     }
   }
 
-  setSize(): void {
+  async setSize(): Promise<void> {
+    if (this.stopped) return;
     this.iframe.width = BrowserUtilities.getWidth() + "px";
     if (!this.scrollMode) {
       let doc = this.iframe.contentDocument;
@@ -673,8 +538,8 @@ export default class ReflowableBookView implements BookView {
       }
       this.iframe.height = this.height + "px";
     } else {
-      let html = this.iframe.contentWindow?.document?.documentElement;
-      this.iframe.height = html?.offsetHeight + "px";
+      this.bindContentResizeObserver(this.iframe);
+      await this.contentSizer.whenSized();
     }
   }
 

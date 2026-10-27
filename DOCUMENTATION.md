@@ -1462,9 +1462,13 @@ D2Reader.load({
 ### Scrolled content is clipped
 
 - Constrain `#iframe-wrapper` to the available reader height and let the reader size the iframe to its content; do not apply a fixed CSS height or max-height to the iframe.
-- The content resize observer measures rendered body and child margin boxes, including child margins that collapse through the body, after styles load. It avoids root viewport heights so the iframe can also shrink when content collapses.
-- In scroll mode, the reader overrides `height`, `min-height`, and `max-height` on the chapter's `html` and `body` elements with intrinsic sizing (`auto`, `0`, and `none`, using inline `!important`). This prevents publication rules such as `min-height: 100vh` plus body margins from feeding the iframe height back into itself. Original inline values and priorities are restored when leaving scroll mode, stopping the view, or binding a new chapter body.
-- Chapters written from cross-origin fetches or `api.getContent` are given an HTML5 doctype to preserve standards mode, including both fixed-layout spread frames. Without it, `document.write` would parse the serialized XHTML in quirks mode, where `body.scrollHeight` can include the iframe viewport and prevent shrinking.
+- The iframe resizes as content expands, collapses, or loads. Body height constraints resolve against the reader viewport and original styles are restored when leaving scroll mode.
+- Fork-specific measurement and resize lifecycle live in the internal [ScrollContentSizer](src/views/ScrollContentSizer.ts) helper; `ReflowableBookView` retains navigation and mode switching.
+- Body height constraints are measured synchronously in the publication iframe at the reader viewport height, then temporary styles and the scroll position are restored. No additional measurement iframe is created; resolved constraints are cached between content changes.
+- Await `setSize()` before restoring a reading position in scroll mode.
+- Pagebreak overlays are redrawn after final chapter sizing, before restoring the destination and publishing resource readiness. Consumers should scope publication iframe queries to `#iframe-wrapper` to exclude unrelated frames.
+- Navigation and resize restoration ignore superseded requests; shutdown flushes a pending valid reading-position save before clearing the view. Injectable load failures use the reader's error handling rather than restoring against missing styles.
+- Chapters loaded through fetch or `api.getContent` use an HTML5 doctype to ensure standards-mode sizing.
 
 ### Content styles look wrong
 
@@ -1475,6 +1479,8 @@ D2Reader.load({
 
 - Pass `lastReadingPosition` in the config, not after loading.
 - The `ReadingPosition` must include a valid `href` that matches a spine item in the publication.
+- Position requests during loading wait for document initialization and sizing; a newer request supersedes the older target without cancelling sibling spread pages.
+- The per-frame load registry identifies the current chapter load, and each frame has one pending/loading/ready/failed status. Destination requests and viewport resizes retain separate cancellation identities so neither cancels sibling spread initialization.
 
 ### TTS not working
 
