@@ -43,6 +43,7 @@ export default class ScrollContentSizer {
   private _contentResizeBody: HTMLElement | undefined;
   private _contentResizeHandler: (() => void) | undefined;
   private _contentHeightRefreshHandler: (() => void) | undefined;
+  private _contentToggleHandler: (() => void) | undefined;
   private _contentHeightStyles: SavedHeightStyle[] = [];
   private _contentResizeWaiters = new Set<() => void>();
 
@@ -71,10 +72,10 @@ export default class ScrollContentSizer {
         { capture: true }
       );
     }
-    if (this._contentResizeHandler) {
+    if (this._contentToggleHandler) {
       this._contentResizeBody?.removeEventListener(
         "toggle",
-        this._contentResizeHandler,
+        this._contentToggleHandler,
         { capture: true }
       );
     }
@@ -82,6 +83,7 @@ export default class ScrollContentSizer {
     this._contentMutationObserver = undefined;
     this._contentResizeBody = undefined;
     this._contentResizeHandler = undefined;
+    this._contentToggleHandler = undefined;
     this._contentHeightRefreshHandler = undefined;
     for (const savedStyle of this._contentHeightStyles) {
       this.restoreHeightStyle(savedStyle);
@@ -167,8 +169,15 @@ export default class ScrollContentSizer {
     doc.addEventListener("load", this._contentHeightRefreshHandler, {
       capture: true,
     });
-    body.addEventListener("toggle", debouncedResize, { capture: true });
-    this._contentMutationObserver = new MutationObserver(debouncedResize);
+    // Content changes can flip selectors like body:has(details[open]); the
+    // observers skip the helper's own style writes, so these are publication changes.
+    const refreshConstraints = () => {
+      declared = undefined;
+      debouncedResize();
+    };
+    body.addEventListener("toggle", refreshConstraints, { capture: true });
+    this._contentToggleHandler = refreshConstraints;
+    this._contentMutationObserver = new MutationObserver(refreshConstraints);
     this._contentMutationObserver.observe(body, {
       childList: true,
       characterData: true,
@@ -267,7 +276,11 @@ export default class ScrollContentSizer {
         win.getComputedStyle(doc.body).getPropertyValue(property)
       );
       if (declared.some((value) => value.includes("%"))) {
-        const measurement = doc.createElement("div");
+        // createElement yields a style-less null-namespace element in XHTML documents.
+        const measurement = doc.createElementNS(
+          "http://www.w3.org/1999/xhtml",
+          "div"
+        ) as HTMLElement;
         measurement.style.cssText =
           "all:initial!important;display:block!important;position:fixed!important;box-sizing:content-box!important;min-height:0!important;max-height:none!important;padding:0!important;border:0!important;";
         doc.documentElement.appendChild(measurement);

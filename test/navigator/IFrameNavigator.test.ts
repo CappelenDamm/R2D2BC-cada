@@ -526,6 +526,26 @@ describe("iframe navigation", () => {
     expect(view.goToProgression).toHaveBeenCalledExactlyOnceWith(0.75);
   });
 
+  it("ignores a previous document's load event until the requested document is delivered", async () => {
+    let finishDocument: (content: string) => void = () => {};
+    const { navigator, iframes } = setup({
+      getContent: () =>
+        new Promise<string>((resolve) => {
+          finishDocument = resolve;
+        }),
+    });
+    await load(navigator);
+    const pending = navigator["iframeLoads"].get(iframes[0] as never);
+
+    await navigator["handleIFrameLoad"](iframes[0] as never);
+    expect(pending?.status).toBe("pending");
+    expect(navigator["iframeLoads"].get(iframes[0] as never)).toBe(pending);
+
+    finishDocument(chapterHTML);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(pending?.documentAssigned).toBe(true);
+  });
+
   it("releases a waiting position request on shutdown without initializing more modules", async () => {
     const { navigator, view, finishSize } = setupRestoration();
     vi.spyOn(navigator, "handleResize").mockResolvedValue();

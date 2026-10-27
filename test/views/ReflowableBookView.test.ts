@@ -124,7 +124,16 @@ describe("scrolling content resize", () => {
     const doc = Object.assign(new EventTarget(), {
       body,
       documentElement: html,
-      createElement: () => measurement,
+      createElement: () => {
+        throw new Error("createElement lacks style in XHTML documents");
+      },
+      createElementNS: (namespace: string, tag: string) => {
+        expect([namespace, tag]).toEqual([
+          "http://www.w3.org/1999/xhtml",
+          "div",
+        ]);
+        return measurement;
+      },
       querySelector: (selector: string) =>
         selector === "html" ? html : selector === "body" ? body : null,
     });
@@ -208,6 +217,25 @@ describe("scrolling content resize", () => {
       }
     }
   );
+
+  it("re-resolves body constraints after toggles and mutations but not plain resizes", () => {
+    const { body, bodyStyle } = setup({ "min-height": "100vh" });
+    const measured = vi.spyOn(bodyStyle, "setProperty");
+    const measurements = () =>
+      measured.mock.calls.filter(([key]) => key === "display").length;
+
+    notifyResize();
+    vi.runAllTimers();
+    expect(measurements()).toBe(0);
+
+    body.dispatchEvent(new Event("toggle"));
+    vi.runAllTimers();
+    expect(measurements()).toBe(1);
+
+    notifyContentChange();
+    vi.runAllTimers();
+    expect(measurements()).toBe(2);
+  });
 
   it("fits fixed-height chapters after images load and content is appended", () => {
     const { iframe } = setup({ height: "400px" });

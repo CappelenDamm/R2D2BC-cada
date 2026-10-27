@@ -259,6 +259,8 @@ interface IFrameLoadState {
   ready: Promise<boolean>;
   positionToken: object;
   status: "pending" | "loading" | "ready" | "failed";
+  /** False until this load's document is written or its src is assigned. */
+  documentAssigned: boolean;
   finish: (ready: boolean) => void;
 }
 
@@ -1416,6 +1418,10 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     if (this.stopped) return;
     const loads = this.iframeLoads;
     const pendingLoad = this.iframeLoads.get(iframe);
+    // A load event from the previous document must not consume the new request.
+    if (pendingLoad?.status === "pending" && !pendingLoad.documentAssigned) {
+      return;
+    }
     const load =
       pendingLoad?.status === "pending"
         ? pendingLoad
@@ -1710,6 +1716,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
       ready,
       positionToken: this.positionRequestToken,
       status: "pending",
+      documentAssigned: false,
       finish: (ready) => {
         if (load.status === "ready" || load.status === "failed") return;
         load.status = ready ? "ready" : "failed";
@@ -1720,6 +1727,16 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
     this.iframeLoads.set(iframe, load);
     previousLoad?.finish(false);
     return load;
+  }
+
+  private markDocumentAssigned(iframe: HTMLIFrameElement) {
+    const load = this.iframeLoads.get(iframe);
+    if (load) load.documentAssigned = true;
+  }
+
+  private setIFrameSrc(iframe: HTMLIFrameElement, src: string) {
+    this.markDocumentAssigned(iframe);
+    iframe.src = src;
   }
 
   private invalidateIFrameLoads() {
@@ -1912,6 +1929,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
       const newHTML = "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
       const iframeDoc = self.iframes[0].contentDocument;
       if (iframeDoc) {
+        self.markDocumentAssigned(self.iframes[0]);
         iframeDoc.open();
         iframeDoc.write(newHTML);
         iframeDoc.close();
@@ -1935,6 +1953,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
       const newHTML = "<!DOCTYPE html>\n" + doc.documentElement.outerHTML;
       const iframeDoc = self.iframes[1].contentDocument;
       if (iframeDoc) {
+        self.markDocumentAssigned(self.iframes[1]);
         iframeDoc.open();
         iframeDoc.write(newHTML);
         iframeDoc.close();
@@ -1961,7 +1980,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                 if (!isCurrentNavigation()) return;
                 if (content === undefined) {
                   if (isSameOrigin) {
-                    this.iframes[0].src = currentHref;
+                    this.setIFrameSrc(this.iframes[0], currentHref);
                   } else {
                     fetch(currentHref, this.requestConfig)
                       .then((r) => r.text())
@@ -1999,7 +2018,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                       if (!isCurrentNavigation()) return;
                       if (content === undefined) {
                         if (isSameOrigin) {
-                          this.iframes[1].src = href;
+                          this.setIFrameSrc(this.iframes[1], href);
                         } else {
                           fetch(href, this.requestConfig)
                             .then((r) => r.text())
@@ -2019,7 +2038,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                     .catch(onContentError);
                 }
               } else {
-                this.iframes[1].src = "about:blank";
+                this.setIFrameSrc(this.iframes[1], "about:blank");
                 this.currentSpreadLinks.right = undefined;
               }
             }
@@ -2039,7 +2058,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                     if (!isCurrentNavigation()) return;
                     if (content === undefined) {
                       if (isSameOrigin) {
-                        this.iframes[0].src = href;
+                        this.setIFrameSrc(this.iframes[0], href);
                       } else {
                         fetch(href, this.requestConfig)
                           .then((r) => r.text())
@@ -2055,7 +2074,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                   .catch(onContentError);
               }
             } else {
-              this.iframes[0].src = "about:blank";
+              this.setIFrameSrc(this.iframes[0], "about:blank");
               this.currentSpreadLinks.left = undefined;
             }
             if (this.iframes.length === 2 && this.publication.isFixedLayout) {
@@ -2069,7 +2088,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                   if (!isCurrentNavigation()) return;
                   if (content === undefined) {
                     if (isSameOrigin) {
-                      this.iframes[1].src = currentHref;
+                      this.setIFrameSrc(this.iframes[1], currentHref);
                     } else {
                       fetch(currentHref, this.requestConfig)
                         .then((r) => r.text())
@@ -2103,7 +2122,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
               if (!isCurrentNavigation()) return;
               if (content === undefined) {
                 if (isSameOrigin) {
-                  this.iframes[0].src = currentHref;
+                  this.setIFrameSrc(this.iframes[0], currentHref);
                 } else {
                   fetch(currentHref, this.requestConfig)
                     .then((r) => r.text())
@@ -2137,7 +2156,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
 
             if (content === undefined) {
               if (isSameOrigin) {
-                this.iframes[0].src = currentHref;
+                this.setIFrameSrc(this.iframes[0], currentHref);
               } else {
                 fetch(currentHref, this.requestConfig)
                   .then((r) => r.text())
@@ -2161,7 +2180,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
         if (this.settings.columnCount !== 1) {
           if (even) {
             if (isSameOrigin) {
-              this.iframes[0].src = this.currentChapterLink.href;
+              this.setIFrameSrc(this.iframes[0], this.currentChapterLink.href);
               this.currentSpreadLinks.left = {
                 href: this.currentChapterLink.href,
               };
@@ -2173,13 +2192,13 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                   );
                   if (next) {
                     const href = this.publication.getAbsoluteHref(next.Href);
-                    this.iframes[1].src = href;
+                    this.setIFrameSrc(this.iframes[1], href);
                     this.currentSpreadLinks.right = {
                       href: href,
                     };
                   }
                 } else {
-                  this.iframes[1].src = "about:blank";
+                  this.setIFrameSrc(this.iframes[1], "about:blank");
                   this.currentSpreadLinks.right = undefined;
                 }
               }
@@ -2216,7 +2235,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                       .catch(onContentError);
                   }
                 } else {
-                  this.iframes[1].src = "about:blank";
+                  this.setIFrameSrc(this.iframes[1], "about:blank");
                   this.currentSpreadLinks.right = undefined;
                 }
               }
@@ -2232,9 +2251,12 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                   href: href,
                 };
                 if (isSameOrigin) {
-                  this.iframes[0].src = href;
+                  this.setIFrameSrc(this.iframes[0], href);
                   if (this.iframes.length === 2) {
-                    this.iframes[1].src = this.currentChapterLink.href;
+                    this.setIFrameSrc(
+                      this.iframes[1],
+                      this.currentChapterLink.href
+                    );
                     this.currentSpreadLinks.right = {
                       href: this.currentChapterLink.href,
                     };
@@ -2264,7 +2286,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                 }
               }
             } else {
-              this.iframes[0].src = "about:blank";
+              this.setIFrameSrc(this.iframes[0], "about:blank");
               this.currentSpreadLinks.left = undefined;
               if (this.iframes.length === 2) {
                 this.currentSpreadLinks.right = {
@@ -2272,7 +2294,10 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
                 };
 
                 if (isSameOrigin) {
-                  this.iframes[1].src = this.currentChapterLink.href;
+                  this.setIFrameSrc(
+                    this.iframes[1],
+                    this.currentChapterLink.href
+                  );
                 } else {
                   fetch(this.currentChapterLink.href, this.requestConfig)
                     .then((r) => r.text())
@@ -2293,7 +2318,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
             href: this.currentChapterLink.href,
           };
           if (isSameOrigin) {
-            this.iframes[0].src = this.currentChapterLink.href;
+            this.setIFrameSrc(this.iframes[0], this.currentChapterLink.href);
           } else {
             fetch(this.currentChapterLink.href, this.requestConfig)
               .then((r) => r.text())
@@ -2312,7 +2337,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
           href: this.currentChapterLink.href,
         };
         if (isSameOrigin) {
-          this.iframes[0].src = this.currentChapterLink.href;
+          this.setIFrameSrc(this.iframes[0], this.currentChapterLink.href);
         } else {
           fetch(this.currentChapterLink.href, this.requestConfig)
             .then((r) => r.text())
