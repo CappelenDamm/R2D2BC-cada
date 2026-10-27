@@ -8,6 +8,7 @@ vi.mock("../../src/utils/BrowserUtilities", () => ({
 
 describe("scrolling content resize", () => {
   let notifyResize: () => void;
+  let notifyContentChange: () => void;
   let contentHeight: number;
 
   beforeEach(() => {
@@ -18,6 +19,16 @@ describe("scrolling content resize", () => {
       class {
         constructor(callback: () => void) {
           notifyResize = callback;
+        }
+        observe() {}
+        disconnect() {}
+      }
+    );
+    vi.stubGlobal(
+      "MutationObserver",
+      class {
+        constructor(callback: () => void) {
+          notifyContentChange = callback;
         }
         observe() {}
         disconnect() {}
@@ -198,7 +209,7 @@ describe("scrolling content resize", () => {
     }
   );
 
-  it("fits overflowing images after they load", () => {
+  it("fits fixed-height chapters after images load and content is appended", () => {
     const { iframe } = setup({ height: "400px" });
     contentHeight = 1800;
     const event = new Event("load");
@@ -206,6 +217,16 @@ describe("scrolling content resize", () => {
     iframe.contentDocument!.dispatchEvent(event);
     vi.runAllTimers();
     expect(iframe.height).toBe("1912px");
+
+    contentHeight = 3000;
+    notifyContentChange();
+    vi.runAllTimers();
+    expect(iframe.height).toBe("3112px");
+
+    contentHeight = 100;
+    notifyContentChange();
+    vi.runAllTimers();
+    expect(iframe.height).toBe("828px");
   });
 
   it("finishes sizing before restoring a saved progression", async () => {
@@ -259,6 +280,7 @@ describe("scrolling content resize", () => {
     await view.setSize();
     contentHeight = 1800;
     body.dispatchEvent(new Event("toggle"));
+    notifyContentChange();
     vi.runAllTimers();
     expect(iframe.height).toBe("0");
     for (const [style, property] of [

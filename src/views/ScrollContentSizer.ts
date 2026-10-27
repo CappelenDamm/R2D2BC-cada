@@ -39,6 +39,7 @@ interface ContentHeightViewport {
 /** Fork-specific scroll sizing, independent of book navigation and overlays. */
 export default class ScrollContentSizer {
   private _contentResizeObserver: ResizeObserver | undefined;
+  private _contentMutationObserver: MutationObserver | undefined;
   private _contentResizeBody: HTMLElement | undefined;
   private _contentResizeHandler: (() => void) | undefined;
   private _contentHeightRefreshHandler: (() => void) | undefined;
@@ -62,6 +63,7 @@ export default class ScrollContentSizer {
   /** Removes resize listeners and restores publication styles. */
   unbind(): void {
     this._contentResizeObserver?.disconnect();
+    this._contentMutationObserver?.disconnect();
     if (this._contentHeightRefreshHandler) {
       this._contentResizeBody?.ownerDocument.removeEventListener(
         "load",
@@ -77,6 +79,7 @@ export default class ScrollContentSizer {
       );
     }
     this._contentResizeObserver = undefined;
+    this._contentMutationObserver = undefined;
     this._contentResizeBody = undefined;
     this._contentResizeHandler = undefined;
     this._contentHeightRefreshHandler = undefined;
@@ -165,6 +168,12 @@ export default class ScrollContentSizer {
       capture: true,
     });
     body.addEventListener("toggle", debouncedResize, { capture: true });
+    this._contentMutationObserver = new MutationObserver(debouncedResize);
+    this._contentMutationObserver.observe(body, {
+      childList: true,
+      characterData: true,
+      subtree: true,
+    });
     _resizeObserver.observe(body, { box: "border-box" });
     if (iframe.parentElement) _resizeObserver.observe(iframe.parentElement);
     this._contentResizeBody = body;

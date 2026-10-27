@@ -240,6 +240,34 @@ describe("iframe navigation", () => {
     return { navigator, view, finishSize };
   }
 
+  it("initializes a new spread frame when switching from one column to two", async () => {
+    const { navigator, finishSize } = setupRestoration(true);
+    navigator.iframes.pop();
+    navigator.settings.columnCount = 2;
+    vi.spyOn(navigator, "handleResize").mockResolvedValue();
+    Object.assign(window, { matchMedia: () => ({ matches: false }) });
+    const iframe = Object.assign(new EventTarget(), {
+      style: {},
+      setAttribute: vi.fn(),
+      contentDocument: {},
+    });
+    vi.stubGlobal("document", {
+      createElement: (tag: string) =>
+        tag === "iframe" ? iframe : { style: {}, appendChild: vi.fn() },
+    });
+    Object.assign(navigator, {
+      spreads: { appendChild: vi.fn() },
+      attributes: { fixedLayoutShadow: false },
+    });
+
+    navigator["handleNumberOfIframes"]();
+    iframe.dispatchEvent(new Event("load"));
+    finishSize();
+    await vi.runAllTimersAsync();
+
+    expect(navigator["showIframeContents"]).toHaveBeenCalledWith(iframe);
+  });
+
   it("waits for final content sizing before restoring the saved position", async () => {
     const { navigator, view, finishSize } = setupRestoration();
     vi.spyOn(navigator, "handleResize").mockResolvedValue();

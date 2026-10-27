@@ -2809,6 +2809,11 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
       ) {
         if (this.iframes.length === 1) {
           var iframe = document.createElement("iframe");
+          addEventListenerOptional(
+            iframe,
+            "load",
+            this.handleIFrameLoad.bind(this, iframe)
+          );
           iframe.setAttribute("SCROLLING", "no");
           iframe.setAttribute("allowtransparency", "true");
           iframe.style.opacity = "1";
