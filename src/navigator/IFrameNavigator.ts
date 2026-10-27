@@ -3597,19 +3597,27 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
       )
         return;
       this.isLoading = false;
+      // Read layout before writing styles so the writes don't force a reflow.
+      let atStart = false;
+      let atEnd = false;
+      const measure = this.view?.layout !== "fixed";
+      if (measure) {
+        this.view?.padOddColumns?.();
+        atStart = !!this.view?.atStart();
+        atEnd = !!this.view?.atEnd();
+      }
       if (this.loadingMessage) {
         this.loadingMessage.style.display = "none";
         this.loadingMessage.classList.remove("is-loading");
       }
-      if (this.view?.layout !== "fixed") {
-        this.view?.padOddColumns?.();
-        if (this.view?.atStart() && this.view?.atEnd()) {
+      if (measure) {
+        if (atStart && atEnd) {
           if (this.api?.resourceFitsScreen) this.api?.resourceFitsScreen();
           this.emit("resource.fits");
-        } else if (this.view?.atEnd()) {
+        } else if (atEnd) {
           if (this.api?.resourceAtEnd) this.api?.resourceAtEnd();
           this.emit("resource.end");
-        } else if (this.view?.atStart()) {
+        } else if (atStart) {
           if (this.api?.resourceAtStart) this.api?.resourceAtStart();
           this.emit("resource.start");
         }
