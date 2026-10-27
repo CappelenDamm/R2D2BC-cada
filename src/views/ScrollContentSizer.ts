@@ -152,9 +152,11 @@ export default class ScrollContentSizer {
         this.finishContentResize();
       });
     }, 20);
-    _resizeObserver = new ResizeObserver(debouncedResize);
+    // debounce throws when called with differing `this` (observer, sizer, undefined).
+    const scheduleResize = () => debouncedResize();
+    _resizeObserver = new ResizeObserver(scheduleResize);
     this._contentResizeObserver = _resizeObserver;
-    this._contentResizeHandler = debouncedResize;
+    this._contentResizeHandler = scheduleResize;
     this._contentHeightRefreshHandler = (event?: Event) => {
       const target = event?.target as Element | null;
       if (
@@ -164,7 +166,7 @@ export default class ScrollContentSizer {
       ) {
         declared = undefined;
       }
-      debouncedResize.call(this);
+      scheduleResize();
     };
     doc.addEventListener("load", this._contentHeightRefreshHandler, {
       capture: true,
@@ -173,7 +175,7 @@ export default class ScrollContentSizer {
     // observers skip the helper's own style writes, so these are publication changes.
     const refreshConstraints = () => {
       declared = undefined;
-      debouncedResize();
+      scheduleResize();
     };
     body.addEventListener("toggle", refreshConstraints, { capture: true });
     this._contentToggleHandler = refreshConstraints;
