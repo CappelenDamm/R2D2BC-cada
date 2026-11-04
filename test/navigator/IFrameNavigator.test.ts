@@ -295,6 +295,19 @@ describe("iframe navigation", () => {
     expect(view.goToProgression).toHaveBeenCalledExactlyOnceWith(0);
   });
 
+  it("does not let a delayed resize overwrite the navigation destination", async () => {
+    const { navigator, view, finishSize } = setupRestoration();
+    const resized = navigator.handleResize();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(view.setSize).toHaveBeenCalledOnce();
+
+    Object.assign(navigator, { newPosition: undefined });
+    finishSize();
+    await resized;
+
+    expect(view.goToProgression).not.toHaveBeenCalled();
+  });
+
   it("ignores spread loads from an older navigation generation", async () => {
     const { navigator, finishSize } = setupRestoration(true);
     vi.spyOn(navigator, "handleResize").mockResolvedValue();
