@@ -2995,6 +2995,7 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
       }
     }
 
+    const wasNavigating = this.newPosition !== undefined;
     const oldPosition = this.view?.getCurrentPosition();
     await this.settings.applyProperties();
     if (
@@ -3035,11 +3036,12 @@ export class IFrameNavigator extends EventEmitter implements Navigator {
       resizeToken !== this.resizeToken
     )
       return;
-    // Skip restoring the pre-resize scroll fraction when a navigation is in flight,
-    // otherwise it reapplies the previous chapter's stale scroll position.
+    // A scroll fraction captured during navigation stays stale even if
+    // navigation finishes while the resize is awaiting layout.
     if (
       positionToken === this.positionRequestToken &&
       oldPosition !== undefined &&
+      !wasNavigating &&
       !this.newPosition
     ) {
       this.view?.goToProgression(oldPosition);
