@@ -184,7 +184,7 @@ export class PDFNavigator extends EventEmitter implements Navigator {
       "#pdf-container"
     );
 
-    // PDFViewer v5 requires the container to be absolutely positioned
+    // PDFViewer requires the container to be absolutely positioned
     // and to be the scroll root (overflow: auto/scroll).
     this.wrapper.style.position = "absolute";
     this.wrapper.style.overflow = "auto";
@@ -387,12 +387,12 @@ export class PDFNavigator extends EventEmitter implements Navigator {
     if (this.pdfDoc) {
       this.pdfViewer.setDocument(null as any);
       this.linkService.setDocument(null as any);
-      await this.pdfDoc.destroy();
+      await this.pdfDoc.loadingTask.destroy();
       this.pdfDoc = null;
     }
 
     try {
-      const task = getDocument(url);
+      const task = getDocument({ url });
       const doc = await task.promise;
       this.pdfDoc = doc;
       this.pdfViewer.setDocument(doc);
@@ -1032,7 +1032,7 @@ export class PDFNavigator extends EventEmitter implements Navigator {
   stop(): void {
     removeEventListenerOptional(window, "resize", this.onResize);
     this.pdfViewer?.setDocument(null as any);
-    this.pdfDoc?.destroy();
+    this.pdfDoc?.loadingTask.destroy();
     this.pdfDoc = null;
   }
 }

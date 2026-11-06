@@ -25,7 +25,7 @@ Any implementer can add their own functionality and design without refactoring t
 ## Features
 
 - EPUB Reflowable + Fixed Layout
-- PDF (via pdfjs-dist v5)
+- PDF (via pdfjs-dist v6)
 - Reader Settings (font, size, spacing, colors, layout, margins)
 - Configurable Modules with Callbacks
 - Injectable Fonts, CSS, JavaScript
@@ -58,7 +58,7 @@ This project implements most components of the [Readium Architecture](https://gi
 - Implements the Readium shared models
 - Integrates Readium CSS v1.1.1
 - Implements Navigator for reflowable and fixed-layout publications
-- Implements PDF Navigator (pdfjs-dist v5)
+- Implements PDF Navigator (pdfjs-dist v6)
 
 ## Origins
 
@@ -83,6 +83,8 @@ The R2D2BC reader has been used in:
 - and more...
 
 ## Get Started
+
+Node.js 22.13.0 or newer is required by PDF.js v6.
 
 ```bash
 npm install
