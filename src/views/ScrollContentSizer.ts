@@ -334,7 +334,8 @@ export default class ScrollContentSizer {
     const bodyBorders =
       pixels(bodyStyle.borderTopWidth) + pixels(bodyStyle.borderBottomWidth);
 
-    const rootTop = doc.documentElement.getBoundingClientRect().top;
+    const rootRect = doc.documentElement.getBoundingClientRect();
+    const rootTop = rootRect.top;
     const availableMinimum = Math.max(
       0,
       minHeight -
@@ -384,11 +385,16 @@ export default class ScrollContentSizer {
       );
     }
 
+    // The root is explicitly intrinsic; its border box also includes nested
+    // margins collapsed through the body, unlike the body's own border box.
     const height = Math.ceil(
-      bottom -
-        rootTop +
-        pixels(htmlStyle.paddingBottom) +
-        pixels(htmlStyle.borderBottomWidth)
+      Math.max(
+        doc.documentElement.getBoundingClientRect().height,
+        bottom -
+          rootTop +
+          pixels(htmlStyle.paddingBottom) +
+          pixels(htmlStyle.borderBottomWidth)
+      )
     );
 
     const nextHeight = Math.max(minHeight, height) + "px";
