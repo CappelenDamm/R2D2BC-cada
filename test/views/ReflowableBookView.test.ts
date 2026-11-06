@@ -45,7 +45,10 @@ describe("scrolling content resize", () => {
     vi.unstubAllGlobals();
   });
 
-  function setup(constraints: Record<string, string> = {}) {
+  function setup(
+    constraints: Record<string, string> = {},
+    collapsedBottomMargin = 0
+  ) {
     function style() {
       const properties = new Map<string, { value: string; priority: string }>();
       return {
@@ -118,7 +121,10 @@ describe("scrolling content resize", () => {
       offsetHeight: 2000,
       clientHeight: 2000,
       scrollHeight: 2000,
-      getBoundingClientRect: () => ({ top: 0 }),
+      getBoundingClientRect: () => ({
+        top: 0,
+        height: bodyHeight() + 112 + collapsedBottomMargin,
+      }),
       appendChild: vi.fn(),
     };
     const doc = Object.assign(new EventTarget(), {
@@ -199,6 +205,22 @@ describe("scrolling content resize", () => {
     body.dispatchEvent(new Event("toggle"));
     vi.runAllTimers();
     expect(iframe.height).toBe("828px");
+  });
+
+  it("includes nested collapsed margins without retaining a stale root viewport height", () => {
+    contentHeight = 1800.25;
+    const { iframe, body } = setup({}, 16);
+    expect(iframe.height).toBe("1929px");
+
+    contentHeight = 100;
+    body.dispatchEvent(new Event("toggle"));
+    vi.runAllTimers();
+    expect(iframe.height).toBe("844px");
+
+    contentHeight = 1800.25;
+    body.dispatchEvent(new Event("toggle"));
+    vi.runAllTimers();
+    expect(iframe.height).toBe("1929px");
   });
 
   it.each([
