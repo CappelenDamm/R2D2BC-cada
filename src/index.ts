@@ -61,6 +61,7 @@ export type {
 export type {
   IUserSettings,
   InitialUserSettings,
+  PDFScrollMode,
 } from "./model/user-settings/UserSettings";
 export type { UserSettingsIncrementable } from "./model/user-settings/UserProperties";
 export type { MediaOverlayPlaybackPosition } from "./modules/mediaoverlays/MediaOverlayModule";

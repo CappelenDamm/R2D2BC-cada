@@ -20,7 +20,10 @@
 import debounce from "debounce";
 import EventEmitter from "eventemitter3";
 import Navigator from "./Navigator";
-import { UserSettings } from "../model/user-settings/UserSettings";
+import {
+  PDFScrollMode,
+  UserSettings,
+} from "../model/user-settings/UserSettings";
 import { Publication } from "../model/Publication";
 import { Bookmark, Locator, ReadingPosition } from "../model/Locator";
 import Annotator from "../store/Annotator";
@@ -71,6 +74,10 @@ export interface PDFNavigatorConfig {
   annotator?: Annotator;
   /** Pre-loaded reading position to seed the annotator before navigation. */
   initialLastReadingPosition?: ReadingPosition;
+  /** Initial scrolling mode; explicit config takes precedence over saved PDF settings. */
+  scrollMode?: PDFScrollMode;
+  /** Initial column count; explicit config takes precedence over saved PDF spreads. */
+  columnCount?: number;
   /**
    * Store used to persist PDF view settings (scroll mode, spread mode, zoom, rotation)
    * across sessions.  Pass the publication store from D2Reader.load().
@@ -111,6 +118,8 @@ export class PDFNavigator extends EventEmitter implements Navigator {
   private _pendingAnnotations: Map<number, unknown[]> | null = null;
 
   private pdfViewer!: PDFViewer;
+  private pendingSpreadMode?: number;
+  private pendingScrollMode?: number;
   // Public so callers can subscribe to PDF.js events directly (e.g. pagechanging, updatefindmatchescount).
   public eventBus!: EventBus;
   private linkService!: PDFLinkService;
@@ -134,6 +143,16 @@ export class PDFNavigator extends EventEmitter implements Navigator {
       config.initialLastReadingPosition,
       config.store
     );
+    if (config.scrollMode !== undefined) {
+      nav.pendingScrollMode =
+        config.scrollMode === "scrolled"
+          ? ScrollMode.VERTICAL
+          : ScrollMode.PAGE;
+    }
+    if (config.columnCount !== undefined) {
+      nav.pendingSpreadMode =
+        config.columnCount === 2 ? SpreadMode.EVEN : SpreadMode.NONE;
+    }
     await nav.start(config.mainElement, config.headerMenu, config.footerMenu);
     return nav;
   }
@@ -230,6 +249,7 @@ export class PDFNavigator extends EventEmitter implements Navigator {
     this.linkService.setViewer(this.pdfViewer);
     // spreadMode must be set after viewer construction, not in options.
     this.pdfViewer.spreadMode = SpreadMode.NONE;
+    this.settings.onColumnSettingsChange(this.applyColumnSettings.bind(this));
 
     // PDFHistory integrates PDF navigation with the browser history API.
     this.pdfHistory = new PDFHistory({
@@ -620,16 +640,19 @@ export class PDFNavigator extends EventEmitter implements Navigator {
   }
 
   private restoreViewSettings(): void {
-    const scroll = this.viewStore?.get(PDFNavigator.KEY_SCROLL);
-    const spread = this.viewStore?.get(PDFNavigator.KEY_SPREAD);
+    const scroll =
+      this.pendingScrollMode ?? this.viewStore?.get(PDFNavigator.KEY_SCROLL);
+    const spread =
+      this.pendingSpreadMode ?? this.viewStore?.get(PDFNavigator.KEY_SPREAD);
     const scale = this.viewStore?.get(PDFNavigator.KEY_SCALE);
     const rotate = this.viewStore?.get(PDFNavigator.KEY_ROTATE);
 
     this.pdfViewer.currentScaleValue = scale ?? "page-fit";
     if (scroll !== null && scroll !== undefined)
-      this.pdfViewer.scrollMode = Number(scroll);
+      this.setScrollMode(Number(scroll));
     if (spread !== null && spread !== undefined)
-      this.pdfViewer.spreadMode = Number(spread);
+      this.setSpreadMode(Number(spread));
+    else this.applyColumnSettings();
     if (rotate !== null && rotate !== undefined)
       this.pdfViewer.pagesRotation = Number(rotate);
   }
@@ -781,9 +804,21 @@ export class PDFNavigator extends EventEmitter implements Navigator {
 
   // ── Spread mode ────────────────────────────────────────────────────────────
 
+  applyColumnSettings(): void {
+    this.setSpreadMode(
+      this.settings.columnCount === 2 ? SpreadMode.EVEN : SpreadMode.NONE
+    );
+  }
+
   setSpreadMode(mode: number): void {
-    this.pdfViewer.spreadMode = mode;
+    this.pendingSpreadMode = mode;
     this.saveViewSetting(PDFNavigator.KEY_SPREAD, mode);
+    // setDocument() resolves before PDF.js creates its page views.
+    // restoreViewSettings() replays the latest request on pagesinit.
+    if (this.pdfViewer.pagesCount > 0) {
+      this.pdfViewer.spreadMode = mode;
+      this.pendingSpreadMode = undefined;
+    }
   }
 
   // ── Annotation editor ──────────────────────────────────────────────────────
@@ -925,6 +960,15 @@ export class PDFNavigator extends EventEmitter implements Navigator {
 
   // ── Scroll mode ────────────────────────────────────────────────────────────
 
+  private setScrollMode(mode: number): void {
+    this.pendingScrollMode = mode;
+    this.saveViewSetting(PDFNavigator.KEY_SCROLL, mode);
+    if (this.pdfViewer.pagesCount > 0) {
+      this.pdfViewer.scrollMode = mode;
+      this.pendingScrollMode = undefined;
+    }
+  }
+
   async scroll(scroll: boolean, direction?: string): Promise<void> {
     const mode = scroll
       ? direction === "horizontal"
@@ -933,8 +977,7 @@ export class PDFNavigator extends EventEmitter implements Navigator {
           ? ScrollMode.WRAPPED
           : ScrollMode.VERTICAL
       : ScrollMode.PAGE;
-    this.pdfViewer.scrollMode = mode;
-    this.saveViewSetting(PDFNavigator.KEY_SCROLL, mode);
+    this.setScrollMode(mode);
   }
 
   // ── Text search (wired to PDFFindController) ────────────────────────────────
@@ -981,9 +1024,7 @@ export class PDFNavigator extends EventEmitter implements Navigator {
   private saveLastReadingPosition(): void {
     if (!this.annotator || !this.resource) return;
     const position: ReadingPosition = {
-      href: this.publication.getAbsoluteHref(this.resource.Href),
-      locations: { position: this.pageNum },
-      type: "application/pdf",
+      ...this.currentLocator(),
       created: new Date(),
     };
     if (this.api?.updateCurrentLocation) {
@@ -1031,6 +1072,7 @@ export class PDFNavigator extends EventEmitter implements Navigator {
 
   stop(): void {
     removeEventListenerOptional(window, "resize", this.onResize);
+    this.settings.onColumnSettingsChange(() => {});
     this.pdfViewer?.setDocument(null as any);
     this.pdfDoc?.loadingTask.destroy();
     this.pdfDoc = null;

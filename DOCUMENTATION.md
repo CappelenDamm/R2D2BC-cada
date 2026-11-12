@@ -355,6 +355,9 @@ interface NavigatorAPI {
 
 The most important callback is `updateCurrentLocation` -- implement this to persist reading position to your backend.
 
+For PDFs, the callback includes `locations.position` (the 1-based page number)
+and `locations.progression` (0–1), matching `reader.currentLocator`.
+
 ### Injectable
 
 Describes a CSS or JS file to inject into content iframes:
@@ -1243,6 +1246,57 @@ reader.zoomOut();         // Zoom out
 reader.activateHand();    // Enable grab-to-pan tool
 reader.deactivateHand();  // Disable grab-to-pan
 ```
+
+### PDF page layout
+
+Use the existing `userSettings.columnCount` setting at load time or update it
+through `applyUserSettings()`:
+
+```typescript
+const reader = await D2Reader.load({
+  url: new URL("https://example.com/pdf-manifest.json"),
+  injectables: [],
+  userSettings: { columnCount: 2 },
+});
+
+await reader.applyUserSettings({ columnCount: 1 });
+```
+
+- `2`: two-page spreads, with the cover alone followed by pages 2–3, 4–5, etc.
+- `1` or `0` (Auto): single-page view.
+- Explicit load settings override saved PDF spread settings. Without an explicit
+  setting, saved PDF view settings are preserved.
+- Runtime changes are persisted when storage is enabled and reported through
+  `api.updateSettings`.
+- Updates made while a PDF is loading are applied once its page views are ready;
+  the latest requested layout wins.
+
+PDF scroll modes can also be updated immediately after loading the reader:
+
+```typescript
+await reader.scroll(false);              // Paginated
+await reader.scroll(true);               // Vertical scrolling
+await reader.scroll(true, "horizontal");
+await reader.scroll(true, "wrapped");
+```
+
+For PDF publications, set the initial mode in `userSettings.scrollMode` when
+loading:
+
+```typescript
+const reader = await D2Reader.load({
+  url: new URL("https://example.com/pdf-manifest.json"),
+  injectables: [],
+  userSettings: { scrollMode: "scrolled" },
+});
+```
+
+Use `"scrolled"` for vertical scrolling or `"paginated"` for page-by-page
+navigation. An explicit load setting takes precedence over the saved PDF scroll
+mode.
+
+Like spread changes, scroll-mode changes wait until PDF.js has initialized its
+page views. They are persisted when storage is enabled.
 
 ### PDF annotations
 
