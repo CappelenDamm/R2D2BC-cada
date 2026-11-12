@@ -22,6 +22,7 @@ import EventEmitter from "eventemitter3";
 import Navigator from "./Navigator";
 import {
   PDFScrollMode,
+  InitialUserSettings,
   UserSettings,
 } from "../model/user-settings/UserSettings";
 import { Publication } from "../model/Publication";
@@ -77,7 +78,7 @@ export interface PDFNavigatorConfig {
   /** Initial scrolling mode; explicit config takes precedence over saved PDF settings. */
   scrollMode?: PDFScrollMode;
   /** Initial column count; explicit config takes precedence over saved PDF spreads. */
-  columnCount?: number;
+  columnCount?: InitialUserSettings["columnCount"];
   /**
    * Store used to persist PDF view settings (scroll mode, spread mode, zoom, rotation)
    * across sessions.  Pass the publication store from D2Reader.load().
@@ -151,7 +152,7 @@ export class PDFNavigator extends EventEmitter implements Navigator {
     }
     if (config.columnCount !== undefined) {
       nav.pendingSpreadMode =
-        config.columnCount === 2 ? SpreadMode.EVEN : SpreadMode.NONE;
+        Number(config.columnCount) === 2 ? SpreadMode.EVEN : SpreadMode.NONE;
     }
     await nav.start(config.mainElement, config.headerMenu, config.footerMenu);
     return nav;

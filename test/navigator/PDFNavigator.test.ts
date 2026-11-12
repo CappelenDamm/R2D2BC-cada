@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { getDocument } from "pdfjs-dist";
 import {
   PDFNavigator,
+  type PDFNavigatorConfig,
   ScrollMode,
   SpreadMode,
 } from "../../src/navigator/PDFNavigator";
@@ -113,7 +114,9 @@ describe("PDF.js v6 integration", () => {
   });
 
   describe("PDF column settings", () => {
-    async function setupColumns(columnCount?: number) {
+    async function setupColumns(
+      columnCount?: PDFNavigatorConfig["columnCount"]
+    ) {
       const settings: UserSettings = await UserSettings.create({
         store: new MemoryStore(),
         layout: "",
@@ -145,7 +148,10 @@ describe("PDF.js v6 integration", () => {
       [0, SpreadMode.NONE, SpreadMode.EVEN],
       [1, SpreadMode.NONE, SpreadMode.EVEN],
       [2, SpreadMode.EVEN, SpreadMode.NONE],
-    ])(
+      ["auto", SpreadMode.NONE, SpreadMode.EVEN],
+      ["1", SpreadMode.NONE, SpreadMode.EVEN],
+      ["2", SpreadMode.EVEN, SpreadMode.NONE],
+    ] as const)(
       "initializes columnCount %s as spread mode %s",
       async (columnCount, spreadMode, savedSpreadMode) => {
         const { navigator, viewStore } = await setupColumns(columnCount);

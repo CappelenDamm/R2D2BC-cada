@@ -111,7 +111,7 @@ export interface InitialUserSettings {
   //Advanced settings
   // publisherDefaults?: boolean | "readium-advanced-on" | "readium-advanced-off";
   textAlignment: number;
-  columnCount: number;
+  columnCount: number | "auto" | "1" | "2";
   direction: string;
   wordSpacing: number;
   letterSpacing: number;
@@ -1458,7 +1458,9 @@ export class UserSettings implements IUserSettings {
     this.settingsChangeCallback();
   }
 
-  private static parseColumnCount(columnCount: number): number {
+  private static parseColumnCount(
+    columnCount: InitialUserSettings["columnCount"]
+  ): number {
     const index = UserSettings.columnCountValues.indexOf(
       columnCount === 0 ? "auto" : String(columnCount)
     );

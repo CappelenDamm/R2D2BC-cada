@@ -798,7 +798,7 @@ Tracks content consumption metrics (time spent, pages read, etc.).
 | `appearance` | `number` | `0` | 0=Default, 1=Sepia, 2=Night |
 | `verticalScroll` | `boolean` | `false` | Scroll mode vs. pagination |
 | `textAlignment` | `number` | `0` | 0=Auto, 1=Justify, 2=Start |
-| `columnCount` | `number` | `0` | 0=Auto, 1=One column, 2=Two columns |
+| `columnCount` | `number \| "auto" \| "1" \| "2"` | `0` | 0=Auto, 1=One column, 2=Two columns |
 | `direction` | `number` | `0` | 0=Auto, 1=LTR, 2=RTL |
 | `wordSpacing` | `number` | `0` | Word spacing adjustment |
 | `letterSpacing` | `number` | `0` | Letter spacing adjustment |
@@ -1264,6 +1264,8 @@ await reader.applyUserSettings({ columnCount: 1 });
 
 - `2`: two-page spreads, with the cover alone followed by pages 2–3, 4–5, etc.
 - `1` or `0` (Auto): single-page view.
+- String values `"2"`, `"1"`, and `"auto"` are also accepted at load time and
+  during updates, matching the values reported by `api.updateSettings`.
 - Explicit load settings override saved PDF spread settings. Without an explicit
   setting, saved PDF view settings are preserved.
 - Runtime changes are persisted when storage is enabled and reported through
