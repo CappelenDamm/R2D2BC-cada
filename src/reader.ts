@@ -66,8 +66,7 @@ import { ConsumptionModule } from "./modules/consumption/ConsumptionModule";
  * pdfjs-dist references browser-only APIs (DOMMatrix, canvas) at import time.
  */
 let _PDFNavigatorClass:
-  | (typeof import("./navigator/PDFNavigator"))["PDFNavigator"]
-  | undefined;
+  (typeof import("./navigator/PDFNavigator"))["PDFNavigator"] | undefined;
 async function loadPDFNavigator() {
   if (!_PDFNavigatorClass) {
     const mod = await import("./navigator/PDFNavigator");
@@ -203,6 +202,7 @@ export default class D2Reader {
         store: settingsStore,
         initialUserSettings: initialConfig.userSettings,
         layout: "",
+        api: initialConfig.api,
       });
       const PDFNav = await loadPDFNavigator();
       const navigator = await PDFNav.create({
@@ -211,6 +211,8 @@ export default class D2Reader {
         settings: settings,
         api: initialConfig.api,
         workerSrc: initialConfig.workerSrc,
+        scrollMode: initialConfig.userSettings?.scrollMode,
+        columnCount: initialConfig.userSettings?.columnCount,
         annotator: annotator,
         initialLastReadingPosition: initialConfig.lastReadingPosition,
         store: store,
@@ -760,9 +762,7 @@ export default class D2Reader {
 
   private isTTSIncrementable(
     incremental:
-      | UserSettingsIncrementable
-      | TTSIncrementable
-      | MediaOverlayIncrementable
+      UserSettingsIncrementable | TTSIncrementable | MediaOverlayIncrementable
   ): incremental is TTSIncrementable {
     return (
       incremental === "pitch" ||
@@ -772,9 +772,7 @@ export default class D2Reader {
   }
   private isMOIncrementable(
     incremental:
-      | UserSettingsIncrementable
-      | TTSIncrementable
-      | MediaOverlayIncrementable
+      UserSettingsIncrementable | TTSIncrementable | MediaOverlayIncrementable
   ): incremental is MediaOverlayIncrementable {
     return incremental === "mo_rate" || incremental === "mo_volume";
   }
@@ -785,9 +783,7 @@ export default class D2Reader {
    */
   increase = async (
     incremental:
-      | UserSettingsIncrementable
-      | TTSIncrementable
-      | MediaOverlayIncrementable
+      UserSettingsIncrementable | TTSIncrementable | MediaOverlayIncrementable
   ) => {
     if (this.isTTSIncrementable(incremental)) {
       if (
@@ -814,9 +810,7 @@ export default class D2Reader {
    */
   decrease = async (
     incremental:
-      | UserSettingsIncrementable
-      | TTSIncrementable
-      | MediaOverlayIncrementable
+      UserSettingsIncrementable | TTSIncrementable | MediaOverlayIncrementable
   ) => {
     if (this.isTTSIncrementable(incremental)) {
       if (

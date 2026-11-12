@@ -87,6 +87,8 @@ export interface IUserSettings {
   textColor: string;
 }
 
+export type PDFScrollMode = "scrolled" | "paginated";
+
 /**
  * The settings that someone might pass in when instantiating
  * the reader. Differs from the internal settings values for
@@ -103,11 +105,13 @@ export interface InitialUserSettings {
     | "readium-scroll-off"
     | "scroll"
     | "paginated";
+  /** Initial scrolling mode for PDF publications. */
+  scrollMode?: PDFScrollMode;
 
   //Advanced settings
   // publisherDefaults?: boolean | "readium-advanced-on" | "readium-advanced-off";
   textAlignment: number;
-  columnCount: number;
+  columnCount: number | "auto" | "1" | "2";
   direction: string;
   wordSpacing: number;
   letterSpacing: number;
@@ -258,9 +262,9 @@ export class UserSettings implements IUserSettings {
         // settings.publisherDefaults = false;
         log.log(settings.textAlignment);
       }
-      if (initialUserSettings.columnCount) {
-        settings.columnCount = UserSettings.columnCountValues.findIndex(
-          (el: any) => el === initialUserSettings.columnCount
+      if (initialUserSettings.columnCount !== undefined) {
+        settings.columnCount = UserSettings.parseColumnCount(
+          initialUserSettings.columnCount
         );
         let prop = settings.userProperties.getByRef(
           ReadiumCSS.COLUMN_COUNT_REF
@@ -595,7 +599,7 @@ export class UserSettings implements IUserSettings {
 
   async applyProperties(): Promise<any> {
     this.userProperties = this.getUserSettings();
-    let doc = this.iframe.contentDocument;
+    let doc = this.iframe?.contentDocument;
     if (doc) {
       const html = HTMLUtilities.findIframeElement(
         doc,
@@ -1327,9 +1331,9 @@ export class UserSettings implements IUserSettings {
       }
     }
 
-    if (userSettings.columnCount) {
-      this.columnCount = UserSettings.columnCountValues.findIndex(
-        (el: any) => el === userSettings.columnCount
+    if (userSettings.columnCount !== undefined) {
+      this.columnCount = UserSettings.parseColumnCount(
+        userSettings.columnCount
       );
       let prop = this.userProperties?.getByRef(ReadiumCSS.COLUMN_COUNT_REF);
       if (prop) {
@@ -1452,6 +1456,18 @@ export class UserSettings implements IUserSettings {
 
     await this.applyProperties();
     this.settingsChangeCallback();
+  }
+
+  private static parseColumnCount(
+    columnCount: InitialUserSettings["columnCount"]
+  ): number {
+    const index = UserSettings.columnCountValues.indexOf(
+      columnCount === 0 ? "auto" : String(columnCount)
+    );
+    if (index < 0) {
+      throw new RangeError(`Unsupported column count: ${columnCount}`);
+    }
+    return index;
   }
 
   /**
